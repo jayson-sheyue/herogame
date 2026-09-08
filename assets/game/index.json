@@ -1,0 +1,34 @@
+{
+  "heroes": [
+    "17",
+    "id_1786855456",
+    "id_1786858227",
+    "id_1786873022",
+    "id_1786874191",
+    "id_1786886794",
+    "id_1786892372",
+    "id_1786895186",
+    "id_1786960452",
+    "id_1787634312",
+    "id_1787793997",
+    "id_1788846740",
+    "idle_fx",
+    "nurhaci_13_armors",
+    "year_zero"
+  ],
+  "stages": [
+    "abandoned_estate_site",
+    "alps_tenshukaku",
+    "atlantis_capitol_ruins",
+    "baimen_bronze_sparrow",
+    "broken_pantheon_terracotta",
+    "cyberpunk_shibuya_eiffel",
+    "forbidden_city_101",
+    "giants_pyramid_causeway",
+    "great_wall_cologne",
+    "ilios_sky_tower",
+    "lunar_station_earth_view",
+    "peak_of_liberty"
+  ],
+  "style": false
+}

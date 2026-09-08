@@ -1,0 +1,340 @@
+{
+  "id": "id_1786858227",
+  "displayName": "努尔哈赤",
+  "oneLiner": "建州女真之主，八旗制度的创立者。",
+  "visualLock": "年轻的努尔哈赤，头戴貂皮暖帽，身穿野猪皮十三副甲，甲片外露，边缘有皮毛。身形结实，腰间佩戴一把弧形腰刀和牛角弓。背后可携带一面小型的正黄旗。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "腰刀横斩",
+    "air_attack": "空中腰刀横斩",
+    "attack_up": "腰刀上挑斩",
+    "attack_down": "俯冲下踏",
+    "skill": "插下八旗战旗",
+    "combo_up": "猛虎跃山斩",
+    "combo_down": "龙脉震地波",
+    "super": "八旗铁骑冲阵"
+  },
+  "voice": {
+    "persona": "沉稳、威严、不怒自威的青年统帅嗓音。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "gemini-2.5-flash-tts",
+    "ttsVoice": "Charon",
+    "speakingRate": 1.0,
+    "pitch": 0,
+    "lines": {
+      "select": {
+        "text": "八旗听令。",
+        "emotion": "沉着，充满自信",
+        "tag": "[determination]"
+      },
+      "intro": {
+        "text": "天命所归，建州将一统天下！",
+        "emotion": "威严，宣告霸权",
+        "tag": "[awe]"
+      },
+      "attack": {
+        "text": "斩！",
+        "emotion": "果断，有力",
+        "tag": "[aggression]"
+      },
+      "skill": {
+        "text": "立我大旗！",
+        "emotion": "坚定，鼓舞士气",
+        "tag": "[excitement]"
+      },
+      "combo_up": {
+        "text": "破空！",
+        "emotion": "凶猛，有爆发力",
+        "tag": "[tension]"
+      },
+      "combo_down": {
+        "text": "震地！",
+        "emotion": "沉重，有力",
+        "tag": "[tension]"
+      },
+      "super": {
+        "text": "铁蹄所至，皆为王土！",
+        "emotion": "霸气，不容置疑的命令",
+        "tag": "[anger]"
+      },
+      "hurt": {
+        "text": "唔！",
+        "emotion": "短促的痛哼",
+        "tag": "[agitation]"
+      },
+      "win": {
+        "text": "此战，不足挂齿。",
+        "emotion": "平静，对胜利习以为常",
+        "tag": "[amusement]"
+      },
+      "defeat": {
+        "text": "天命…未绝…",
+        "emotion": "不甘，但仍存希望",
+        "tag": "[frustration]"
+      }
+    }
+  },
+  "sprites": {
+    "walk": {
+      "file": "walk.png",
+      "frames": 6,
+      "frameWidth": 264,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1584,
+      "height": 672,
+      "committedAt": "2026-08-16T17:18:10"
+    },
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 344,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1376,
+      "height": 768,
+      "score": {
+        "total": 90,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T17:18:20"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 6,
+      "frameWidth": 264,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1584,
+      "height": 672,
+      "score": {
+        "total": 96,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T17:22:40"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "committedAt": "2026-08-30T13:22:59"
+    }
+  },
+  "cgs": {},
+  "moves": {
+    "attack": {
+      "label": "腰刀横斩",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "空中腰刀横斩",
+      "reach": 48,
+      "damage": 8,
+      "lunge": 90,
+      "hit": {
+        "knock": 300,
+        "lift": -70,
+        "stun": 260,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "腰刀上挑斩",
+      "reach": 52,
+      "damage": 8,
+      "lunge": 110,
+      "hit": {
+        "knock": 240,
+        "lift": -110,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "俯冲下踏",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 40,
+      "hit": {
+        "knock": 280,
+        "lift": -24,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "插下八旗战旗",
+      "reach": 72,
+      "damage": 12,
+      "lunge": 200,
+      "hit": {
+        "knock": 520,
+        "lift": -160,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_up": {
+      "label": "猛虎跃山斩",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 130,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "龙脉震地波",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "八旗铁骑冲阵",
+      "reach": 88,
+      "damage": 22,
+      "lunge": 240,
+      "hit": {
+        "knock": 680,
+        "lift": -780,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    }
+  }
+}

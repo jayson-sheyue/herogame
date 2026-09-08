@@ -1,0 +1,314 @@
+{
+  "id": "id_1786873022",
+  "displayName": "大便超人",
+  "oneLiner": "用神圣的棕色物质惩罚世间万恶的英雄。",
+  "visualLock": "一位穿着棕色紧身衣和红色披风的肌肉猛男，头戴遮住全脸的棕色头套，只露出眼睛和嘴巴。胸前有一个黄色的、螺旋形的大便卡通标志。他的武器是一把能发射棕色弹药的未来主义手枪。所有后续帧都必须严格遵守此设定。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "【棕色子弹】用手枪平射一发棕色能量弹。",
+    "air_attack": "【空中棕色子弹】在空中用手枪平射一发棕色能量弹。",
+    "attack_up": "【对空射击】站在地面，向斜上方发射一发棕色能量弹。",
+    "attack_down": "【俯冲射击】在空中，向斜下方发射一发棕色能量弹。",
+    "skill": "【棕色风暴】用枪向前方快速三连射棕色能量弹。",
+    "combo_up": "【冲天炮】用枪向正上方发射一发巨大的棕色能量球。",
+    "combo_down": "【陨石轰炸】跳至空中，用枪向地面连续发射小型棕色弹药，形成弹幕。",
+    "super": "【终极审判：黄金螺旋】蓄力后，发射一道巨大的、旋转的棕色光束横扫屏幕。"
+  },
+  "voice": {
+    "persona": "充满正义感的超级英雄声线，但说的内容很荒诞。语气严肃而滑稽。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "gemini-2.5-flash-tts",
+    "ttsVoice": "Charon",
+    "speakingRate": 1.0,
+    "pitch": 0,
+    "lines": {
+      "select": {
+        "text": "正义，已装填完毕！",
+        "emotion": "自信，严肃",
+        "tag": "[determination]"
+      },
+      "intro": {
+        "text": "污秽之人，准备好接受洗礼了吗？",
+        "emotion": "威严，充满压迫感",
+        "tag": "[awe]"
+      },
+      "attack": {
+        "text": "接招！",
+        "emotion": "用力，短促",
+        "tag": "[aggression]"
+      },
+      "skill": {
+        "text": "尝尝这个！棕色风暴！",
+        "emotion": "兴奋，连续",
+        "tag": "[excitement]"
+      },
+      "combo_up": {
+        "text": "看我一发冲天！",
+        "emotion": "用力上扬",
+        "tag": "[tension]"
+      },
+      "combo_down": {
+        "text": "感受天降正义吧！",
+        "emotion": "俯冲，压制",
+        "tag": "[tension]"
+      },
+      "super": {
+        "text": "终极审判！黄金螺旋——！",
+        "emotion": "愤怒，全力以赴，拖长音",
+        "tag": "[anger]"
+      },
+      "hurt": {
+        "text": "呃啊！",
+        "emotion": "痛苦，短促",
+        "tag": "[agitation]"
+      },
+      "win": {
+        "text": "哼，又一个被净化的灵魂。",
+        "emotion": "轻蔑，得意",
+        "tag": "[amusement]"
+      },
+      "defeat": {
+        "text": "不……我的正义……",
+        "emotion": "不甘，虚弱",
+        "tag": "[frustration]"
+      }
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 344,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1376,
+      "height": 768,
+      "score": {
+        "total": 90,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T17:42:29"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "committedAt": "2026-08-30T13:22:59"
+    }
+  },
+  "cgs": {},
+  "moves": {
+    "attack": {
+      "label": "【棕色子弹】用手枪平射一发棕色能量弹。",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "【空中棕色子弹】在空中用手枪平射一发棕色能量弹。",
+      "reach": 48,
+      "damage": 8,
+      "lunge": 90,
+      "hit": {
+        "knock": 300,
+        "lift": -70,
+        "stun": 260,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "【对空射击】站在地面，向斜上方发射一发棕色能量弹。",
+      "reach": 52,
+      "damage": 8,
+      "lunge": 110,
+      "hit": {
+        "knock": 240,
+        "lift": -110,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "【俯冲射击】在空中，向斜下方发射一发棕色能量弹。",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 40,
+      "hit": {
+        "knock": 280,
+        "lift": -24,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "【棕色风暴】用枪向前方快速三连射棕色能量弹。",
+      "reach": 72,
+      "damage": 12,
+      "lunge": 200,
+      "hit": {
+        "knock": 520,
+        "lift": -160,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_up": {
+      "label": "【冲天炮】用枪向正上方发射一发巨大的棕色能量球。",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 130,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "【陨石轰炸】跳至空中，用枪向地面连续发射小型棕色弹药，形成弹幕。",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "barrage",
+        "count": 3,
+        "delay": 140,
+        "spread": 72,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "burn"
+    },
+    "super": {
+      "label": "【终极审判：黄金螺旋】蓄力后，发射一道巨大的、旋转的棕色光束横扫屏幕。",
+      "reach": 88,
+      "damage": 22,
+      "lunge": 240,
+      "hit": {
+        "knock": 680,
+        "lift": -780,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "beam",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": true,
+        "ticks": 2
+      },
+      "ailment": "none"
+    }
+  }
+}

@@ -1,0 +1,614 @@
+{
+  "id": "id_1786874191",
+  "displayName": "甄嬛",
+  "oneLiner": "后宫之主，以柔克刚的利爪玫瑰。",
+  "visualLock": "身着雍容华贵的深色刺绣贵妃袍，长袖及地。头戴精致点翠发饰，配流苏步摇。双手佩戴五枚尖锐的金色凤爪护甲。仪态端庄，眼神凌厉，非战斗时将手藏于袖中。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "凤仪爪：向前优雅地挥出利爪。",
+    "air_attack": "飞燕掠：在空中转身甩出利爪。",
+    "attack_up": "惊鸿刺：迅速拔出发髻上的银簪向上刺出。",
+    "attack_down": "凤落九天：在半空中向下俯冲，以利爪猛击地面。",
+    "skill": "掌嘴：向前踏步，用凤爪打出响亮的掌掴。",
+    "combo_up": "逆风解意：原地旋转，用长袖向上挥舞，形成攻击气流。",
+    "combo_down": "金枝欲孽：在空中向下急坠，用穿着高底鞋的脚猛力踩踏。",
+    "super": "赏你一丈红：舞动身姿，以极快速度向前方打出无数次爪击，最后以长袖将对手击飞。"
+  },
+  "voice": {
+    "persona": "青年女声，清亮优雅，语带锋芒，笑里藏刀，不怒自威。",
+    "gender": "female",
+    "ttsEngine": "gemini",
+    "ttsModel": "",
+    "ttsVoice": "",
+    "ttsLanguage": "cmn-CN",
+    "voiceAge": "adult",
+    "speakingRate": 1,
+    "pitch": -1.0,
+    "lines": {
+      "select": {
+        "text": "这福气，给你要不要？",
+        "emotion": "语调上扬，带着一丝轻蔑和玩味，仿佛在施舍。",
+        "tag": "[amusement]",
+        "file": "voice/select.mp3"
+      },
+      "intro": {
+        "text": "这后宫，终究是本宫的天下。",
+        "emotion": "沉稳有力，带着不容置疑的威严和一丝尘埃落定的感慨。",
+        "tag": "[determination]",
+        "file": "voice/intro.mp3"
+      },
+      "hurt": {
+        "text": "啊！",
+        "emotion": "短促、愤怒的低喝，带着被冒犯的怒意。",
+        "tag": "[anger]",
+        "file": "voice/hurt.mp3"
+      },
+      "super": {
+        "text": "逆风如解意",
+        "emotion": "语调狠厉，带着宣判般的冷酷和决绝，充满杀气。",
+        "tag": "[aggression]",
+        "file": "voice/super.mp3"
+      },
+      "win": {
+        "text": "终究是本宫，略胜一筹。",
+        "emotion": "平静中带着一丝轻蔑的笑意，仿佛一切尽在掌握。",
+        "tag": "[amusement]",
+        "file": "voice/win.mp3"
+      },
+      "defeat": {
+        "text": "罢了……从头来过罢了。",
+        "emotion": "先是一声无奈的叹息，随即转为不屈的坚定，带着重整旗鼓的决心。",
+        "tag": "[frustration]",
+        "file": "voice/defeat.mp3"
+      }
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 344,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1440,
+      "height": 787,
+      "committedAt": "2026-08-26T16:11:09",
+      "w": 1376,
+      "h": 768
+    },
+    "guard": {
+      "file": "guard.png",
+      "frames": 6,
+      "frameWidth": 327,
+      "frameHeight": 735,
+      "facing": "right",
+      "keyed": true,
+      "width": 1962,
+      "height": 735,
+      "bodyH": 585,
+      "committedAt": "2026-08-28T17:00:49"
+    },
+    "attack": {
+      "file": "attack.png",
+      "frames": 5,
+      "frameWidth": 473,
+      "frameHeight": 733,
+      "facing": "right",
+      "keyed": true,
+      "width": 2365,
+      "height": 733,
+      "bodyH": 581,
+      "committedAt": "2026-08-28T17:05:01"
+    },
+    "air_attack": {
+      "file": "air_attack.png",
+      "frames": 6,
+      "frameWidth": 473,
+      "frameHeight": 730,
+      "facing": "right",
+      "keyed": true,
+      "width": 2838,
+      "height": 730,
+      "bodyH": 547,
+      "committedAt": "2026-08-28T17:04:45"
+    },
+    "attack_down": {
+      "file": "attack_down.png",
+      "frames": 6,
+      "frameWidth": 393,
+      "frameHeight": 964,
+      "facing": "right",
+      "keyed": true,
+      "width": 2358,
+      "height": 964,
+      "bodyH": 563,
+      "committedAt": "2026-08-28T17:05:26"
+    },
+    "super": {
+      "file": "super.png",
+      "frames": 6,
+      "frameWidth": 400,
+      "frameHeight": 733,
+      "facing": "right",
+      "keyed": true,
+      "width": 2400,
+      "height": 733,
+      "bodyH": 591,
+      "committedAt": "2026-08-28T17:06:15"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 6,
+      "frameWidth": 428,
+      "frameHeight": 779,
+      "facing": "right",
+      "keyed": true,
+      "width": 2568,
+      "height": 779,
+      "bodyH": 554,
+      "committedAt": "2026-08-28T17:04:17"
+    },
+    "walk": {
+      "file": "walk.png",
+      "frames": 6,
+      "frameWidth": 331,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 1986,
+      "height": 729,
+      "bodyH": 582,
+      "committedAt": "2026-08-28T17:00:20"
+    },
+    "idle": {
+      "file": "idle.png",
+      "frames": 6,
+      "frameWidth": 264,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 1584,
+      "height": 729,
+      "bodyH": 578,
+      "committedAt": "2026-08-28T17:00:10"
+    },
+    "attack_up": {
+      "file": "attack_up.png",
+      "frames": 6,
+      "frameWidth": 362,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 2172,
+      "height": 729,
+      "bodyH": 588,
+      "committedAt": "2026-08-28T17:05:11"
+    },
+    "combo_down": {
+      "file": "combo_down.png",
+      "frames": 6,
+      "frameWidth": 349,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 2094,
+      "height": 729,
+      "bodyH": 572,
+      "committedAt": "2026-08-28T17:06:05"
+    },
+    "win_cg": {
+      "file": "win_cg.png",
+      "frames": 6,
+      "frameWidth": 281,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 1686,
+      "height": 729,
+      "bodyH": 599,
+      "committedAt": "2026-08-28T17:08:50"
+    },
+    "dash": {
+      "file": "dash.png",
+      "frames": 6,
+      "frameWidth": 390,
+      "frameHeight": 738,
+      "facing": "right",
+      "keyed": true,
+      "width": 2340,
+      "height": 738,
+      "bodyH": 542,
+      "committedAt": "2026-08-28T17:00:36"
+    },
+    "combo_up": {
+      "file": "combo_up.png",
+      "frames": 6,
+      "frameWidth": 407,
+      "frameHeight": 869,
+      "facing": "right",
+      "keyed": true,
+      "width": 2442,
+      "height": 869,
+      "bodyH": 590,
+      "committedAt": "2026-08-28T17:05:48"
+    },
+    "skill": {
+      "file": "skill.png",
+      "frames": 6,
+      "frameWidth": 464,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 2784,
+      "height": 729,
+      "bodyH": 553,
+      "committedAt": "2026-08-28T17:05:37"
+    },
+    "hurt": {
+      "file": "hurt.png",
+      "frames": 5,
+      "frameWidth": 537,
+      "frameHeight": 794,
+      "facing": "right",
+      "keyed": true,
+      "width": 2685,
+      "height": 794,
+      "bodyH": 458,
+      "committedAt": "2026-08-28T17:01:02"
+    },
+    "opening_cg": {
+      "file": "opening_cg.png",
+      "frames": 6,
+      "frameWidth": 268,
+      "frameHeight": 731,
+      "facing": "right",
+      "keyed": true,
+      "width": 1608,
+      "height": 731,
+      "bodyH": 577,
+      "committedAt": "2026-08-28T17:06:25"
+    },
+    "air_hurt": {
+      "file": "air_hurt.png",
+      "frames": 4,
+      "frameWidth": 531,
+      "frameHeight": 729,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 2124,
+      "height": 729,
+      "bodyH": 409,
+      "committedAt": "2026-08-28T17:04:34"
+    },
+    "defeat_cg": {
+      "file": "defeat_cg.png",
+      "frames": 5,
+      "frameWidth": 561,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2805,
+      "height": 672,
+      "bodyH": 493,
+      "committedAt": "2026-08-28T17:08:15"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "crop": {
+        "x": 65,
+        "y": 12,
+        "size": 227,
+        "manual": true
+      },
+      "committedAt": "2026-09-08T10:23:10"
+    }
+  },
+  "cgs": {},
+  "moves": {
+    "attack": {
+      "label": "凤仪爪：向前优雅地挥出利爪。",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "飞燕掠：在空中转身甩出利爪。",
+      "reach": 48,
+      "damage": 8,
+      "lunge": 90,
+      "hit": {
+        "knock": 300,
+        "lift": -70,
+        "stun": 260,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "惊鸿刺：迅速拔出发髻上的银簪向上刺出。",
+      "reach": 52,
+      "damage": 8,
+      "lunge": 110,
+      "hit": {
+        "knock": 240,
+        "lift": -110,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "凤落九天：在半空中向下俯冲，以利爪猛击地面。",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 40,
+      "hit": {
+        "knock": 280,
+        "lift": -24,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "掌嘴：向前踏步，用凤爪打出响亮的掌掴。",
+      "reach": 48,
+      "damage": 12,
+      "lunge": 200,
+      "hit": {
+        "knock": 520,
+        "lift": -160,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/skill.png",
+        "frames": 4,
+        "frameWidth": 421,
+        "frameHeight": 768,
+        "speed": 480,
+        "life": 1100,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.28,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "normal",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 56,
+        "hitH": 40
+      },
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "freeze"
+    },
+    "combo_up": {
+      "label": "逆风解意：原地旋转，用长袖向上挥舞，形成攻击气流。",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 130,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_up.png",
+        "frames": 4,
+        "frameWidth": 396,
+        "frameHeight": 768,
+        "speed": 80,
+        "life": 780,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.22,
+        "motion": "field",
+        "origin": "front_up",
+        "blend": "normal",
+        "screen": 0.18,
+        "gravity": 0,
+        "hitW": 320,
+        "hitH": 220
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 3
+      },
+      "ailment": "freeze"
+    },
+    "combo_down": {
+      "label": "金枝欲孽：在空中向下急坠，用穿着高底鞋的脚猛力踩踏。",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_down.png",
+        "frames": 4,
+        "frameWidth": 432,
+        "frameHeight": 768,
+        "speed": 80,
+        "life": 1100,
+        "damage": 14,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.22,
+        "motion": "field",
+        "origin": "front_down",
+        "blend": "normal",
+        "screen": 0.2,
+        "gravity": 0,
+        "hitW": 320,
+        "hitH": 220
+      },
+      "mechanic": {
+        "type": "trap",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "逆风解意",
+      "reach": 48,
+      "damage": 22,
+      "lunge": 240,
+      "hit": {
+        "knock": 680,
+        "lift": -780,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/super.png",
+        "frames": 4,
+        "frameWidth": 387,
+        "frameHeight": 768,
+        "speed": 520,
+        "life": 1400,
+        "damage": 22,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.22,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "normal",
+        "screen": 0.2,
+        "gravity": 0,
+        "hitW": 140,
+        "hitH": 120
+      },
+      "mechanic": {
+        "type": "barrage",
+        "count": 4,
+        "delay": 140,
+        "spread": 72,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    }
+  }
+}

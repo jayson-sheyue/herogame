@@ -1,0 +1,44 @@
+{
+  "id": "alps_tenshukaku",
+  "displayName": "雪境天守阁・改",
+  "visual": "阿尔卑斯山脉中的日式天守阁，白雪与樱花并存。战斗场地是城前的石板庭院，构成通铺的地面。庭院左侧是一座较低的门房屋顶，形成一个可跳上的高台。右侧则是天守阁延伸出的更高一层石制基座，构成第二个高台。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0,
+        "y": 0.8963673485728012,
+        "w": 1.0,
+        "h": 0.09074582649425517
+      }
+    ],
+    "platforms": [
+      {
+        "x": 0.07391304347826087,
+        "y": 0.7045918571600144,
+        "w": 0.19999999999999996,
+        "h": 0.02
+      },
+      {
+        "x": 0.6815217391304348,
+        "y": 0.6097922254693943,
+        "w": 0.20108695652173914,
+        "h": 0.028183674286400562
+      }
+    ],
+    "pits": []
+  },
+  "committedAt": "2026-08-21T22:46:15",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 108,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「雪境天守阁・改」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 阿尔卑斯山脉中的日式天守阁，白雪与樱花并存。战斗场地是城前的石板庭院，构成通铺的地面。庭院左侧是一座较低的门房屋顶，形成一个可跳上的高台。右侧则是天守阁延伸出的更高一层石制基座，构成第二个高台。\nInstrumentation palette: brittle high pads, sparse piano in minor, cold percussion, hollow space.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 108 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-21T13:14:44",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:15:20"
+  }
+}

@@ -1,0 +1,599 @@
+{
+  "id": "idle_fx",
+  "displayName": "许家印",
+  "oneLiner": "地产大亨，一掷千金，跌落神坛。",
+  "visualLock": "中年许家印，发际线后移、无眼镜、国字脸、开怀大笑露齿、眼睛眯起。体态微胖结实，动态像广场上小跑欢呼。深藏青/黑西装外套解开随跑飘起，雪白衬衫扎进裤腰，灰白斜纹领带被风甩到一侧。黑西裤，腰间黑色皮带、超大抛光金色 H 形爱马仕带扣（解开外套时必须露在腹前正中，剪影主识别点）。黑皮带+金色 H 扣可作近战鞭/抽打武器（金属扣当锤头），灰白斜纹领带可随动作甩。可另持一瓶恒大冰泉（蓝白瓶标，液体用白/浅蓝高光，禁止青绿）。金碧辉煌烂尾楼大门、没打好地基的楼体，只作为技能召唤物出现在特效弹道图，禁止做成肩甲、披风或戴在头上，以免和西装剪影冲突。禁止金丝眼镜、禁止橙色披肩/绶带、禁止把皮带画成橙色、禁止另做一套礼服。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "金扣横扫",
+    "air_attack": "金扣空抽",
+    "attack_up": "H字上挑",
+    "attack_down": "地基重击",
+    "skill": "冰泉飞掷",
+    "combo_up": "门面担当",
+    "combo_down": "基坑陷阱",
+    "super": "烂尾倾城"
+  },
+  "voice": {
+    "persona": "自负，略带狂妄，但又透着一丝疲惫和不甘。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "gemini-2.5-flash-tts",
+    "ttsVoice": "Puck",
+    "speakingRate": 1.0,
+    "pitch": 0,
+    "lines": {
+      "select": {
+        "text": "我的财富，超出你的想象！",
+        "emotion": "proud",
+        "tag": "[determination]",
+        "file": "voice/select.mp3"
+      },
+      "intro": {
+        "text": "谁敢挡我？我要一往无前！",
+        "emotion": "boastful",
+        "tag": "[awe]",
+        "file": "voice/intro.mp3"
+      },
+      "hurt": {
+        "text": "呃…疼！",
+        "emotion": "agitation",
+        "tag": "[agitation]",
+        "file": "voice/hurt.mp3"
+      },
+      "super": {
+        "text": "金玉其外，败絮其中！砸烂他们！",
+        "emotion": "rage",
+        "tag": "[anger]",
+        "file": "voice/super.mp3"
+      },
+      "win": {
+        "text": "呵，这就是实力！",
+        "emotion": "smug",
+        "tag": "[amusement]",
+        "file": "voice/win.mp3"
+      },
+      "defeat": {
+        "text": "怎么会……这不科学！",
+        "emotion": "disbelief",
+        "tag": "[frustration]",
+        "file": "voice/defeat.mp3"
+      }
+    }
+  },
+  "moves": {
+    "attack": {
+      "label": "金扣横扫",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "金扣空抽",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 100,
+      "hit": {
+        "knock": 280,
+        "lift": 0,
+        "stun": 240,
+        "knockdown": false,
+        "stop": 24
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "H字上挑",
+      "reach": 48,
+      "damage": 9,
+      "lunge": 80,
+      "hit": {
+        "knock": 200,
+        "lift": -520,
+        "stun": 200,
+        "knockdown": true,
+        "stop": 32
+      },
+      "effect": "launch",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "地基重击",
+      "reach": 40,
+      "damage": 10,
+      "lunge": 150,
+      "hit": {
+        "knock": 300,
+        "lift": 0,
+        "stun": 250,
+        "knockdown": true,
+        "stop": 36
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "冰泉飞掷",
+      "reach": 48,
+      "damage": 12,
+      "lunge": 80,
+      "hit": {
+        "knock": 200,
+        "lift": -40,
+        "stun": 120,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/skill.png",
+        "frames": 4,
+        "frameWidth": 344,
+        "frameHeight": 768,
+        "speed": 360,
+        "life": 1200,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.32,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "add",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 44,
+        "hitH": 32
+      },
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "freeze"
+    },
+    "combo_up": {
+      "label": "门面担当",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 100,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_up.png",
+        "frames": 4,
+        "frameWidth": 350,
+        "frameHeight": 768,
+        "speed": 360,
+        "life": 1200,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.32,
+        "motion": "forward",
+        "origin": "front_up",
+        "blend": "add",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 44,
+        "hitH": 32
+      },
+      "mechanic": {
+        "type": "drop",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "基坑陷阱",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "root",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_down.png",
+        "frames": 4,
+        "frameWidth": 382,
+        "frameHeight": 768,
+        "speed": 360,
+        "life": 1200,
+        "damage": 14,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.32,
+        "motion": "forward",
+        "origin": "front_down",
+        "blend": "add",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 44,
+        "hitH": 32
+      },
+      "mechanic": {
+        "type": "trap",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "烂尾倾城",
+      "reach": 48,
+      "damage": 22,
+      "lunge": 120,
+      "hit": {
+        "knock": 680,
+        "lift": -780,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/super.png",
+        "frames": 4,
+        "frameWidth": 923,
+        "frameHeight": 325,
+        "speed": 240,
+        "life": 1600,
+        "damage": 22,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.22,
+        "motion": "field",
+        "origin": "ahead",
+        "blend": "add",
+        "screen": 0.34,
+        "gravity": 360,
+        "hitW": 140,
+        "hitH": 120
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "burn"
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 378,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1512,
+      "height": 768,
+      "bodyH": 733,
+      "committedAt": "2026-09-08T14:41:06"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "size": 378,
+        "manual": true
+      },
+      "committedAt": "2026-09-08T14:47:01"
+    },
+    "walk": {
+      "file": "walk.png",
+      "frames": 5,
+      "frameWidth": 339,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1695,
+      "height": 672,
+      "bodyH": 354,
+      "committedAt": "2026-09-08T14:25:14"
+    },
+    "dash": {
+      "file": "dash.png",
+      "frames": 5,
+      "frameWidth": 380,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1900,
+      "height": 672,
+      "bodyH": 501,
+      "committedAt": "2026-09-08T14:25:21"
+    },
+    "idle": {
+      "file": "idle.png",
+      "frames": 5,
+      "frameWidth": 317,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1585,
+      "height": 672,
+      "bodyH": 628,
+      "committedAt": "2026-09-08T14:41:16"
+    },
+    "guard": {
+      "file": "guard.png",
+      "frames": 5,
+      "frameWidth": 387,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1935,
+      "height": 672,
+      "bodyH": 634,
+      "committedAt": "2026-09-08T14:41:26"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 5,
+      "frameWidth": 355,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1775,
+      "height": 672,
+      "bodyH": 558,
+      "committedAt": "2026-09-08T14:41:51"
+    },
+    "air_attack": {
+      "file": "air_attack.png",
+      "frames": 5,
+      "frameWidth": 418,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2090,
+      "height": 672,
+      "bodyH": 515,
+      "committedAt": "2026-09-08T14:42:19"
+    },
+    "attack_up": {
+      "file": "attack_up.png",
+      "frames": 5,
+      "frameWidth": 317,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1585,
+      "height": 672,
+      "bodyH": 506,
+      "committedAt": "2026-09-08T14:42:32"
+    },
+    "attack_down": {
+      "file": "attack_down.png",
+      "frames": 5,
+      "frameWidth": 410,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2050,
+      "height": 672,
+      "bodyH": 495,
+      "committedAt": "2026-09-08T14:42:42"
+    },
+    "attack": {
+      "file": "attack.png",
+      "frames": 5,
+      "frameWidth": 414,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2070,
+      "height": 672,
+      "bodyH": 621,
+      "committedAt": "2026-09-08T14:42:51"
+    },
+    "skill": {
+      "file": "skill.png",
+      "frames": 5,
+      "frameWidth": 469,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2345,
+      "height": 672,
+      "bodyH": 602,
+      "committedAt": "2026-09-08T14:43:07"
+    },
+    "combo_up": {
+      "file": "combo_up.png",
+      "frames": 5,
+      "frameWidth": 351,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1755,
+      "height": 672,
+      "bodyH": 493,
+      "committedAt": "2026-09-08T14:45:38"
+    },
+    "combo_down": {
+      "file": "combo_down.png",
+      "frames": 5,
+      "frameWidth": 336,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1680,
+      "height": 672,
+      "bodyH": 507,
+      "committedAt": "2026-09-08T14:45:49"
+    },
+    "super": {
+      "file": "super.png",
+      "frames": 5,
+      "frameWidth": 443,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2215,
+      "height": 672,
+      "bodyH": 532,
+      "committedAt": "2026-09-08T14:45:58"
+    },
+    "opening_cg": {
+      "file": "opening_cg.png",
+      "frames": 5,
+      "frameWidth": 405,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2025,
+      "height": 672,
+      "bodyH": 628,
+      "committedAt": "2026-09-08T14:46:19"
+    },
+    "defeat_cg": {
+      "file": "defeat_cg.png",
+      "frames": 5,
+      "frameWidth": 369,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1845,
+      "height": 672,
+      "bodyH": 267,
+      "committedAt": "2026-09-08T14:46:29"
+    },
+    "win_cg": {
+      "file": "win_cg.png",
+      "frames": 5,
+      "frameWidth": 391,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1955,
+      "height": 672,
+      "bodyH": 602,
+      "committedAt": "2026-09-08T14:46:38"
+    },
+    "air_hurt": {
+      "file": "air_hurt.png",
+      "frames": 5,
+      "frameWidth": 407,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 2035,
+      "height": 672,
+      "bodyH": 437,
+      "committedAt": "2026-09-08T14:48:46"
+    }
+  },
+  "cgs": {}
+}

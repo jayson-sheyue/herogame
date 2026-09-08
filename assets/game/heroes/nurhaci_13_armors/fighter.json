@@ -1,0 +1,607 @@
+{
+  "id": "nurhaci_13_armors",
+  "displayName": "努尔哈赤",
+  "oneLiner": "铁骑横扫，八旗称王",
+  "visualLock": "野猪皮制成的十三副重甲，头戴貂皮暖帽或八角帽，手持牛角弓和腰刀，身后有八旗旗帜元素",
+  "homeStageId": "",
+  "kit": {
+    "attack": "挥舞腰刀连斩",
+    "skill": "插旗立阵（建州号令）",
+    "combo": "上+小技能：凭锋跃斩",
+    "super": "八旗铁骑冲锋（八旗铁骑）",
+    "transform": "战神崛起（十三副甲触发）",
+    "combo_up": "上+小技能：凭锋跃斩"
+  },
+  "voice": {
+    "persona": "帝王，果决霸气，带有北方民族的粗犷与威严，带怒气的喊叫",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "gemini-2.5-flash-tts",
+    "ttsVoice": "Aoede",
+    "speakingRate": 1.0,
+    "pitch": 0,
+    "lines": {
+      "select": {
+        "text": "我来了",
+        "emotion": "沉稳短促，像点到自己",
+        "tag": "[determination]",
+        "file": "voice/select.mp3"
+      },
+      "intro": {
+        "text": "十三副遗甲，亦可吞吐天下！",
+        "emotion": "开场亮相，先压后抬，有身份感",
+        "tag": "[awe]",
+        "file": "voice/intro.mp3"
+      },
+      "attack": {
+        "text": "杀！",
+        "emotion": "近战喝斥，咬字短、有冲劲",
+        "tag": "[aggression]",
+        "file": "voice/attack.mp3"
+      },
+      "skill": {
+        "text": "立阵！",
+        "emotion": "喊招，得意但不油",
+        "tag": "[excitement]",
+        "file": "voice/skill.mp3"
+      },
+      "combo_up": {
+        "text": "凭锋破阵！",
+        "emotion": "对空加压，字往上送",
+        "tag": "[tension]",
+        "file": "voice/combo_up.mp3"
+      },
+      "combo_down": {
+        "text": "死！",
+        "emotion": "对地砸实，字往下压",
+        "tag": "[tension]",
+        "file": "voice/combo_down.mp3"
+      },
+      "super": {
+        "text": "八旗听令——踏碎关山！",
+        "emotion": "奥义，先憋再爆，把字砸出去",
+        "tag": "[anger]",
+        "file": "voice/super.mp3"
+      },
+      "hurt": {
+        "text": "哼！",
+        "emotion": "被打中，痛、短、真的挨了打",
+        "tag": "[agitation]",
+        "file": "voice/hurt.mp3"
+      },
+      "win": {
+        "text": "辽东的风雪，终将淹没尔等之名。",
+        "emotion": "胜负已分，轻蔑或从容",
+        "tag": "[amusement]",
+        "file": "voice/win.mp3"
+      },
+      "defeat": {
+        "text": "此役，非战之罪...",
+        "emotion": "不甘，气短，不要播音腔",
+        "tag": "[frustration]",
+        "file": "voice/defeat.mp3"
+      }
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 336,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1344,
+      "height": 768,
+      "score": {
+        "total": 49,
+        "verdict": "unusable"
+      },
+      "committedAt": "2026-08-15T18:46:26"
+    },
+    "hurt": {
+      "file": "hurt.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 85,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-15T18:47:08"
+    },
+    "idle": {
+      "file": "idle.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 80,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T09:38:22"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 92,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-15T18:48:04"
+    },
+    "super": {
+      "file": "super.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 76,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T09:25:09"
+    },
+    "skill": {
+      "file": "skill.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 79,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:49:31"
+    },
+    "knockdown": {
+      "file": "knockdown.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 85,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-15T22:41:32"
+    },
+    "attack": {
+      "file": "attack.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 89,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-15T22:41:56"
+    },
+    "air_attack": {
+      "file": "air_attack.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 89,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-15T23:20:19"
+    },
+    "walk": {
+      "file": "walk.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 92,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:40:23"
+    },
+    "dash": {
+      "file": "dash.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 97,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:34:28"
+    },
+    "opening_cg": {
+      "file": "opening_cg.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 82,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:53:55"
+    },
+    "win_cg": {
+      "file": "win_cg.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 79,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:44:51"
+    },
+    "guard": {
+      "file": "guard.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 81,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:57:46"
+    },
+    "combo_down": {
+      "file": "combo_down.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 93,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:53:58"
+    },
+    "defeat_cg": {
+      "file": "defeat_cg.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 86,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:49:00"
+    },
+    "combo_up": {
+      "file": "combo_up.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 76,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:49:23"
+    },
+    "attack_up": {
+      "file": "attack_up.png",
+      "frames": 6,
+      "frameWidth": 256,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1536,
+      "height": 672,
+      "score": {
+        "total": 83,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:54:23"
+    },
+    "attack_down": {
+      "file": "attack_down.png",
+      "frames": 6,
+      "frameWidth": 264,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1584,
+      "height": 672,
+      "score": {
+        "total": 92,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:56:29"
+    },
+    "air_hurt": {
+      "file": "air_hurt.png",
+      "frames": 6,
+      "frameWidth": 264,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1584,
+      "height": 672,
+      "score": {
+        "total": 75,
+        "verdict": "playable"
+      },
+      "committedAt": "2026-08-16T10:59:36"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "committedAt": "2026-08-30T13:22:59"
+    }
+  },
+  "cgs": {},
+  "moves": {
+    "attack": {
+      "label": "挥舞腰刀连斩",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "",
+      "reach": 48,
+      "damage": 8,
+      "lunge": 90,
+      "hit": {
+        "knock": 300,
+        "lift": -70,
+        "stun": 260,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "",
+      "reach": 52,
+      "damage": 8,
+      "lunge": 110,
+      "hit": {
+        "knock": 240,
+        "lift": -110,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 40,
+      "hit": {
+        "knock": 280,
+        "lift": -24,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "插旗立阵（建州号令）",
+      "reach": 72,
+      "damage": 12,
+      "lunge": 200,
+      "hit": {
+        "knock": 520,
+        "lift": -160,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_up": {
+      "label": "上+小技能：凭锋跃斩",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 130,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "八旗铁骑冲锋（八旗铁骑）",
+      "reach": 88,
+      "damage": 22,
+      "lunge": 240,
+      "hit": {
+        "knock": 680,
+        "lift": -780,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    }
+  }
+}

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>英灵大乱斗</title>
+  <style>
+    :root { color-scheme: dark; }
+    @font-face {
+      font-family: GameUI;
+      src: url("/fonts/GameUI.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: BodyUI;
+      src: url("/fonts/BodyUI.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: BrushUI;
+      src: url("/fonts/BrushUI.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1410; color: #f4ead0; font-family: GameUI, "PingFang SC", "Hiragino Sans GB", sans-serif; font-weight: 400; }
+    header {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+      padding: 8px 20px 12px;
+      background: linear-gradient(to bottom, rgba(26,20,16,.94), transparent);
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+      pointer-events: none;
+      border-bottom: 0;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      color: #f6e4b4;
+      text-indent: 0.18em;
+      text-shadow: 0 2px 0 #3a2410, 0 0 12px rgba(210, 160, 60, .28);
+    }
+    header p { margin: 0; font-size: 16px; color: #d4b06a; letter-spacing: 0.06em; text-shadow: 0 1px 0 #3a2410; }
+    #game { position: absolute; inset: 0; }
+    canvas { image-rendering: auto; }
+    #keys {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+      padding: 18px 16px 12px;
+      background: linear-gradient(to top, rgba(26,20,16,.96) 58%, transparent);
+      font-size: 15px; line-height: 1.6; color: #f0e2c4;
+      pointer-events: none;
+      text-shadow: 0 1px 0 #2a1c10;
+    }
+    #selectKeys:not([hidden]) { display: flex; flex-direction: column; gap: 3px; }
+    #selectShare { color: #8ab4a0; }
+    #selectHint { color: #c8b88a; }
+    #selectHint.warn { color: #e8a060; }
+    kbd {
+      display: inline-block; min-width: 1.2em; padding: 1px 8px;
+      border: 2px solid #c4a060; border-bottom-width: 3px; border-radius: 8px;
+      background: linear-gradient(#8d5a30, #5a3c24); color: #f8e8c0; font-family: inherit;
+      font-size: 14px;
+      box-shadow: 0 1px 0 rgba(255,240,200,.35) inset, 0 3px 0 #2a180c, 0 4px 8px rgba(0,0,0,.35);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>英灵大乱斗</h1>
+    <p>选择英灵与战场</p>
+  </header>
+  <div id="game"></div>
+  <div id="keys">
+    <div id="selectKeys">
+      <div id="selectShare"></div>
+      <div id="selectHint"></div>
+      <div><kbd>Q</kbd> 切模式　<kbd>1</kbd> 木桩　<kbd>2</kbd> PVE　<kbd>3</kbd> 斗蛐蛐　<kbd>4</kbd> PVP　PVE 难度：<kbd>F</kbd> 切换　<kbd>5</kbd>仁慈　<kbd>6</kbd>认真　木桩/PVE/斗蛐蛐：<kbd>A</kbd><kbd>D</kbd> 换英灵　卡池两侧箭头翻页（每屏 6 人）　<kbd>W</kbd><kbd>S</kbd> 切 1P/2P　点地图两侧箭头换图　<kbd>E</kbd> 锁地图（PVE/斗蛐蛐不锁则抽签）　<kbd>J</kbd> 开战　PVP：点头像换人，主机点箭头换图、<kbd>E</kbd> 锁定</div>
+    </div>
+    <div id="dummyKeys" hidden>
+    <div><kbd>A</kbd><kbd>D</kbd> 走　<kbd>⇧ Shift</kbd> 冲刺（可穿过木桩）　<kbd>W</kbd> 跳（高台下方/边缘可跳上去）　<kbd>S</kbd> 防守　<kbd>W</kbd>+<kbd>J</kbd>/<kbd>K</kbd> 对空（原地）　<kbd>S</kbd>+<kbd>J</kbd>/<kbd>K</kbd> 对地</div>
+    <div><kbd>J</kbd> 普攻（耗体力）　<kbd>K</kbd> 小技能（32蓝/16体力）　<kbd>L</kbd> 奥义（55蓝）　倒地/被控时再按 <kbd>L</kbd> 挣脱（耗体力，短暂无敌）　冲刺耗体力　<kbd>S</kbd> 防守回体　木桩无限血</div>
+    <div><kbd>I</kbd> 出场　<kbd>O</kbd> 胜利　<kbd>P</kbd> 战败　<kbd>H</kbd> 受击　<kbd>N</kbd> 倒地　<kbd>Esc</kbd> 重选英灵</div>
+    </div>
+    <div id="pveKeys" hidden>
+    <div><kbd>A</kbd><kbd>D</kbd> 走　<kbd>⇧ Shift</kbd> 冲刺　<kbd>W</kbd> 跳上高台　<kbd>S</kbd> 防守　<kbd>W</kbd>+<kbd>J</kbd>/<kbd>K</kbd> 对空　<kbd>S</kbd>+<kbd>J</kbd>/<kbd>K</kbd> 对地</div>
+    <div><kbd>J</kbd> 普攻　<kbd>K</kbd> 小技能　<kbd>L</kbd> 奥义　倒地/被控时 <kbd>L</kbd> 挣脱免控　<kbd>S</kbd> 防守回体　双方都有血/蓝/体力，打倒对方即胜</div>
+    <div><kbd>Esc</kbd> 重选英灵　结束后 <kbd>J</kbd> / <kbd>Enter</kbd> 再战（同难度）</div>
+    </div>
+    <div id="cricketKeys" hidden>
+    <div>旁观两名人机对打。镜头跟着两人，不接手操作。</div>
+    <div>人机会轮流打出技能 / 对空 / 对地 / 奥义，拉开距离再接近，避免站桩对 A。</div>
+    <div><kbd>Esc</kbd> 重选英灵　结束后 <kbd>J</kbd> / <kbd>Enter</kbd> 再看一场</div>
+    </div>
+    <div id="pvpKeys" hidden>
+    <div>2 人全员准备 → 1v1；3 人全员准备 → 混战。结束后 Esc 回房间可换人换图，不必退房。</div>
+    <div><kbd>A</kbd><kbd>D</kbd> 走　<kbd>⇧ Shift</kbd> 冲刺（受击时可闪避脱战）　<kbd>W</kbd> 跳上高台　<kbd>S</kbd> 防守　<kbd>J</kbd> 普攻　<kbd>K</kbd> 技能　<kbd>L</kbd> 奥义／被控时挣脱　技能耗蓝　打倒对方即胜</div>
+    <div>结束后 <kbd>J</kbd> / <kbd>Enter</kbd> 再战（同人同图）　<kbd>Esc</kbd> 回房间重选英灵/地图</div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="/src/net.js?v=6"></script>
+  <script src="/src/game.js?v=235"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+{
+  "id": "atlantis_capitol_ruins",
+  "displayName": "亚特兰蒂斯总统山",
+  "visual": "亚特兰蒂斯风格的海底总统山废墟。战场是开阔的海底大理石平台，被中央一条约一人深、有可见沟底的可站立海沟分为左右两块主地面。左右两块主地面上各有一截倒塌的希腊式廊柱残骸，形成可跳上的高台。背景是幽暗的深海，远处是四座被严重侵蚀、长满珊瑚的巨大总统头雕，发出微弱的生物光。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.008152173913043478,
+        "y": 0.7558349013171064,
+        "w": 0.3847826086956522,
+        "h": 0.23315585091476843
+      },
+      {
+        "x": 0.6021739130434782,
+        "y": 0.758397053524961,
+        "w": 0.3967391304347826,
+        "h": 0.23059369870691382
+      },
+      {
+        "x": 0.4108695652173913,
+        "y": 0.9454341646983466,
+        "w": 0.175,
+        "h": 0.03843228311781899
+      }
+    ],
+    "platforms": [
+      {
+        "x": 0.015217391304347827,
+        "y": 0.49705752832379196,
+        "w": 0.2717391304347826,
+        "h": 0.028183674286400617
+      },
+      {
+        "x": 0.002173913043478261,
+        "y": 0.5483005724808839,
+        "w": 0.04021739130434782,
+        "h": 0.025621522078545955
+      },
+      {
+        "x": 0.03804347826086957,
+        "y": 0.6149165298851035,
+        "w": 0.03695652173913043,
+        "h": 0.028183674286400562
+      },
+      {
+        "x": 0.08043478260869565,
+        "y": 0.6840946394971776,
+        "w": 0.0467391304347826,
+        "h": 0.020497217662836742
+      },
+      {
+        "x": 0.7141304347826087,
+        "y": 0.5021818327395012,
+        "w": 0.27391304347826084,
+        "h": 0.025621522078545955
+      },
+      {
+        "x": 0.9282608695652174,
+        "y": 0.5816085511829937,
+        "w": 0.06413043478260871,
+        "h": 0.028183674286400562
+      },
+      {
+        "x": 0.9054347826086957,
+        "y": 0.6149165298851035,
+        "w": 0.02934782608695652,
+        "h": 0.03587013090996438
+      },
+      {
+        "x": 0.8826086956521739,
+        "y": 0.6635974218343409,
+        "w": 0.035869565217391264,
+        "h": 0.03843228311781888
+      }
+    ],
+    "pits": []
+  },
+  "committedAt": "2026-08-21T22:50:53",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 108,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「沉没的总统山」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 亚特兰蒂斯风格的海底总统山。战场是一片宏伟的废墟，中央是一道深不见底的海沟，将大理石地面一分为二。海沟两侧的地面上，各有一截倒塌的巨型廊柱残骸，形成可以跳上的高台。远景是深海中四座巨大的、被侵蚀的总统头雕。\nInstrumentation palette: low brass drones, distorted war drums, grit and dust in the mix; sub-bass pressure, muffled pulse, wet ambience under a stern rhythm.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 108 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-21T13:31:22",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:31:36"
+  }
+}

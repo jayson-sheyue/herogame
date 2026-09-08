@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "files": {
+    "click": "click.wav",
+    "click_firm": "click_firm.wav",
+    "map_draw_tick": "map_draw_tick.wav",
+    "map_draw_pick": "map_draw_pick.wav",
+    "count_tick": "count_tick.wav",
+    "count_go": "count_go.wav",
+    "result_win": "result_win.wav",
+    "result_lose": "result_lose.wav",
+    "hit_light": "hit_light.wav",
+    "hit_heavy": "hit_heavy.wav",
+    "hit_whoosh": "hit_whoosh.wav",
+    "hit_guard": "hit_guard.wav"
+  }
+}

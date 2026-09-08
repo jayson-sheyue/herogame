@@ -1,0 +1,597 @@
+{
+  "id": "17",
+  "displayName": "艾萨克·牛顿",
+  "oneLiner": "用三大定律和万有引力支配战场的科学巨匠。",
+  "visualLock": "中年男性，戴着17世纪标志性的白色长卷发假发，身穿深色英国皇家学会学者长袍。配饰包括：一个红苹果、一个玻璃三棱镜、一本厚重的《自然哲学的数学原理》典籍、一个大型黄铜圆规。剪影清晰，学者风范。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "挥舞大型黄铜圆规进行横扫。",
+    "air_attack": "空中挥舞大型黄铜圆规横扫。",
+    "attack_up": "向上抛出苹果，将敌人击飞。",
+    "attack_down": "从半空中急速下坠，落地时产生引力波震荡。",
+    "skill": "向前举起三棱镜，折射出七彩光谱射线。",
+    "combo_up": "在地面施放反重力场，将敌人浮空。",
+    "combo_down": "在空中制造重力坍缩区域，吸附敌人。",
+    "super": "召唤巨大陨石从天而降，砸向全场。"
+  },
+  "voice": {
+    "persona": "中年男性，声线沉稳、洪亮且富有磁性，语调平缓但充满不容置疑的权威感与智力上的优越感，仿佛在宣讲宇宙真理，而非与凡人争斗。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "",
+    "ttsVoice": "",
+    "ttsLanguage": "cmn-CN",
+    "voiceAge": "adult",
+    "speakingRate": 1,
+    "pitch": 8.0,
+    "lines": {
+      "select": {
+        "text": "The universe awaits my calculations.",
+        "emotion": "沉稳自信，带着一丝不屑，仿佛在陈述一个事实。",
+        "tag": "[determination]",
+        "file": "voice/select.mp3"
+      },
+      "intro": {
+        "text": "For every action, there is an equal and opposite reaction. Let the lesson begin.",
+        "emotion": "教授般的口吻，冷静而充满压迫感，语速平稳，在 reaction 后稍作停顿。",
+        "tag": "[awe]",
+        "file": "voice/intro.mp3"
+      },
+      "hurt": {
+        "text": "Oh!",
+        "emotion": "被打中，痛、短、真的挨了打",
+        "tag": "[agitation]",
+        "file": "voice/hurt.mp3"
+      },
+      "super": {
+        "text": "Hypotheses non fingo! Witness the law of universal gravitation!",
+        "emotion": "从冷静的宣告转为雷霆万钧的怒吼，力量感层层递进，在喊出 gravitation 时达到顶峰。",
+        "tag": "[anger]",
+        "file": "voice/super.mp3"
+      },
+      "win": {
+        "text": "A predictable outcome. Gravity always wins.",
+        "emotion": "平静，略带一丝嘲弄和理所当然的傲慢，仿佛在总结实验报告。",
+        "tag": "[amusement]",
+        "file": "voice/win.mp3"
+      },
+      "defeat": {
+        "text": "Impossible... the calculations... were flawless...",
+        "emotion": "难以置信，从震惊转为不甘，最后气息微弱，断断续续。",
+        "tag": "[frustration]",
+        "file": "voice/defeat.mp3"
+      }
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 368,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1472,
+      "height": 768,
+      "committedAt": "2026-08-17T11:26:28"
+    },
+    "air_attack": {
+      "file": "air_attack.png",
+      "frames": 4,
+      "frameWidth": 581,
+      "frameHeight": 747,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 2324,
+      "height": 747,
+      "committedAt": "2026-08-27T10:33:17"
+    },
+    "hurt": {
+      "file": "hurt.png",
+      "frames": 5,
+      "frameWidth": 530,
+      "frameHeight": 761,
+      "facing": "right",
+      "keyed": true,
+      "width": 2650,
+      "height": 761,
+      "committedAt": "2026-08-27T10:32:01"
+    },
+    "attack": {
+      "file": "attack.png",
+      "frames": 4,
+      "frameWidth": 410,
+      "frameHeight": 675,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1640,
+      "height": 675,
+      "committedAt": "2026-08-27T10:33:28"
+    },
+    "skill": {
+      "file": "skill.png",
+      "frames": 6,
+      "frameWidth": 335,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 2010,
+      "height": 675,
+      "committedAt": "2026-08-27T10:33:58"
+    },
+    "opening_cg": {
+      "file": "opening_cg.png",
+      "frames": 6,
+      "frameWidth": 358,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 2148,
+      "height": 675,
+      "bodyH": 555,
+      "committedAt": "2026-08-28T16:59:10"
+    },
+    "win_cg": {
+      "file": "win_cg.png",
+      "frames": 6,
+      "frameWidth": 328,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 1968,
+      "height": 675,
+      "bodyH": 553,
+      "committedAt": "2026-08-28T16:59:48"
+    },
+    "walk": {
+      "file": "walk.png",
+      "frames": 6,
+      "frameWidth": 314,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 1884,
+      "height": 675,
+      "committedAt": "2026-08-27T10:30:00"
+    },
+    "dash": {
+      "file": "dash.png",
+      "frames": 4,
+      "frameWidth": 390,
+      "frameHeight": 675,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1560,
+      "height": 675,
+      "committedAt": "2026-08-27T10:30:16"
+    },
+    "idle": {
+      "file": "idle.png",
+      "frames": 6,
+      "frameWidth": 305,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 1830,
+      "height": 675,
+      "committedAt": "2026-08-27T10:29:47"
+    },
+    "guard": {
+      "file": "guard.png",
+      "frames": 6,
+      "frameWidth": 305,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 1830,
+      "height": 675,
+      "committedAt": "2026-08-27T10:31:46"
+    },
+    "attack_up": {
+      "file": "attack_up.png",
+      "frames": 6,
+      "frameWidth": 340,
+      "frameHeight": 708,
+      "facing": "right",
+      "keyed": true,
+      "width": 2040,
+      "height": 708,
+      "committedAt": "2026-08-27T10:33:38"
+    },
+    "attack_down": {
+      "file": "attack_down.png",
+      "frames": 6,
+      "frameWidth": 389,
+      "frameHeight": 712,
+      "facing": "right",
+      "keyed": true,
+      "width": 2334,
+      "height": 712,
+      "committedAt": "2026-08-27T10:33:49"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 6,
+      "frameWidth": 342,
+      "frameHeight": 772,
+      "facing": "right",
+      "keyed": true,
+      "width": 2052,
+      "height": 772,
+      "committedAt": "2026-08-27T10:32:16"
+    },
+    "super": {
+      "file": "super.png",
+      "frames": 6,
+      "frameWidth": 437,
+      "frameHeight": 770,
+      "facing": "right",
+      "keyed": true,
+      "width": 2622,
+      "height": 770,
+      "committedAt": "2026-08-27T10:34:34"
+    },
+    "combo_down": {
+      "file": "combo_down.png",
+      "frames": 5,
+      "frameWidth": 580,
+      "frameHeight": 877,
+      "facing": "right",
+      "keyed": true,
+      "width": 2900,
+      "height": 877,
+      "committedAt": "2026-08-27T10:34:23"
+    },
+    "defeat_cg": {
+      "file": "defeat_cg.png",
+      "frames": 5,
+      "frameWidth": 585,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 2925,
+      "height": 675,
+      "bodyH": 499,
+      "committedAt": "2026-08-28T16:59:36"
+    },
+    "air_hurt": {
+      "file": "air_hurt.png",
+      "frames": 5,
+      "frameWidth": 557,
+      "frameHeight": 911,
+      "facing": "right",
+      "keyed": true,
+      "width": 2785,
+      "height": 911,
+      "committedAt": "2026-08-27T10:32:47"
+    },
+    "combo_up": {
+      "file": "combo_up.png",
+      "frames": 6,
+      "frameWidth": 339,
+      "frameHeight": 675,
+      "facing": "right",
+      "keyed": true,
+      "width": 2034,
+      "height": 675,
+      "committedAt": "2026-08-27T10:34:07"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "crop": {
+        "x": 43,
+        "y": 76,
+        "size": 284,
+        "manual": true
+      },
+      "committedAt": "2026-09-08T10:23:04"
+    }
+  },
+  "cgs": {},
+  "moves": {
+    "attack": {
+      "label": "挥舞大型黄铜圆规进行横扫。",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "空中挥舞大型黄铜圆规横扫。",
+      "reach": 48,
+      "damage": 8,
+      "lunge": 90,
+      "hit": {
+        "knock": 300,
+        "lift": -70,
+        "stun": 260,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "向上抛出苹果，将敌人击飞。",
+      "reach": 52,
+      "damage": 8,
+      "lunge": 110,
+      "hit": {
+        "knock": 240,
+        "lift": -110,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "从半空中急速下坠，落地时产生引力波震荡。",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 40,
+      "hit": {
+        "knock": 280,
+        "lift": -24,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 5
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "向前举起三棱镜，折射出七彩光谱射线。",
+      "reach": 48,
+      "damage": 12,
+      "lunge": 80,
+      "hit": {
+        "knock": 220,
+        "lift": -60,
+        "stun": 140,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/skill.png",
+        "frames": 4,
+        "frameWidth": 473,
+        "frameHeight": 768,
+        "speed": 200,
+        "life": 700,
+        "damage": 12,
+        "hit": {
+          "knock": 280,
+          "lift": -70,
+          "stun": 80,
+          "knockdown": false,
+          "stop": 28
+        },
+        "spawnFrame": 0.28,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "add",
+        "screen": 0.16,
+        "gravity": 0,
+        "hitW": 280,
+        "hitH": 36
+      },
+      "mechanic": {
+        "type": "beam",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": true,
+        "ticks": 2
+      },
+      "ailment": "none"
+    },
+    "combo_up": {
+      "label": "在地面施放反重力场，将敌人浮空。",
+      "reach": 64,
+      "damage": 12,
+      "lunge": 100,
+      "hit": {
+        "knock": 300,
+        "lift": -860,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_up.png",
+        "frames": 4,
+        "frameWidth": 386,
+        "frameHeight": 768,
+        "speed": 50,
+        "life": 800,
+        "damage": 1,
+        "hit": {
+          "knock": 0,
+          "lift": 0,
+          "stun": 160,
+          "knockdown": false,
+          "stop": 20
+        },
+        "spawnFrame": 0.22,
+        "motion": "field",
+        "origin": "front_up",
+        "blend": "add",
+        "screen": 0.28,
+        "gravity": 0,
+        "hitW": 420,
+        "hitH": 520
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": true,
+        "ticks": 10
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "在空中制造重力坍缩区域，吸附敌人。",
+      "reach": 72,
+      "damage": 14,
+      "lunge": 40,
+      "hit": {
+        "knock": 420,
+        "lift": -80,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 56
+      },
+      "effect": "pull",
+      "effectStrength": 1.2,
+      "projectile": {
+        "file": "fx/combo_down.png",
+        "frames": 4,
+        "frameWidth": 349,
+        "frameHeight": 768,
+        "speed": 160,
+        "life": 1600,
+        "damage": 14,
+        "hit": {
+          "knock": 420,
+          "lift": -60,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 48
+        },
+        "spawnFrame": 0.22,
+        "motion": "field",
+        "origin": "front_down",
+        "blend": "add",
+        "screen": 0.28,
+        "gravity": 0,
+        "hitW": 360,
+        "hitH": 240
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 5
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "召唤巨大陨石从天而降，砸向全场。",
+      "reach": 96,
+      "damage": 22,
+      "lunge": 120,
+      "hit": {
+        "knock": 640,
+        "lift": -820,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.2,
+      "projectile": {
+        "file": "fx/super.png",
+        "frames": 4,
+        "frameWidth": 392,
+        "frameHeight": 768,
+        "speed": 560,
+        "life": 1500,
+        "damage": 22,
+        "hit": {
+          "knock": 640,
+          "lift": -820,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 80
+        },
+        "spawnFrame": 0.18,
+        "motion": "fall",
+        "origin": "sky",
+        "blend": "add",
+        "screen": 0.42,
+        "gravity": 520,
+        "hitW": 140,
+        "hitH": 120
+      },
+      "mechanic": {
+        "type": "drop",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "burn"
+    }
+  }
+}

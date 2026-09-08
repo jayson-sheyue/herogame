@@ -1,0 +1,31 @@
+{
+  "id": "lunar_station_earth_view",
+  "displayName": "月球空间站",
+  "visual": "月球基地的金属平台，透过巨大的舷窗可以看到远处的蓝色地球和繁星，具有科幻感的格斗场地。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "committedAt": "2026-08-21T22:54:25",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 124,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no choir, no spoken words.\n30-second seamless fighting-game battle loop for the stage 「月球空间站」.\nScene mood: 月球基地的金属平台，透过巨大的舷窗可以看到远处的蓝色地球和繁星，具有科幻感的格斗场地。\nGenre: cinematic arcade fighter BGM with punchy drums and memorable lead melody.\nTempo around 124 BPM. Energetic but not chaotic; intro hits quickly, ends on a loop-friendly cadence.\nMatch the stage atmosphere (historical, sci-fi, ruins, neon city, etc.) through instrumentation and harmony.\nProduction: 44.1kHz stereo, game-ready mix, moderate compression, no long silence at start or end.",
+    "generatedAt": "2026-08-20T10:51:46",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:19:25"
+  },
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0,
+        "y": 0.84,
+        "w": 1.0,
+        "h": 0.149675327274911
+      }
+    ],
+    "platforms": [],
+    "pits": []
+  }
+}

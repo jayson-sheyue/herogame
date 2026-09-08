@@ -1,0 +1,391 @@
+{
+  "id": "id_1788846740",
+  "displayName": "许家印",
+  "oneLiner": "地产大亨，金门皮带冰泉，财力碾压一切！",
+  "visualLock": "中年，发际线后移，金丝眼镜，国字脸，微胖魁梧，暗金暗纹西装，橙红恒大色披肩绶带，腰间一条抢眼的爱马仕橙皮带。主武器为皮带鞭（金属扣当锤头），副标志为恒大冰泉瓶（蓝白瓶标）。技能涉及金碧辉煌的欧式烂尾楼大门（金柱、狮头门环、空心门楣）和未浇筑的钢筋地基。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "皮带横抽",
+    "air_attack": "空中皮带横抽",
+    "attack_up": "皮带上挑",
+    "attack_down": "皮带下砸",
+    "skill": "冰泉冲击",
+    "combo_up": "金门天降",
+    "combo_down": "地基不稳",
+    "super": "烂尾巨厦"
+  },
+  "voice": {
+    "persona": "霸道总裁，自信，略带傲慢，言必称“恒大”。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "gemini-2.5-flash-tts",
+    "ttsVoice": "Charon",
+    "ttsLanguage": "cmn-CN",
+    "voiceAge": "adult",
+    "speakingRate": 1.0,
+    "pitch": 0,
+    "lines": {
+      "select": {
+        "text": "我，恒大，许家印！",
+        "emotion": "自信而有力",
+        "tag": "[determination]"
+      },
+      "intro": {
+        "text": "谁敢挡我恒大步伐？",
+        "emotion": "傲慢且充满挑战性",
+        "tag": "[awe]"
+      },
+      "hurt": {
+        "text": "呃…！亏了！",
+        "emotion": "痛苦中带着一丝不悦",
+        "tag": "[agitation]"
+      },
+      "super": {
+        "text": "恒大无敌！碾碎一切！",
+        "emotion": "霸气十足，充满毁灭性",
+        "tag": "[anger]"
+      },
+      "win": {
+        "text": "胜利，是恒大的本能！",
+        "emotion": "得意而自负",
+        "tag": "[amusement]"
+      },
+      "defeat": {
+        "text": "这不可能…我的帝国…！",
+        "emotion": "震惊，不甘与沮丧",
+        "tag": "[frustration]"
+      }
+    }
+  },
+  "moves": {
+    "attack": {
+      "label": "皮带横抽",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "空中皮带横抽",
+      "reach": 56,
+      "damage": 8,
+      "lunge": 170,
+      "hit": {
+        "knock": 340,
+        "lift": -36,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "皮带上挑",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 100,
+      "hit": {
+        "knock": 300,
+        "lift": -400,
+        "stun": 200,
+        "knockdown": true,
+        "stop": 30
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "皮带下砸",
+      "reach": 48,
+      "damage": 10,
+      "lunge": 100,
+      "hit": {
+        "knock": 300,
+        "lift": -200,
+        "stun": 200,
+        "knockdown": true,
+        "stop": 30
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "冰泉冲击",
+      "reach": 48,
+      "damage": 12,
+      "lunge": 80,
+      "hit": {
+        "knock": 200,
+        "lift": -40,
+        "stun": 120,
+        "knockdown": false,
+        "stop": 32
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/skill.png",
+        "frames": 4,
+        "frameWidth": null,
+        "frameHeight": null,
+        "speed": 480,
+        "life": 900,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.35,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "add",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 48,
+        "hitH": 40
+      },
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "freeze"
+    },
+    "combo_up": {
+      "label": "金门天降",
+      "reach": 64,
+      "damage": 15,
+      "lunge": 100,
+      "hit": {
+        "knock": 360,
+        "lift": -840,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 72
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_up.png",
+        "frames": 4,
+        "frameWidth": null,
+        "frameHeight": null,
+        "speed": 480,
+        "life": 900,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.35,
+        "motion": "up",
+        "origin": "front_up",
+        "blend": "add",
+        "screen": 0.18,
+        "gravity": 0,
+        "hitW": 48,
+        "hitH": 40
+      },
+      "mechanic": {
+        "type": "drop",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "地基不稳",
+      "reach": 56,
+      "damage": 14,
+      "lunge": 50,
+      "hit": {
+        "knock": 220,
+        "lift": -380,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 64
+      },
+      "effect": "root",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/combo_down.png",
+        "frames": 4,
+        "frameWidth": null,
+        "frameHeight": null,
+        "speed": 480,
+        "life": 900,
+        "damage": 14,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.35,
+        "motion": "forward",
+        "origin": "front_down",
+        "blend": "add",
+        "screen": 0.18,
+        "gravity": 0,
+        "hitW": 48,
+        "hitH": 40
+      },
+      "mechanic": {
+        "type": "trap",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "烂尾巨厦",
+      "reach": 48,
+      "damage": 25,
+      "lunge": 120,
+      "hit": {
+        "knock": 700,
+        "lift": -800,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 100
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/super.png",
+        "frames": 4,
+        "frameWidth": null,
+        "frameHeight": null,
+        "speed": 480,
+        "life": 900,
+        "damage": 22,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.35,
+        "motion": "field",
+        "origin": "ahead",
+        "blend": "add",
+        "screen": 0.18,
+        "gravity": 0,
+        "hitW": 48,
+        "hitH": 40
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "burn"
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 408,
+      "frameHeight": 768,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1632,
+      "height": 768,
+      "bodyH": 719,
+      "committedAt": "2026-09-08T14:12:04"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "crop": {
+        "x": 101,
+        "y": 132,
+        "size": 200,
+        "manual": false
+      },
+      "committedAt": "2026-09-08T14:12:04"
+    }
+  },
+  "cgs": {}
+}

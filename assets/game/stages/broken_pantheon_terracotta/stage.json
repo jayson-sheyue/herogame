@@ -1,0 +1,43 @@
+{
+  "id": "broken_pantheon_terracotta",
+  "displayName": "神陨陷庭",
+  "visual": "雅典卫城与秦始皇陵墓的废墟在此交织。神殿的中央地砖大面积崩塌，形成了一个可供进入的下沉庭院深坑，作为中央的低地战场。左右两侧是较高的神殿石板地面，散落着断裂的希腊石柱和破碎的兵马俑。远景是诸神黄昏的血色天空。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0,
+        "y": 0.6018257827978511,
+        "w": 0.3467391304347826,
+        "h": 0.37856108406462424
+      },
+      {
+        "x": 0.3456299834381447,
+        "y": 0.889181457954615,
+        "w": 0.37087407866203115,
+        "h": 0.08467421720214874
+      },
+      {
+        "x": 0.7158314533593138,
+        "y": 0.5939826221060542,
+        "w": 0.2764710890889171,
+        "h": 0.3751448583272892
+      }
+    ],
+    "platforms": [],
+    "pits": []
+  },
+  "committedAt": "2026-08-21T22:51:22",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 108,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「神殒断陵」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 雅典卫城与秦始皇兵马俑的废墟交织。神殿的中央地砖大面积崩塌，形成一道深不见底的裂隙，将战场一分为二。左右两侧的地面上散落着断裂的希腊石柱和破碎的兵马俑残骸。远景是末日黄昏的血色天空。\nInstrumentation palette: low brass drones, distorted war drums, grit and dust in the mix; deep taiko / ritual drums, sparse bamboo flute in minor mode, tense silence between hits; ominous choir-free strings, pipe-organ stabs, heavy timpani.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 108 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-21T13:15:46",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:16:17"
+  }
+}

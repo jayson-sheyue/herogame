@@ -1,0 +1,612 @@
+{
+  "id": "year_zero",
+  "displayName": "波尔布特",
+  "oneLiner": "以革命之名，涤荡旧世界的幽魂。",
+  "visualLock": "老年波尔布特，阴郁严厉的面容，不齐的胡须，短发。身穿黑色粗布制服（衬衫与长裤），颈间围着红白格纹的格马克围巾（水怪）。腰间系皮带，配有手枪。脚穿简易橡胶底草鞋。手持农用钢叉作为主武器。",
+  "homeStageId": "",
+  "kit": {
+    "attack": "农叉突刺",
+    "air_attack": "空中挥叉",
+    "attack_up": "上挑",
+    "attack_down": "裂地击",
+    "skill": "革命穿刺",
+    "combo_up": "青年冲锋",
+    "combo_down": "再教育营",
+    "super": "去城市化"
+  },
+  "voice": {
+    "persona": "中文，一个阴郁、严厉、固执的年迈革命领袖。声音低沉沙哑，语速缓慢，带着不容置疑的权威感和冷酷的决心。说话时几乎没有情绪起伏，像是在陈述一个冰冷的事实。",
+    "gender": "male",
+    "ttsEngine": "gemini",
+    "ttsModel": "",
+    "ttsVoice": "",
+    "ttsLanguage": "cmn-CN",
+    "voiceAge": "adult",
+    "speakingRate": 1,
+    "pitch": -8.0,
+    "lines": {
+      "select": {
+        "text": "တော်လှန်ရေးအတွက်။",
+        "emotion": "低语，坚定，不带感情。",
+        "tag": "[determination]",
+        "file": "voice/select.mp3"
+      },
+      "intro": {
+        "text": "သမိုင်းဟောင်းကို ဖျက်သိမ်းရမယ်။",
+        "emotion": "缓慢，沉重，带着不容置疑的权威感，仿佛在宣告一个真理。",
+        "tag": "[awe]",
+        "file": "voice/intro.mp3"
+      },
+      "hurt": {
+        "text": "ဟက်!",
+        "emotion": "短促，压抑的痛呼，从喉咙深处发出。",
+        "tag": "[agitation]",
+        "file": "voice/hurt.mp3"
+      },
+      "super": {
+        "text": "သုညနှစ်... အစပြုပြီ!",
+        "emotion": "声音由低沉瞬间爆发，带着毁灭一切的狂热与冷酷，有回响感。",
+        "tag": "[anger]",
+        "file": "voice/super.mp3"
+      },
+      "win": {
+        "text": "မင်းဟာ အမှိုက်ပဲ။",
+        "emotion": "轻蔑，不屑，仿佛在处理一件无足轻重的东西。",
+        "tag": "[amusement]",
+        "file": "voice/win.mp3"
+      },
+      "defeat": {
+        "text": "တော်လှန်ရေး... မပြီးသေးဘူး...",
+        "emotion": "气若游丝，充满不甘和执念，最后几个字几乎听不清。",
+        "tag": "[frustration]",
+        "file": "voice/defeat.mp3"
+      }
+    }
+  },
+  "moves": {
+    "attack": {
+      "label": "农叉突刺",
+      "reach": 60,
+      "damage": 8,
+      "lunge": 180,
+      "hit": {
+        "knock": 350,
+        "lift": -40,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "air_attack": {
+      "label": "空中挥叉",
+      "reach": 60,
+      "damage": 8,
+      "lunge": 0,
+      "hit": {
+        "knock": 320,
+        "lift": -120,
+        "stun": 280,
+        "knockdown": false,
+        "stop": 28
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_up": {
+      "label": "上挑",
+      "reach": 58,
+      "damage": 7,
+      "lunge": 0,
+      "hit": {
+        "knock": 100,
+        "lift": -750,
+        "stun": 300,
+        "knockdown": false,
+        "stop": 30
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "attack_down": {
+      "label": "裂地击",
+      "reach": 64,
+      "damage": 9,
+      "lunge": 0,
+      "hit": {
+        "knock": 200,
+        "lift": 200,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 45
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": null,
+      "mechanic": {
+        "type": "melee",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "skill": {
+      "label": "革命穿刺",
+      "reach": 40,
+      "damage": 12,
+      "lunge": 50,
+      "hit": {
+        "knock": 200,
+        "lift": -60,
+        "stun": 400,
+        "knockdown": false,
+        "stop": 35
+      },
+      "effect": "root",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/skill.png",
+        "frames": 4,
+        "frameWidth": 450,
+        "frameHeight": 768,
+        "speed": 360,
+        "life": 1200,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.32,
+        "motion": "forward",
+        "origin": "hand",
+        "blend": "normal",
+        "screen": 0.12,
+        "gravity": 0,
+        "hitW": 44,
+        "hitH": 32
+      },
+      "mechanic": {
+        "type": "bolt",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": true,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_up": {
+      "label": "青年冲锋",
+      "reach": 24,
+      "damage": 10,
+      "lunge": 0,
+      "hit": {
+        "knock": 400,
+        "lift": -200,
+        "stun": 320,
+        "knockdown": false,
+        "stop": 30
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/combo_up.png",
+        "frames": 4,
+        "frameWidth": 352,
+        "frameHeight": 768,
+        "speed": 360,
+        "life": 1200,
+        "damage": 12,
+        "hit": {
+          "knock": 360,
+          "lift": -120,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 40
+        },
+        "spawnFrame": 0.32,
+        "motion": "forward",
+        "origin": "front_up",
+        "blend": "normal",
+        "screen": 0.3,
+        "gravity": 0,
+        "hitW": 100,
+        "hitH": 160
+      },
+      "mechanic": {
+        "type": "barrage",
+        "count": 2,
+        "delay": 20,
+        "spread": 80,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 1
+      },
+      "ailment": "none"
+    },
+    "combo_down": {
+      "label": "再教育营",
+      "reach": 24,
+      "damage": 4,
+      "lunge": 0,
+      "hit": {
+        "knock": 50,
+        "lift": -20,
+        "stun": 100,
+        "knockdown": false,
+        "stop": 10
+      },
+      "effect": "none",
+      "effectStrength": 0.0,
+      "projectile": {
+        "file": "fx/combo_down.png",
+        "frames": 4,
+        "frameWidth": 376,
+        "frameHeight": 768,
+        "speed": 40,
+        "life": 2800,
+        "damage": 10,
+        "hit": {
+          "knock": 0,
+          "lift": 0,
+          "stun": 220,
+          "knockdown": false,
+          "stop": 6
+        },
+        "spawnFrame": 0.28,
+        "motion": "field",
+        "origin": "front_down",
+        "blend": "normal",
+        "screen": 0.18,
+        "gravity": 0,
+        "hitW": 90,
+        "hitH": 110
+      },
+      "mechanic": {
+        "type": "zone",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": false,
+        "ticks": 5
+      },
+      "ailment": "none"
+    },
+    "super": {
+      "label": "去城市化",
+      "reach": 220,
+      "damage": 35,
+      "lunge": 0,
+      "hit": {
+        "knock": 800,
+        "lift": -500,
+        "stun": 0,
+        "knockdown": true,
+        "stop": 120
+      },
+      "effect": "launch",
+      "effectStrength": 1.0,
+      "projectile": {
+        "file": "fx/super.png",
+        "frames": 4,
+        "frameWidth": 486,
+        "frameHeight": 224,
+        "speed": 40,
+        "life": 4000,
+        "damage": 40,
+        "hit": {
+          "knock": 420,
+          "lift": -520,
+          "stun": 0,
+          "knockdown": true,
+          "stop": 90
+        },
+        "spawnFrame": 0.18,
+        "motion": "fall",
+        "origin": "sky",
+        "blend": "normal",
+        "screen": 0.58,
+        "gravity": 0,
+        "hitW": 460,
+        "hitH": 340
+      },
+      "mechanic": {
+        "type": "drop",
+        "count": 1,
+        "delay": 0,
+        "spread": 0,
+        "homing": 0.0,
+        "pierce": true,
+        "ticks": 1
+      },
+      "ailment": "none"
+    }
+  },
+  "sprites": {
+    "turnaround": {
+      "file": "turnaround.png",
+      "frames": 4,
+      "frameWidth": 273,
+      "frameHeight": 676,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 1092,
+      "height": 676,
+      "bodyH": 565,
+      "committedAt": "2026-08-28T18:31:16"
+    },
+    "walk": {
+      "file": "walk.png",
+      "frames": 5,
+      "frameWidth": 327,
+      "frameHeight": 678,
+      "facing": "right",
+      "keyed": true,
+      "width": 1635,
+      "height": 678,
+      "bodyH": 562,
+      "committedAt": "2026-09-08T10:26:39"
+    },
+    "dash": {
+      "file": "dash.png",
+      "frames": 6,
+      "frameWidth": 554,
+      "frameHeight": 729,
+      "facing": "right",
+      "keyed": true,
+      "width": 3324,
+      "height": 729,
+      "bodyH": 506,
+      "committedAt": "2026-08-28T18:03:22"
+    },
+    "idle": {
+      "file": "idle.png",
+      "frames": 5,
+      "frameWidth": 317,
+      "frameHeight": 672,
+      "facing": "right",
+      "keyed": true,
+      "width": 1585,
+      "height": 672,
+      "committedAt": "2026-08-24T21:01:52"
+    },
+    "air_hurt": {
+      "file": "air_hurt.png",
+      "frames": 4,
+      "frameWidth": 920,
+      "frameHeight": 819,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 3680,
+      "height": 819,
+      "bodyH": 336,
+      "committedAt": "2026-08-28T17:36:14"
+    },
+    "guard": {
+      "file": "guard.png",
+      "frames": 5,
+      "frameWidth": 489,
+      "frameHeight": 686,
+      "facing": "right",
+      "keyed": true,
+      "width": 2445,
+      "height": 686,
+      "bodyH": 550,
+      "committedAt": "2026-08-28T17:33:05"
+    },
+    "hurt": {
+      "file": "hurt.png",
+      "frames": 5,
+      "frameWidth": 1194,
+      "frameHeight": 774,
+      "facing": "right",
+      "keyed": true,
+      "width": 5970,
+      "height": 774,
+      "bodyH": 546,
+      "committedAt": "2026-08-28T17:33:57"
+    },
+    "jump": {
+      "file": "jump.png",
+      "frames": 5,
+      "frameWidth": 537,
+      "frameHeight": 676,
+      "facing": "right",
+      "keyed": true,
+      "width": 2685,
+      "height": 676,
+      "bodyH": 496,
+      "committedAt": "2026-08-28T17:34:54"
+    },
+    "attack_up": {
+      "file": "attack_up.png",
+      "frames": 5,
+      "frameWidth": 658,
+      "frameHeight": 855,
+      "facing": "right",
+      "keyed": true,
+      "width": 3290,
+      "height": 855,
+      "bodyH": 578,
+      "committedAt": "2026-08-28T17:37:09"
+    },
+    "attack_down": {
+      "file": "attack_down.png",
+      "frames": 4,
+      "frameWidth": 810,
+      "frameHeight": 815,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 3240,
+      "height": 815,
+      "bodyH": 400,
+      "committedAt": "2026-08-28T17:38:27"
+    },
+    "combo_up": {
+      "file": "combo_up.png",
+      "frames": 5,
+      "frameWidth": 367,
+      "frameHeight": 704,
+      "facing": "right",
+      "keyed": true,
+      "width": 1835,
+      "height": 704,
+      "bodyH": 599,
+      "committedAt": "2026-08-28T17:43:07"
+    },
+    "win_cg": {
+      "file": "win_cg.png",
+      "frames": 5,
+      "frameWidth": 371,
+      "frameHeight": 709,
+      "facing": "right",
+      "keyed": true,
+      "width": 1855,
+      "height": 709,
+      "bodyH": 570,
+      "committedAt": "2026-08-28T17:46:39"
+    },
+    "super": {
+      "file": "super.png",
+      "frames": 5,
+      "frameWidth": 422,
+      "frameHeight": 709,
+      "facing": "right",
+      "keyed": true,
+      "width": 2110,
+      "height": 709,
+      "bodyH": 569,
+      "committedAt": "2026-08-28T17:44:20"
+    },
+    "combo_down": {
+      "file": "combo_down.png",
+      "frames": 5,
+      "frameWidth": 442,
+      "frameHeight": 676,
+      "facing": "right",
+      "keyed": true,
+      "width": 2210,
+      "height": 676,
+      "bodyH": 560,
+      "committedAt": "2026-08-28T17:44:09"
+    },
+    "skill": {
+      "file": "skill.png",
+      "frames": 6,
+      "frameWidth": 571,
+      "frameHeight": 676,
+      "facing": "right",
+      "keyed": true,
+      "width": 3426,
+      "height": 676,
+      "bodyH": 566,
+      "committedAt": "2026-08-28T17:39:08"
+    },
+    "attack": {
+      "file": "attack.png",
+      "frames": 4,
+      "frameWidth": 606,
+      "frameHeight": 675,
+      "facing": "mixed",
+      "keyed": true,
+      "width": 2424,
+      "height": 675,
+      "bodyH": 537,
+      "committedAt": "2026-08-28T17:36:36"
+    },
+    "air_attack": {
+      "file": "air_attack.png",
+      "frames": 5,
+      "frameWidth": 612,
+      "frameHeight": 689,
+      "facing": "right",
+      "keyed": true,
+      "width": 3060,
+      "height": 689,
+      "bodyH": 540,
+      "committedAt": "2026-09-08T10:26:49"
+    },
+    "defeat_cg": {
+      "file": "defeat_cg.png",
+      "frames": 5,
+      "frameWidth": 1141,
+      "frameHeight": 736,
+      "facing": "right",
+      "keyed": true,
+      "width": 5705,
+      "height": 736,
+      "bodyH": 450,
+      "committedAt": "2026-08-28T17:45:51"
+    },
+    "opening_cg": {
+      "file": "opening_cg.png",
+      "frames": 5,
+      "frameWidth": 460,
+      "frameHeight": 691,
+      "facing": "right",
+      "keyed": true,
+      "width": 2300,
+      "height": 691,
+      "bodyH": 562,
+      "committedAt": "2026-08-28T17:45:02"
+    },
+    "select": {
+      "file": "select.png",
+      "width": 128,
+      "height": 128,
+      "keyed": true,
+      "source": "turnaround",
+      "crop": {
+        "x": 0,
+        "y": 38,
+        "size": 258,
+        "manual": true
+      },
+      "committedAt": "2026-09-08T10:24:47"
+    }
+  },
+  "cgs": {}
+}

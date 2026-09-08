@@ -1,0 +1,55 @@
+{
+  "id": "baimen_bronze_sparrow",
+  "displayName": "白门雀台",
+  "visual": "左右两侧为较低的青砖校场地面，中央升起厚实的石砖铜雀台基座（实体高台，与左右地面相连，落差约一人高），中央基座上方还有一层由朱红梁柱支撑的木制阁楼平台。背景为白门楼门洞与黄昏冷月。所有战斗地形侧视同层，无深渊。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0,
+        "y": 0.7909938882809789,
+        "w": 0.8202898550724638,
+        "h": 0.20900611171902106
+      },
+      {
+        "x": 0.7101449275362318,
+        "y": 0.8080746750647204,
+        "w": 0.2898550724637682,
+        "h": 0.13726680722730777
+      },
+      {
+        "x": 0.4884057971014493,
+        "y": 0.7156849662387572,
+        "w": 0.3420289855072463,
+        "h": 0.2562118017561186
+      },
+      {
+        "x": 0.42318840579710143,
+        "y": 0.7532626971629881,
+        "w": 0.06521739130434784,
+        "h": 0.22205022818863596
+      }
+    ],
+    "platforms": [
+      {
+        "x": 0.5217391304347827,
+        "y": 0.4012423603512236,
+        "w": 0.23913043478260881,
+        "h": 0.04
+      }
+    ],
+    "pits": []
+  },
+  "committedAt": "2026-08-27T10:03:07",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 118,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「白门雀台」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 左右两侧为较低的青砖校场地面，中央升起厚实的石砖铜雀台基座（实体高台，与左右地面相连，落差约一人高），中央基座上方还有一层由朱红梁柱支撑的木制阁楼平台。背景为白门楼门洞与黄昏冷月。所有战斗地形侧视同层，无深渊。\nInstrumentation palette: hybrid orchestra + dark electronic pulse: low strings, muted brass, tight combat drums.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 118 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-27T09:55:15",
+    "committedAt": "2026-08-27T09:56:24"
+  }
+}

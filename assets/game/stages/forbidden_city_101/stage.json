@@ -1,0 +1,62 @@
+{
+  "id": "forbidden_city_101",
+  "displayName": "紫禁之巅101",
+  "visual": "前景是故宫宫殿群的屋顶，构成一个带三个高台的战斗场地。主地面是一整条宽阔的琉璃瓦屋顶。在主地面之上，左右各有一个较低的飞檐作为高台，中央有一个更高的屋脊作为高台。远景是连绵的宫殿建筑和黄昏天空，台北101大楼耸立在远方的天际线上。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.005673396050212165,
+        "y": 0.7147333615655311,
+        "w": 0.9937441198392043,
+        "h": 0.2824367195951289
+      }
+    ],
+    "platforms": [
+      {
+        "x": 0.1336253558642767,
+        "y": 0.46433800869790626,
+        "w": 0.15933677895482817,
+        "h": 0.02709714581953284
+      },
+      {
+        "x": 0.39687205991960217,
+        "y": 0.27668903545404805,
+        "w": 0.20156397004019894,
+        "h": 0.04
+      },
+      {
+        "x": 0.7007819850200994,
+        "y": 0.4588082140491346,
+        "w": 0.16481067409552436,
+        "h": 0.04
+      },
+      {
+        "x": 0.0023459550602983764,
+        "y": 0.23870280233864233,
+        "w": 0.11807973803501827,
+        "h": 0.03502203277555371
+      },
+      {
+        "x": 0.8875529978128857,
+        "y": 0.25344892140203334,
+        "w": 0.11182385787422255,
+        "h": 0.03870856254140148
+      }
+    ],
+    "pits": []
+  },
+  "committedAt": "2026-08-21T22:51:36",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 108,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「紫禁之巅101」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 前景是故宫宫殿群的屋顶，构成一个带三个高台的战斗场地。主地面是一整条宽阔的琉璃瓦屋顶。在主地面之上，左右各有一个较低的飞檐作为高台，中央有一个更高的屋脊作为高台。远景是连绵的宫殿建筑和黄昏天空，台北101大楼耸立在远方的天际线上。\nInstrumentation palette: deep taiko / ritual drums, sparse bamboo flute in minor mode, tense silence between hits; ominous choir-free strings, pipe-organ stabs, heavy timpani.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 108 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-21T13:17:21",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:17:40"
+  }
+}

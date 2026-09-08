@@ -1,0 +1,31 @@
+{
+  "id": "abandoned_estate_site",
+  "displayName": "烂尾豪宅 - 售楼处幻象",
+  "visual": "画面正中是金碧辉煌的中式售楼处大门，其后是停工烂尾的超高层混凝土骨架楼。大门前的左右水泥路面是主地面，其间是一个约一人深、有底的塌陷基坑，可供站立。主地面上点缀着可跳上的裸露钢筋台阶作为高台。大门左侧立有巨大户外广告牌，展示着完工后的美好小区幻象。所有可站立面均在同一侧视图层。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0054347826086956486,
+        "y": 0.9382801553304774,
+        "w": 0.9880434782608695,
+        "h": 0.06171984466952263
+      }
+    ],
+    "platforms": [],
+    "pits": []
+  },
+  "committedAt": "2026-09-08T15:42:00",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 118,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「烂尾豪宅 - 售楼处幻象」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 画面正中是金碧辉煌的中式售楼处大门，其后是停工烂尾的超高层混凝土骨架楼。大门前的左右水泥路面是主地面，其间是一个约一人深、有底的塌陷基坑，可供站立。主地面上点缀着可跳上的裸露钢筋台阶作为高台。大门左侧立有巨大户外广告牌，展示着完工后的美好小区幻象。所有可站立面均在同一侧视图层。\nInstrumentation palette: sub-bass pressure, muffled pulse, wet ambience under a stern rhythm.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 118 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-09-08T16:36:52",
+    "imageRef": true,
+    "committedAt": "2026-09-08T16:37:38"
+  }
+}

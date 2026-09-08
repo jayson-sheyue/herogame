@@ -1,0 +1,31 @@
+{
+  "id": "ilios_sky_tower",
+  "displayName": "伊利奥斯天塔",
+  "visual": "蓝白色的地中海建筑群，远景是标志性的哈利法塔摩天楼，阳光明媚，爱琴海波光粼粼。",
+  "file": "stage.png",
+  "width": 3168,
+  "height": 1344,
+  "committedAt": "2026-08-21T22:54:15",
+  "bgm": "bgm.mp3",
+  "bgmMeta": {
+    "model": "lyria-3-clip-preview",
+    "bpm": 108,
+    "instrumental": true,
+    "prompt": "Instrumental only. No vocals, no lyrics, no choir singing words, no spoken voice.\n30-second seamless VERSUS fighting-game stage loop for 「伊利奥斯天塔」 — the music of an active duel, not a victory parade or adventure overworld.\nStage description (color the arrangement, do NOT make it cheerful): 蓝白色的地中海建筑群，远景是标志性的哈利法塔摩天楼，阳光明媚，爱琴海波光粼粼。\nInstrumentation palette: sub-bass pressure, muffled pulse, wet ambience under a stern rhythm.\nGenre: dark cinematic fighter / arena combat underscore (Street Fighter / Tekken / Guilty Gear vibe: pressure, grit, immersion).\nHarmony: prefer minor / modal / tense intervals; sustained low drones under a driving mid-tempo groove.\nMelody: short motif or rhythmic hook only — no catchy cheerful lead, no playful whistle, no bright pop earworm.\nTempo around 108 BPM. Heavy and focused; intro locks in within 1–2 bars; end on a loop-friendly downbeat with no fade-out cliff.\nMood keywords: tense, confrontational, immersive, weighty, determined.\nHard avoid: upbeat pop, happy major fanfare, cute chiptune bounce, festival EDM, comedy/cartoon scoring, soft lo-fi chill, triumphant victory theme, long ambient silence.\nProduction: 44.1kHz stereo, game-ready mid-forward mix, controlled low end, moderate compression, no dead air at start or end.",
+    "generatedAt": "2026-08-21T13:19:30",
+    "imageRef": true,
+    "committedAt": "2026-08-21T13:19:50"
+  },
+  "collision": {
+    "floors": [
+      {
+        "x": 0.0,
+        "y": 0.8792164872648542,
+        "w": 1.0,
+        "h": 0.11343923442966336
+      }
+    ],
+    "platforms": [],
+    "pits": []
+  }
+}
