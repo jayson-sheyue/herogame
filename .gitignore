@@ -8,6 +8,7 @@ game/incoming/*.zip
 game/incoming/_done/
 **/_bak/
 *.hgpk.zip
+*.bak_pre_domain
 **/*service-account*.json
 **/application_default_credentials.json
 .env
