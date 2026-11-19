@@ -8,7 +8,9 @@
       this.wsPort = null;
       this.connected = false;
       this.handlers = {};
-      this._queue = [];
+      this._generation = 0;
+      this._connectPromise = null;
+      this._roomPromise = null;
       this._inbox = [];
     }
 
@@ -58,137 +60,151 @@
       return `${proto}//${host}:${wsPort}`;
     }
 
-    async discover() {
+    async discover(signal) {
       try {
-        const info = await fetch("/api/lan").then((r) => r.json());
-        if (info.wsPort) this.wsPort = info.wsPort;
+        const info = await fetch("/api/lan", { signal }).then((r) => r.json());
+        if (!signal?.aborted && info.wsPort) this.wsPort = info.wsPort;
       } catch {
-        this.wsPort = Number(location.port || 8788) + 1;
+        // The conventional adjacent port remains usable if discovery fails.
       }
     }
 
     connect() {
-      return new Promise(async (resolve, reject) => {
-        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-          resolve();
-          return;
-        }
-        await this.discover();
+      if (this.connected && this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+      if (this._connectPromise) return this._connectPromise;
+      const generation = ++this._generation;
+      const controller = new AbortController();
+      const current = () => generation === this._generation;
+      const pending = new Promise((resolve, reject) => {
         let settled = false;
-        let ws;
-        try {
-          ws = new WebSocket(this.url());
-        } catch (err) {
-          reject(err);
-          return;
-        }
-        this.ws = ws;
-        ws.onopen = () => {
-          this.connected = true;
+        const finish = (error) => {
+          if (settled) return;
           settled = true;
-          resolve();
+          clearTimeout(timer);
+          clearTimeout(discoveryTimer);
+          controller.abort();
+          if (current()) this._cancelConnect = null;
+          if (error) reject(error);
+          else resolve();
         };
-        ws.onerror = () => {
-          if (!settled) {
-            settled = true;
-            reject(
-              new Error(
-                `无法连接对战服务 ${this.url()}，请确认已启动 game/serve.py，并放行端口 ${this.wsPort || "8789"}`
-              )
-            );
-          }
-        };
-        ws.onclose = () => {
-          this.connected = false;
-          this.emit("close", {});
-        };
-        ws.onmessage = (ev) => {
-          let msg;
-          try {
-            msg = JSON.parse(ev.data);
-          } catch {
-            return;
-          }
-          const type = msg.type;
-          if (type === "created" || type === "joined") {
-            this.seat = msg.seat || "";
-            this.room = msg.room || "";
-            if (msg.wsPort) this.wsPort = msg.wsPort;
-          }
-          this.emit(type, msg);
-          this.emit("any", msg);
-        };
+        const timer = setTimeout(() => {
+          finish(new Error(`连接超时，请确认 game/serve.py 已启动，且端口 ${this.wsPort || "8789"} 可访问`));
+          if (current()) this.close();
+        }, 8000);
+        const discoveryTimer = setTimeout(() => controller.abort(), 2000);
+        this._cancelConnect = () => finish(new Error("连接已取消"));
+        this.discover(controller.signal).then(() => {
+          if (!current() || settled) return;
+          let ws;
+          try { ws = new WebSocket(this.url()); }
+          catch (error) { finish(error); return; }
+          this.ws = ws;
+          ws.onopen = () => {
+            if (!current() || this.ws !== ws) return;
+            this.connected = true;
+            finish();
+          };
+          ws.onerror = () => {
+            if (!current()) return;
+            finish(new Error(`无法连接对战服务 ${this.url()}，请确认 game/serve.py 已启动`));
+            this.close();
+          };
+          ws.onclose = () => {
+            if (!current() || this.ws !== ws) return;
+            finish(new Error("对战连接已断开，请重试"));
+            this.ws = null;
+            this.connected = false;
+            this.seat = "";
+            this.room = "";
+            this._inbox = [];
+            this.emit("close", {});
+          };
+          ws.onmessage = (ev) => {
+            if (!current() || this.ws !== ws) return;
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch { return; }
+            if (!msg || typeof msg.type !== "string") return;
+            const type = msg.type;
+            if (type === "created" || type === "joined") {
+              this.seat = msg.seat || "";
+              this.room = msg.room || "";
+              if (msg.wsPort) this.wsPort = msg.wsPort;
+            }
+            this.emit(type, msg);
+            this.emit("any", msg);
+          };
+        }).catch(finish);
       });
+      this._connectPromise = pending;
+      const clear = () => { if (this._connectPromise === pending) this._connectPromise = null; };
+      pending.then(clear, clear);
+      return pending;
     }
 
     send(obj) {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
-      this.ws.send(JSON.stringify(obj));
-      return true;
+      try {
+        this.ws.send(JSON.stringify(obj));
+        return true;
+      } catch { return false; }
     }
 
-    async create() {
-      await this.connect();
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("开房超时，请确认 8789 端口可访问，并重启 game/serve.py"));
-        }, 8000);
-        const onCreated = (msg) => {
-          cleanup();
-          resolve(msg);
-        };
-        const onError = (msg) => {
-          cleanup();
-          reject(new Error(msg.message || "开房失败"));
-        };
-        const cleanup = () => {
-          clearTimeout(timer);
-          this.on("created", null);
-          this.on("error", null);
-        };
-        this.on("created", onCreated);
-        this.on("error", onError);
-        this.send({ type: "create" });
-      });
+    create() {
+      return this.requestRoom("create", "created");
     }
 
-    async join(room) {
-      await this.connect();
+    join(room) {
       const code = String(room || "").trim().toUpperCase();
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("加入超时，请确认房间号与 8789 端口"));
-        }, 8000);
-        const onJoined = (msg) => {
-          cleanup();
-          resolve(msg);
-        };
-        const onError = (msg) => {
-          cleanup();
-          reject(new Error(msg.message || "加入失败"));
-        };
+      if (!/^[A-Z0-9]{4}$/.test(code)) return Promise.reject(new Error("房间号应为 4 位字母或数字"));
+      return this.requestRoom("join", "joined", code);
+    }
+
+    requestRoom(type, reply, room) {
+      if (this._roomPromise) return Promise.reject(new Error("正在连接房间，请稍候"));
+      const pending = this.connect().then(() => new Promise((resolve, reject) => {
         const cleanup = () => {
           clearTimeout(timer);
-          this.on("joined", null);
+          this.on(reply, null);
           this.on("error", null);
+          this.on("close", null);
         };
-        this.on("joined", onJoined);
-        this.on("error", onError);
-        this.send({ type: "join", room: code });
-      });
+        const fail = (message) => {
+          cleanup();
+          this.close();
+          reject(new Error(message));
+        };
+        const timer = setTimeout(() => fail("房间响应超时，请检查房间号和网络后重试"), 8000);
+        this.on(reply, (msg) => { cleanup(); resolve(msg); });
+        this.on("error", (msg) => fail(msg.message || "进入房间失败"));
+        this.on("close", () => fail("对战连接已断开，请重试"));
+        if (!this.send({ type, ...(room ? { room } : {}) })) fail("连接已断开，请重试");
+      }));
+      this._roomPromise = pending;
+      const clear = () => { if (this._roomPromise === pending) this._roomPromise = null; };
+      pending.then(clear, clear);
+      return pending;
     }
 
     close() {
-      try {
-        this.ws?.close();
-      } catch {
-        /* ignore */
-      }
+      this._cancelConnect?.();
+      this._cancelConnect = null;
+      ++this._generation;
+      this._connectPromise = null;
+      const ws = this.ws;
       this.ws = null;
       this.connected = false;
+      this.seat = "";
+      this.room = "";
+      this._inbox = [];
+      if (ws) {
+        ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
+        try { ws.close(); } catch { /* already closed */ }
+      }
+      const onClose = this.handlers.close;
+      this.handlers = {};
+      onClose?.({});
     }
+
   }
 
   window.HeroNet = { NetRoom };

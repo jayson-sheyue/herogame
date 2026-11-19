@@ -1,0 +1,57 @@
+@font-face {font-family:GameUI;src:url('/fonts/GameUI.ttf') format('truetype');font-display:swap}
+@font-face {font-family:BodyUI;src:url('/fonts/BodyUI.woff2') format('woff2');font-display:swap}
+@font-face {font-family:BrushUI;src:url('/fonts/BrushUI.ttf') format('truetype');font-display:swap}
+:root {color-scheme:dark;--bg:#141311;--surface:#24211b;--line:#5e5036;--ink:#f4e9cf;--muted:#bfb197;--gold:#dfbd79;--head:72px;--foot:86px}
+* {box-sizing:border-box}
+html,body {margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:BodyUI,'PingFang SC',sans-serif}
+body {background:radial-gradient(ellipse at 50% 45%,#30291c 0%,#141311 75%)}
+button {font:inherit;font-size:14px;color:var(--ink);background:#28241c;border:1px solid var(--line);border-radius:6px;padding:10px 15px;cursor:pointer;transition:background .15s,border-color .15s,transform .15s;white-space:nowrap;min-height:40px}
+button:hover {background:#3c3323;border-color:var(--gold)}
+button:active {transform:translateY(1px)}
+button:focus-visible {outline:2px solid #f5d38e;outline-offset:4px}
+button:disabled {opacity:.5;cursor:wait}
+button.primary {background:linear-gradient(135deg,#e9ce91,#ba9250);border-color:#e9ce91;color:#241c10;font-weight:700;min-width:164px;box-shadow:0 3px 16px #0005}
+button.primary:hover {background:#f0d59a}
+[hidden] {display:none!important}
+header {height:var(--head);display:flex;align-items:center;gap:24px;padding:0 28px;border-bottom:1px solid #b49a5333;background:#181713ed;position:relative;z-index:3}
+.brand {display:flex;align-items:center;gap:12px;flex-shrink:0}
+.brand-seal {font-family:BrushUI,serif;background:#822e26;border:1px solid #bc6c50;color:#f6d2a1;padding:3px 6px;font-size:28px;line-height:1.2;transform:rotate(-4deg)}
+header h1 {margin:0;font-family:GameUI,serif;font-weight:400;font-size:23px;letter-spacing:3px;color:#f1d8a7}
+.brand-caption {font-size:10px;letter-spacing:3px;color:var(--muted)}
+header p {flex:1;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+nav {display:flex;gap:8px;align-items:center}
+nav button {background:transparent;font-size:12px;padding:7px 12px}
+nav button span {opacity:.6;margin-left:5px}
+#game {position:absolute;inset:var(--head) 0 var(--foot);overflow:hidden}
+canvas {display:block;image-rendering:auto}
+#commandBar {position:absolute;bottom:0;width:100%;height:var(--foot);display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 28px;border-top:1px solid #b49a5333;background:#1b1915;z-index:3}
+.command-copy {min-width:0}
+#phaseLabel {font-size:15px;color:var(--gold);letter-spacing:1px}
+#quickHint {font-size:12px;line-height:1.5;color:var(--muted);margin:6px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.command-actions {display:flex;gap:10px;flex-shrink:0}
+kbd {display:inline-block;border:1px solid #7c7058;border-bottom-width:2px;border-radius:3px;padding:0 5px;margin:0 3px;font:11px/1.6 system-ui;color:inherit;background:#ffffff08;vertical-align:1px}
+.loading {position:absolute;inset:var(--head) 0 var(--foot);display:grid;place-items:center;z-index:4;background:radial-gradient(ellipse at center,#2b251b,#141311)}
+.loading-card {width:min(480px,85vw);text-align:center;padding:38px}
+.eyebrow {font-size:11px;letter-spacing:5px;color:var(--gold)}
+h2 {font-size:26px;font-weight:500;color:var(--ink);margin:14px 0}
+.loading-card p,dialog p {font-size:14px;line-height:1.8;color:var(--muted)}
+progress {width:100%;height:4px;margin:24px 0;accent-color:var(--gold)}
+progress::-webkit-progress-bar {background:#413726;border-radius:4px}
+progress::-webkit-progress-value {background:var(--gold);border-radius:4px}
+dialog {background:#25211b;color:var(--ink);border:1px solid #a38a56;border-radius:12px;box-shadow:0 30px 120px #000a;padding:28px;width:min(760px,calc(100vw - 32px));max-height:85vh;overflow:auto}
+dialog::backdrop {background:#090a0cd9}
+.dialog-heading {display:flex;justify-content:space-between;align-items:center;gap:20px}
+.dialog-heading h2 {margin-bottom:0}
+#keys {font-size:14px;line-height:2.4;color:#e3d5b9}
+#keys>div>div {padding:12px 0;border-top:1px solid #ffffff12}
+#selectShare:empty,#selectHint:empty {display:none}
+#selectShare {overflow-wrap:anywhere;color:#a7c2aa}
+#selectHint.warn {color:#ffbf86}
+#pauseDialog {width:min(380px,calc(100vw - 32px));text-align:center;padding:40px}
+#resumeButton {margin-top:14px}
+@media(max-width:1000px) {header {padding:0 18px;gap:12px}header p {text-align:left}header h1 {font-size:20px}#commandBar {padding:12px 18px}.brand-caption {letter-spacing:1px}}
+@media(max-width:720px) {:root{--head:60px;--foot:106px}.brand-seal,.brand-caption,header p,nav button span{display:none}header{padding:0 12px;justify-content:space-between;gap:8px}header h1{font-size:18px;letter-spacing:1px}nav{gap:4px}nav button{font-size:11px;padding:6px 8px;min-height:36px}#commandBar{padding:10px 12px;flex-wrap:wrap;gap:6px;align-content:center}.command-copy{width:100%}#phaseLabel{font-size:12px}#quickHint{font-size:11px;margin-top:2px}.command-actions{width:100%;justify-content:flex-end}.command-actions button{font-size:12px;padding:6px 10px;min-height:34px}.command-actions .primary{min-width:130px}h2{font-size:22px}dialog{padding:20px}}
+@media(max-height:550px) and (min-width:721px) {:root{--head:48px;--foot:58px}.brand-caption{display:none}header{padding:0 16px}#commandBar{padding:6px 16px;flex-wrap:nowrap}.command-copy{width:auto}.command-actions{width:auto}#quickHint{max-width:38vw}button{min-height:34px}}
+@media(prefers-reduced-motion:reduce) {button{transition:none}}
+
+@media(max-width:380px) {header h1{font-size:16px}nav button{font-size:10px;padding:6px}header{gap:6px}}

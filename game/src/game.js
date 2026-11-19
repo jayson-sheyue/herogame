@@ -19,7 +19,7 @@
   const PUSH_PRONE_W = 152;
   const PUSH_PRONE_H = 36;
   const GAME_NAME = "英灵大乱斗";
-  const UI_FONT = "GameUI, PingFang SC, sans-serif";
+  const UI_FONT = "BodyUI, PingFang SC, sans-serif";
   const BODY_FONT = "BodyUI, PingFang SC, Hiragino Sans GB, sans-serif";
   const BRUSH_FONT = "BrushUI, STKaiti, KaiTi, serif";
   const P1_DEFAULT = "id_1786892372";
@@ -79,7 +79,14 @@
     }
     return next;
   }
-  const HIDDEN_HEROES = new Set(["nurhaci_13_armors", "id_1786855456", "id_1786858227"]);
+  const HIDDEN_HEROES = new Set([
+    "nurhaci_13_armors",
+    "id_1786855456",
+    "id_1786858227",
+    "id_1786873022",
+    "id_1788846740",
+    "idle_fx",
+  ]);
   const REACH = {
     attack: 56,
     air_attack: 48,
@@ -200,16 +207,22 @@
     const rawProj = custom?.projectile;
     const projectile =
       rawProj && typeof rawProj === "object" && rawProj.file ? rawProj : null;
+    const defaultHit = moveHit(move);
+    const customHit = custom?.hit && typeof custom.hit === "object" ? custom.hit : {};
     return {
-      reach: REACH[move] || 56,
-      damage: moveDamage(move),
-      lunge: LUNGE[move] || 160,
-      hit: moveHit(move),
-      effect: isSuperMove(move) ? "launch" : "none",
-      effectStrength: isSuperMove(move) ? 1 : 0,
+      reach: Number.isFinite(custom?.reach) ? custom.reach : REACH[move] || 56,
+      damage: Number.isFinite(custom?.damage) ? custom.damage : moveDamage(move),
+      lunge: Number.isFinite(custom?.lunge) ? custom.lunge : LUNGE[move] || 160,
+      hit: { ...defaultHit, ...customHit },
+      effect: custom?.effect || (isSuperMove(move) ? "launch" : "none"),
+      effectStrength: Number.isFinite(custom?.effectStrength)
+        ? custom.effectStrength
+        : isSuperMove(move)
+          ? 1
+          : 0,
       projectile,
       mechanic: mechanicSpec(custom),
-      ailment: "none",
+      ailment: custom?.ailment || "none",
     };
   }
 
@@ -454,13 +467,17 @@
     }
   }
 
+  // Texture identity changes when another hero reuses p1-* on a rematch.
+  // Weak keys allow unloaded sheets to be collected, while sharing scans across scenes.
+  const frameScans = new WeakMap();
   function scanFrameCached(scene, key, index, minAlpha = 24, additive = false) {
-    scene._scanFrameCache ||= new Map();
-    const cacheKey = `${key}:${index}:${minAlpha}:${additive ? 1 : 0}`;
-    if (scene._scanFrameCache.has(cacheKey)) return scene._scanFrameCache.get(cacheKey);
-    const scanned = scanFrame(scene, key, index, minAlpha, additive);
-    scene._scanFrameCache.set(cacheKey, scanned);
-    return scanned;
+    const texture = scene.textures.get(key);
+    if (!texture) return scanFrame(scene, key, index, minAlpha, additive);
+    let cache = frameScans.get(texture);
+    if (!cache) { cache = new Map(); frameScans.set(texture, cache); }
+    const cacheKey = `${index}:${minAlpha}:${additive ? 1 : 0}`;
+    if (!cache.has(cacheKey)) cache.set(cacheKey, scanFrame(scene, key, index, minAlpha, additive));
+    return cache.get(cacheKey);
   }
 
   function clearNetLobbyPings(net) {
@@ -519,9 +536,50 @@
     return new Phaser.Geom.Rectangle(left, top, Math.max(8, Math.abs(x1 - x0) + pad * 2), Math.max(8, Math.abs(y1 - y0) + pad * 2));
   }
 
+  /** 全屏电网 / 骑冲 / 黑洞等走各自盒子，不要收成飞行弹墨迹。 */
+  function usesSpecialSuperHitBox(shot) {
+    return !!(
+      shot?.fullscreen ||
+      shot?.screenSpace ||
+      shot?.lockBurst ||
+      shot?.luBuCharge ||
+      shot?.domainField ||
+      shot?.hawkingSuper ||
+      shot?.rainCurtain ||
+      shot?.trajectoryOnly
+    );
+  }
+
+  /**
+   * 德川/甄嬛这类向前飞的奥义粒子：判定贴飞行原点（手/弹头），
+   * 并上可见墨迹。空白帧、整格失败、Additive 火星都不能收到几何中心。
+   */
+  function superTravelHitBox(scene, shot) {
+    const spr = shot.sprite;
+    const cellW = Math.max(8, Math.abs(spr.displayWidth) || 8);
+    const cellH = Math.max(8, Math.abs(spr.displayHeight) || 8);
+    const w = Math.max(72, Number(shot.hitW) || 0, Math.min(cellW * 0.62, scene.scale.width * 0.28));
+    const h = Math.max(52, Number(shot.hitH) || 0, Math.min(cellH * 0.28, scene.scale.height * 0.2));
+    const left = spr.x - w * (spr.originX ?? 0.5);
+    const top = spr.y - h * (spr.originY ?? 0.5);
+    const travel = new Phaser.Geom.Rectangle(left, top, w, h);
+    let ink = spriteInkWorldRect(scene, spr, 16, 12);
+    const area = ink.width * ink.height;
+    const full = ink.width >= cellW * 0.84 && ink.height >= cellH * 0.84;
+    const tiny = area < 20 * 20;
+    if (full || tiny) return travel;
+    const pad = spr.blendMode === Phaser.BlendModes.ADD ? 22 : 12;
+    ink = new Phaser.Geom.Rectangle(ink.x - pad, ink.y - pad, ink.width + pad * 2, ink.height + pad * 2);
+    const l = Math.min(travel.x, ink.x);
+    const t = Math.min(travel.y, ink.y);
+    const r = Math.max(travel.right, ink.right);
+    const b = Math.max(travel.bottom, ink.bottom);
+    return new Phaser.Geom.Rectangle(l, t, r - l, b - t);
+  }
+
   function scanSheet(scene, key, frames) {
     const out = [];
-    for (let i = 0; i < frames; i++) out.push(scanFrame(scene, key, i));
+    for (let i = 0; i < frames; i++) out.push(scanFrameCached(scene, key, i));
     return out;
   }
 
@@ -541,6 +599,20 @@
     return median(cores);
   }
 
+  function compactStagePreview(scene, key) {
+    if (!scene.textures.exists(key)) return;
+    const source = scene.textures.get(key).getSourceImage();
+    const ratio = Math.min(1, 1024 / source.width, 576 / source.height);
+    if (ratio >= 1) return;
+    const tempKey = `${key}-compact`;
+    const preview = scene.textures.createCanvas(tempKey, Math.max(1, Math.round(source.width * ratio)), Math.max(1, Math.round(source.height * ratio)));
+    preview.context.drawImage(source, 0, 0, preview.width, preview.height);
+    preview.refresh();
+    scene.textures.remove(key);
+    scene.textures.renameTexture(tempKey, key);
+    setLinearFilter(scene, key);
+  }
+
   function stageTexSize(scene, key, meta) {
     const tex = scene.textures.get(key);
     const frame = tex?.get?.();
@@ -552,7 +624,10 @@
 
   /** Fit stage to viewport height; world width follows the source image aspect ratio. */
   function buildStageLayout(scene, stageId, stages, viewH) {
-    const key = `stage-${stageId}`;
+    // Raid reuses the loaded map card instead of blocking entry on the
+    // full-resolution stage background. Normal matches retain full artwork.
+    const fullKey = `stage-${stageId}`;
+    const key = scene.textures.exists(fullKey) ? fullKey : `stage-thumb-${stageId}`;
     const meta = stages?.[stageId] || {};
     const { w: srcW, h: srcH } = stageTexSize(scene, key, meta);
     const scale = viewH / srcH;
@@ -600,7 +675,23 @@
     if (id && HIDDEN_HEROES.has(id)) return false;
     if (fighter?.displayName === "努尔哈赤") return false;
     const sprites = fighter?.sprites || {};
-    return Boolean(sprites.idle?.file);
+    // A fighter with only a select portrait can still reach the battle loader,
+    // where it either fails outright (no idle) or gives no combat feedback
+    // (e.g. missing hurt). Do not make incomplete asset packs selectable.
+    const coreMoves = [
+      "idle",
+      "walk",
+      "jump",
+      "attack",
+      "air_attack",
+      "attack_down",
+      "attack_up",
+      "hurt",
+      "guard",
+      "skill",
+      "super",
+    ];
+    return coreMoves.every((move) => Boolean(sprites[move]?.file));
   }
 
   function sortRoster(ids, fighters) {
@@ -624,18 +715,40 @@
     return `${heroes}|${stages}`;
   }
 
+  function raidBossFor(roster, pack) {
+    const picked = new Set([pack?.p1Id, pack?.p2Id, pack?.p3Id].filter(Boolean));
+    const candidates = (roster?.playable || []).filter((id) => !picked.has(id) && roster?.fighters?.[id]);
+    if (!candidates.length) return null;
+    const seed = String(pack?.stageId || "raid");
+    let hash = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    const bossId = candidates[Math.abs(hash >>> 0) % candidates.length];
+    return { id: bossId, fighter: roster.fighters[bossId] };
+  }
+
+  async function fetchJson(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } finally { clearTimeout(timeout); }
+  }
+
   async function fetchRoster(prev = null) {
     const t = Date.now();
-    const catalog = await fetch(`/assets/game/index.json?t=${t}`, { cache: "no-store" }).then((r) => r.json());
+    const catalog = await fetchJson(`/assets/game/index.json?t=${t}`);
     const ids = catalog.heroes || [];
     const fighters = { ...(prev?.fighters || {}) };
     await Promise.all(
       ids.map(async (id) => {
         if (fighters[id]?.sprites?.idle) return;
         try {
-          fighters[id] = await fetch(`/assets/game/heroes/${id}/fighter.json?t=${t}`, { cache: "no-store" }).then((r) =>
-            r.json()
-          );
+          fighters[id] = await fetchJson(`/assets/game/heroes/${id}/fighter.json?t=${t}`);
         } catch {
           fighters[id] = null;
         }
@@ -653,9 +766,7 @@
     await Promise.all(
       stageIds.map(async (id) => {
         try {
-          stages[id] = await fetch(`/assets/game/stages/${id}/stage.json?t=${t}`, { cache: "no-store" }).then((r) =>
-            r.json()
-          );
+          stages[id] = await fetchJson(`/assets/game/stages/${id}/stage.json?t=${t}`);
         } catch {
           stages[id] = { id, displayName: id, file: "stage.png" };
         }
@@ -734,10 +845,12 @@
   }
 
   function setChrome(mode, text) {
+    window.HeroShell?.mode(mode);
     const selectKeys = document.getElementById("selectKeys");
     const dummyKeys = document.getElementById("dummyKeys") || document.getElementById("fightKeys");
     const pveKeys = document.getElementById("pveKeys");
     const pvpKeys = document.getElementById("pvpKeys");
+    const raidKeys = document.getElementById("raidKeys");
     const title = document.querySelector("header p");
     if (selectKeys) selectKeys.hidden = mode !== "select";
     if (dummyKeys) dummyKeys.hidden = mode !== "dummy";
@@ -745,6 +858,7 @@
     const cricketKeys = document.getElementById("cricketKeys");
     if (cricketKeys) cricketKeys.hidden = mode !== "cricket";
     if (pvpKeys) pvpKeys.hidden = mode !== "pvp";
+    if (raidKeys) raidKeys.hidden = mode !== "raid";
     if (title && text) title.textContent = text;
   }
 
@@ -755,6 +869,7 @@
     if (hintEl && hint != null) {
       hintEl.textContent = hint;
       hintEl.classList.toggle("warn", Boolean(warn));
+      if (warn) window.HeroShell?.hint(hint);
     }
   }
 
@@ -1327,13 +1442,13 @@
     const fill =
       rawFill == null || rawFill === 0x1c222c
         ? selected
-          ? 0xf6e4b4
-          : 0x2a1c12
+          ? 0xe5d3a8
+          : 0x28251e
         : rawFill;
     g.fillStyle(0x120a06, 0.38);
     if (!opts.hollow) g.fillRoundedRect(x + 3, y + 5, w, h, r);
     if (opts.hollow) {
-      g.lineStyle(11, selected ? 0x8d5a30 : 0x5a3c24, 1);
+      g.lineStyle(5, selected ? 0x947447 : 0x514530, 1);
       g.strokeRoundedRect(x + 5, y + 5, w - 10, h - 10, Math.max(6, r - 2));
       g.lineStyle(3, 0xf2d090, selected ? 0.9 : 0.45);
       g.strokeRoundedRect(x + 8, y + 8, w - 16, h - 16, Math.max(4, r - 4));
@@ -1343,7 +1458,7 @@
       g.strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, r);
       return;
     }
-    g.fillStyle(selected ? 0x8d5a30 : 0x5a3c24, 1);
+    g.fillStyle(selected ? 0x8b7049 : 0x4c422f, 1);
     g.fillRoundedRect(x, y, w, h, r);
     g.fillStyle(fill, 1);
     g.fillRoundedRect(x + inset, y + inset, w - inset * 2, h - inset * 2, Math.max(3, r - 4));
@@ -1367,7 +1482,7 @@
 
   function crispUi(text) {
     if (!text || typeof text.setFontFamily !== "function") return text;
-    if (typeof text.setResolution === "function") text.setResolution(3);
+    if (typeof text.setResolution === "function") text.setResolution(Math.min(2, window.devicePixelRatio || 1));
     if (typeof text.setPadding === "function") text.setPadding(4, 3, 4, 3);
     if (text.texture?.setFilter) text.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     return text;
@@ -1713,10 +1828,10 @@
   }
 
   function wipeFightAssets(scene) {
-    const prefixes = ["p1-", "p2-", "p3-", "hero-voice-"];
+    const prefixes = ["p1-", "p2-", "p3-", "boss-", "hero-voice-"];
     try {
       [...scene.textures.getTextureKeys()].forEach((k) => {
-        if (prefixes.some((p) => k.startsWith(p))) scene.textures.remove(k);
+        if (prefixes.some((p) => k.startsWith(p)) || (k.startsWith("stage-") && !k.startsWith("stage-thumb-"))) scene.textures.remove(k);
       });
     } catch {
       /* ignore */
@@ -1806,6 +1921,46 @@
       const key = voiceKey(heroId, id);
       if (scene.cache.audio.exists(key)) scene.cache.audio.remove(key);
       scene.load.audio(key, `${heroRoot}/${line.file}`);
+    });
+  }
+
+  // The raid prototype needs combat feedback, not cinematics, voice packs, or
+  // select portraits. This avoids a slow optional resource trapping the player
+  // on the transition screen.
+  const RAID_MOVE_SPRITES = new Set([
+    "idle", "walk", "dash", "jump", "guard", "hurt", "air_hurt", "knockdown",
+    "attack", "air_attack", "attack_up", "attack_down", "skill", "combo_up",
+    "combo_down", "super",
+  ]);
+
+  function loadRaidFighterSprites(scene, prefix, heroId, fighter) {
+    if (!fighter) return;
+    const heroRoot = `/assets/game/heroes/${heroId}`;
+    Object.entries(fighter.sprites || {}).forEach(([id, spec]) => {
+      if (!RAID_MOVE_SPRITES.has(id) || !spec?.file) return;
+      const frames = Math.max(1, spec.frames || 6);
+      const bust = encodeURIComponent(spec.committedAt || "1");
+      scene.load.spritesheet(`${prefix}-${id}`, `${heroRoot}/${spec.file}?t=${bust}`, {
+        frameWidth: spec.frameWidth || 280,
+        frameHeight: spec.frameHeight || 672,
+        startFrame: 0,
+        endFrame: frames - 1,
+      });
+    });
+    // Projectile art is small and keeps Q/K/L moves readable; voice and CG
+    // resources are deliberately non-blocking in this prototype.
+    Object.entries(fighter.moves || {}).forEach(([move, spec]) => {
+      const proj = spec?.projectile;
+      if (!proj?.file) return;
+      const frames = Math.max(1, proj.frames || 4);
+      const fw = proj.frameWidth || 64;
+      const fh = proj.frameHeight || 64;
+      scene.load.spritesheet(`${prefix}-proj-${move}`, `${heroRoot}/${proj.file}?fw=${fw}&fh=${fh}&n=${frames}`, {
+        frameWidth: fw,
+        frameHeight: fh,
+        startFrame: 0,
+        endFrame: frames - 1,
+      });
     });
   }
 
@@ -2147,7 +2302,7 @@
       const p = this.sprite;
       const body = p.body;
       if (body) {
-        if (this.pullPhaseUntil && this.scene.time.now >= this.pullPhaseUntil) {
+        if (this.pullPhaseUntil && (this.scene.combatNow ?? this.scene.time.now) >= this.pullPhaseUntil) {
           this.pullPhaseUntil = 0;
           body.checkCollision.none = false;
           body.setAllowGravity(true);
@@ -2172,7 +2327,7 @@
           p.y = maxY;
           if (body.velocity.y > 0) p.setVelocityY(0);
         }
-        if (!this.reacting() && !this.pitFalling && !(this.pullPhaseUntil && this.scene.time.now < this.pullPhaseUntil)) {
+        if (!this.reacting() && !this.pitFalling && !(this.pullPhaseUntil && (this.scene.combatNow ?? this.scene.time.now) < this.pullPhaseUntil)) {
           body.setDragX(this.grounded() ? 820 : 0);
         }
       }
@@ -2202,19 +2357,19 @@
 
     invulnerable() {
       // 只有 invulnUntil（倒地起身瞬间等）才无敌；击飞/趴地/站立常态均可挨打
-      return Boolean(this.invulnUntil && this.scene.time.now < this.invulnUntil);
+      return Boolean(this.invulnUntil && (this.scene.combatNow ?? this.scene.time.now) < this.invulnUntil);
     }
 
     /** 连击窗口内未击飞：持续锁招，不能立刻还手 */
     comboLocked() {
       if (this.ko || this.willKnockdown || this.airFalling) return false;
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       if (!(this.comboUntil && now < this.comboUntil && (this.comboDmg || 0) > 0)) return false;
       return true;
     }
 
     downed() {
-      return Boolean(this.downedUntil && this.scene.time.now < this.downedUntil);
+      return Boolean(this.downedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.downedUntil);
     }
 
     canAct() {
@@ -2222,9 +2377,9 @@
       if (this.pitFalling) return false;
       if (this.airFalling) return false;
       if (this.willKnockdown) return false;
-      if (this.downedUntil && this.scene.time.now < this.downedUntil) return false;
-      if (this.stunUntil && this.scene.time.now < this.stunUntil) return false;
-      if (this.rootedUntil && this.scene.time.now < this.rootedUntil) return false;
+      if (this.downedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.downedUntil) return false;
+      if (this.stunUntil && (this.scene.combatNow ?? this.scene.time.now) < this.stunUntil) return false;
+      if (this.rootedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.rootedUntil) return false;
       if (this.frozen()) return false;
       if (this.comboLocked()) return false;
       return !this.busy;
@@ -2233,19 +2388,19 @@
     reacting() {
       if (this.airFalling) return true;
       if (this.willKnockdown) return true;
-      if (this.downedUntil && this.scene.time.now < this.downedUntil) return true;
-      if (this.stunUntil && this.scene.time.now < this.stunUntil) return true;
-      if (this.rootedUntil && this.scene.time.now < this.rootedUntil) return true;
+      if (this.downedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.downedUntil) return true;
+      if (this.stunUntil && (this.scene.combatNow ?? this.scene.time.now) < this.stunUntil) return true;
+      if (this.rootedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.rootedUntil) return true;
       if (this.frozen()) return true;
       return FALL.has(this.move);
     }
 
     frozen() {
-      return this.ailment === "freeze" && this.scene.time.now < this.ailmentUntil;
+      return this.ailment === "freeze" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil;
     }
 
     immobilized() {
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       return Boolean((this.rootedUntil && now < this.rootedUntil) || this.frozen());
     }
 
@@ -2275,11 +2430,11 @@
         if (!this.sprite.anims.isPlaying) this.holdDown();
         return;
       }
-      if (this.downedUntil && this.scene.time.now >= this.downedUntil) {
+      if (this.downedUntil && (this.scene.combatNow ?? this.scene.time.now) >= this.downedUntil) {
         this.downedUntil = 0;
         this.willKnockdown = false;
         // 仅在起身站起来的瞬间给短暂无敌
-        this.invulnUntil = this.scene.time.now + GET_UP_INVULN_MS;
+        this.invulnUntil = (this.scene.combatNow ?? this.scene.time.now) + GET_UP_INVULN_MS;
         this.busy = false;
         if (this.grounded()) this.startMove("idle", { busy: false });
         return;
@@ -2294,9 +2449,9 @@
         this.tickDownScaleMul();
         this.plantFrame(false);
       }
-      if (!this.willKnockdown && this.stunUntil && this.scene.time.now >= this.stunUntil) {
+      if (!this.willKnockdown && this.stunUntil && (this.scene.combatNow ?? this.scene.time.now) >= this.stunUntil) {
         this.stunUntil = 0;
-        const now = this.scene.time.now;
+        const now = (this.scene.combatNow ?? this.scene.time.now);
         // 仍在连击窗口：保持 hurt 硬直，不回 idle 还手
         if (this.comboUntil && now < this.comboUntil && (this.comboDmg || 0) > 0) {
           this.busy = true;
@@ -2313,7 +2468,7 @@
         !this.willKnockdown &&
         !this.airFalling &&
         this.comboUntil &&
-        this.scene.time.now >= this.comboUntil &&
+        (this.scene.combatNow ?? this.scene.time.now) >= this.comboUntil &&
         (this.comboDmg || 0) > 0
       ) {
         this.comboDmg = 0;
@@ -2333,7 +2488,7 @@
       this.comboDmg = 0;
       this.comboUntil = 0;
       this.sp = this.maxSp;
-      this.downedUntil = this.scene.time.now + GET_UP_MS;
+      this.downedUntil = (this.scene.combatNow ?? this.scene.time.now) + GET_UP_MS;
       // 趴地阶段不预挂无敌；起身时再刷 GET_UP_INVULN_MS
       this.invulnUntil = 0;
       const pose = this.has("knockdown") ? "knockdown" : this.move === "air_hurt" ? "air_hurt" : "hurt";
@@ -2351,7 +2506,7 @@
 
     isProne() {
       if (this.ko) return true;
-      if (this.downedUntil && this.scene.time.now < this.downedUntil) return true;
+      if (this.downedUntil && (this.scene.combatNow ?? this.scene.time.now) < this.downedUntil) return true;
       if (!FALL.has(this.move) || this.airFalling) return false;
       const pivot = this.pivots[this.move]?.[this.textureIndex()];
       return Boolean(pivot && pivot.h < pivot.w * 0.85);
@@ -2434,12 +2589,14 @@
       this.ghost.setOrigin(src.originX, src.originY);
       this.ghost.setPosition(src.x, src.y);
       this.ghost.setTint(this.tint);
-      this.ghost.setVisible(true).setAlpha(0.4);
+      // This is only a very brief pose smear. Keep it faint enough that it
+      // cannot be mistaken for another player character.
+      this.ghost.setVisible(true).setAlpha(0.16);
       this._ghostFrozen = true;
       this.ghostTween = this.scene.tweens.add({
         targets: this.ghost,
         alpha: 0,
-        duration: 120,
+        duration: 70,
         onComplete: () => {
           this.ghost.setVisible(false);
           this._ghostFrozen = false;
@@ -2447,24 +2604,23 @@
       });
     }
 
-    /** 冲刺残影：沿途不断甩出淡出分身 */
+    /** 冲刺残影：使用速度光带，不再复制完整英雄造成“分身”错觉。 */
     spawnDashAfterimage() {
       const src = this.sprite;
       if (!src?.active) return;
-      const shown = Math.abs(src.scaleY) || Math.abs(this.displayScale) || this.baseScale;
-      const g = this.scene.add.sprite(src.x, src.y, src.texture.key, src.frame.name);
-      g.setDepth(Math.max(0, (src.depth || 2) - 1));
-      g.setScale(shown, shown);
-      g.setFlipX(src.flipX);
-      g.setFlipY(false);
-      g.setOrigin(src.originX, src.originY);
-      g.setTint(this.tint !== 0xffffff ? this.tint : 0xa8d4ff);
-      g.setAlpha(0.55);
+      const dir = this.facingSign();
+      const color = this.tint !== 0xffffff ? this.tint : 0xa8d4ff;
+      const trailW = Phaser.Math.Clamp(src.displayWidth * 0.34, 54, 118);
+      const trailY = src.y - Phaser.Math.Clamp(src.displayHeight * 0.32, 42, 92);
+      const g = this.scene.add
+        .rectangle(src.x - dir * 18, trailY, trailW, 5, color, 0.28)
+        .setDepth(Math.max(0, (src.depth || 2) - 1));
       this.scene.tweens.add({
         targets: g,
         alpha: 0,
-        x: src.x - this.facingSign() * 18,
-        duration: 220,
+        x: g.x - dir * 44,
+        scaleX: 0.45,
+        duration: 105,
         ease: "Quad.easeOut",
         onComplete: () => g.destroy(),
       });
@@ -2472,9 +2628,9 @@
 
     tickDashTrail() {
       if (this.move !== "dash" || this.ko) return;
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       if (now < (this._dashGhostAt || 0)) return;
-      this._dashGhostAt = now + 38;
+      this._dashGhostAt = now + 62;
       this.spawnDashAfterimage();
     }
 
@@ -2497,7 +2653,7 @@
       this.displayScale = this.baseScale;
       let shown = Math.abs(this.displayScale) || this.baseScale;
       if (this.move === "idle") {
-        shown *= 1 + Math.sin(this.scene.time.now / 920) * 0.012;
+        shown *= 1 + Math.sin((this.scene.combatNow ?? this.scene.time.now) / 920) * 0.012;
       }
       this.syncFacingVisual(shown);
       p.setOrigin(pivot.originX, pivot.originY);
@@ -2586,7 +2742,7 @@
     applyAilment(kind, strength) {
       if (!kind || kind === "none") return;
       const s = Number.isFinite(strength) ? strength : 1;
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       const dur =
         kind === "freeze" ? 900 + 400 * s : kind === "poison" ? 3200 + 900 * s : 2800 + 900 * s;
       this.ailment = kind;
@@ -2615,11 +2771,11 @@
         this.sprite.setTint(0xe8f3ff);
         return;
       }
-      if (this.ailment === "burn" && this.scene.time.now < this.ailmentUntil) {
+      if (this.ailment === "burn" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) {
         this.sprite.setTint(0xffe6d4);
         return;
       }
-      if (this.ailment === "poison" && this.scene.time.now < this.ailmentUntil) {
+      if (this.ailment === "poison" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) {
         this.sprite.setTint(0xeef6dc);
         return;
       }
@@ -2629,12 +2785,12 @@
 
     syncAilmentShell() {
       const src = this.sprite;
-      const on = this.ailment !== "none" && this.scene.time.now < this.ailmentUntil;
+      const on = this.ailment !== "none" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil;
       if (!on) {
         this.shell.setVisible(false);
         return;
       }
-      const pulse = 0.5 + 0.5 * Math.sin(this.scene.time.now / 220);
+      const pulse = 0.5 + 0.5 * Math.sin((this.scene.combatNow ?? this.scene.time.now) / 220);
       this.shell.setTexture(src.texture.key, src.frame.name);
       this.shell.setOrigin(src.originX, src.originY);
       this.shell.setFlipX(src.flipX);
@@ -2708,7 +2864,7 @@
     }
 
     tickAilment() {
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       if (this.ailment !== "none" && now >= this.ailmentUntil) {
         const wasFreeze = this.ailment === "freeze";
         this.clearAilment();
@@ -2781,7 +2937,7 @@
       this._voicePlaying = this._voicePlaying || {};
       const live = this._voicePlaying[id];
       if (live?.isPlaying) return false;
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       if (id === "hurt" && (this.voiceCool.hurt || 0) > now) return false;
       if (id === "hurt") this.voiceCool.hurt = now + 420;
       const volume = id === "super" || id === "intro" || id === "win" || id === "defeat" ? 1 : id === "hurt" ? 0.96 : 0.9;
@@ -2844,9 +3000,9 @@
       this.sprite.anims.play({ key, startFrame: 0, skipMissedFrames: false }, LOOP.has(resolved));
       this.applyMoveFrame(resolved, this.textureIndex());
       this.busy = busy;
-      this._moveAt = this.scene.time.now;
+      this._moveAt = (this.scene.combatNow ?? this.scene.time.now);
       if (resolved === "dash" && DASH_IFRAMES_MS > 0) {
-        this.invulnUntil = Math.max(this.invulnUntil || 0, this.scene.time.now + DASH_IFRAMES_MS);
+        this.invulnUntil = Math.max(this.invulnUntil || 0, (this.scene.combatNow ?? this.scene.time.now) + DASH_IFRAMES_MS);
       }
       if (this.frozen()) this.sprite.anims.pause();
       if (voice) this.playVoice(voice);
@@ -2913,7 +3069,7 @@
     /** 防止 freezeHit / cutin 导致攻击动画永久暂停；并兜底卡死 busy */
     ensureAttackAnimLive() {
       if (!ATTACKS.has(this.move) || this.ko) return;
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       const anims = this.sprite?.anims;
       if (anims?.isPaused) {
         if (!this._attackPauseAt) this._attackPauseAt = now;
@@ -2957,7 +3113,7 @@
       if (this.invulnerable()) return;
       const specFull = fromSpec || moveSpec(null, move);
       const dmg = specFull.damage || moveDamage(move);
-      const now = this.scene.time.now;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
       // 霍金时间凝滞：只记账，无击退/无受击动作，结束时一并爆发
       if (this.timeLockBanking && now < (this.timeLockUntil || 0) && !specFull.timeLockBurst) {
         if (dmg > 0) this.timeLockBank = (this.timeLockBank || 0) + dmg;
@@ -3058,12 +3214,1122 @@
     }
   }
 
+  function raidEnemyTheme(stageId) {
+    const id = String(stageId || "");
+    if (/alps|snow|tenshukaku/.test(id)) return { id: "frost", name: "霜境", colors: [0x75c9e8, 0xb8e7f5, 0x285b78] };
+    if (/cyber|lunar|station/.test(id)) return { id: "mech", name: "机巧", colors: [0x55e0ce, 0xf06adf, 0x203f56] };
+    if (/atlantis|ilios/.test(id)) return { id: "tide", name: "潮汐", colors: [0x3eb7b0, 0x91e1cb, 0x185c68] };
+    if (/giants|pyramid|pantheon|terracotta/.test(id)) return { id: "stone", name: "岩甲", colors: [0xb38a55, 0xe0bd78, 0x55402f] };
+    if (/abandoned|estate/.test(id)) return { id: "blight", name: "荒宅", colors: [0x8cb34f, 0xd0dc75, 0x3e512d] };
+    if (/peak|liberty|cologne/.test(id)) return { id: "storm", name: "风暴", colors: [0x718bd3, 0xb6c8f1, 0x303d6e] };
+    return { id: "imperial", name: "禁军", colors: [0xd76755, 0xeab06d, 0x672b28] };
+  }
+
+  function raidEnemyBlueprint(stageId, enemyId, elite) {
+    const theme = raidEnemyTheme(stageId);
+    const forms = [
+      { variant: "skitter", name: "矮脚兽", bodyX: 1.28, bodyY: 0.72, scale: 0.88, pace: 2.45, hp: 0.78, attack: "charge" },
+      { variant: "fang", name: "尖牙兽", bodyX: 1.05, bodyY: 0.96, scale: 1, pace: 2.05, hp: 1, attack: "bite" },
+      { variant: "wisp", name: "长颈妖", bodyX: 0.72, bodyY: 1.34, scale: 0.96, pace: 1.7, hp: 0.88, attack: "spit" },
+      { variant: "claw", name: "裂爪兽", bodyX: 0.94, bodyY: 1.12, scale: 1.03, pace: 1.9, hp: 1.08, attack: "claw" },
+      { variant: "brute", name: "重甲兽", bodyX: 1.42, bodyY: 1.05, scale: 1.12, pace: 1.38, hp: 1.45, attack: "slam" },
+    ];
+    const stageSeed = [...String(stageId || "")].reduce((sum, ch) => (sum * 33 + ch.charCodeAt(0)) >>> 0, 17);
+    const form = forms[(stageSeed + Number(enemyId || 0)) % forms.length];
+    if (elite) {
+      const eliteForms = {
+        frost: { variant: "mammoth", name: "冰冠猛犸", bodyX: 1.62, bodyY: 1.08, scale: 1.2, pace: 1.34, attack: "charge" },
+        mech: { variant: "sentinel", name: "过载哨兵", bodyX: 1.08, bodyY: 1.45, scale: 1.18, pace: 1.58, attack: "slam" },
+        tide: { variant: "kraken", name: "潮渊多腕兽", bodyX: 1.48, bodyY: 1.18, scale: 1.2, pace: 1.42, attack: "claw" },
+        stone: { variant: "golem", name: "断碑巨像", bodyX: 1.5, bodyY: 1.32, scale: 1.22, pace: 1.2, attack: "slam" },
+        blight: { variant: "treant", name: "腐根树妖", bodyX: 1.28, bodyY: 1.5, scale: 1.17, pace: 1.26, attack: "claw" },
+        storm: { variant: "wyvern", name: "裂空翼兽", bodyX: 1.5, bodyY: 1.02, scale: 1.18, pace: 1.72, attack: "charge" },
+        imperial: { variant: "guardian", name: "赤甲门神", bodyX: 1.32, bodyY: 1.38, scale: 1.2, pace: 1.38, attack: "slam" },
+      };
+      const eliteForm = eliteForms[theme.id] || eliteForms.imperial;
+      return {
+        ...eliteForm,
+        theme,
+        hp: 1,
+        color: theme.colors[1],
+      };
+    }
+    return { ...form, theme, name: `${theme.name}${form.name}`, color: theme.colors[0] };
+  }
+
+  function raidStoryLines(stageId, stageName, bossName, heroName) {
+    const chapters = {
+      giants_pyramid_causeway: [
+        ["旁白", "巨像踏碎商道，流沙正吞没逃难车队；金字塔顶的「太阳金印」是止住沙暴的第一枚宝鉴残片。"],
+        ["boss", "沙海只认强者。那些连巨像脚步都躲不开的人，不配等来救援。"],
+        ["hero", "他们不是你的试金石。我要让商道重新升起炊烟。"],
+        ["boss", "那就穿过我身后的死亡长廊——每一块石砖都埋着失败者。"],
+        ["hero", "我听见的不是亡魂，是他们催我继续向前。"],
+        ["boss", "太阳金印会把你的豪言烧成灰。"],
+        ["hero", "火能毁灭，也能为迷路的人点灯。来吧。"],
+        ["旁白", "烈日垂落，金印苏醒；沙海救援战在巨像残骸间打响。"],
+      ],
+      ilios_sky_tower: [
+        ["旁白", "天空塔失去浮力，整座海港正缓缓坠向云底；唯有「曙光羽核」能重启升空机关。"],
+        ["boss", "让它坠落吧。旧城粉碎后，我会在云端建一座只属于胜者的新国。"],
+        ["hero", "你的新国若以万家灯火为地基，只会是一座坟墓。"],
+        ["boss", "你救得下一座塔，救得下所有被魔潮撕开的天空吗？"],
+        ["hero", "先救眼前这一座，再救下一座——苍生从来不是一句空话。"],
+        ["boss", "很好，我会让狂风替你回答。"],
+        ["hero", "风越高，我手中的旗就会让更多人看见。"],
+        ["旁白", "警钟穿过云海，羽核争夺战在倾斜的天空塔顶爆发。"],
+      ],
+      baimen_bronze_sparrow: [
+        ["旁白", "铜雀台下万民被困，白门封印正抽走城中生气；「王侯玉简」记着解除封门之法。"],
+        ["boss", "乱世只需一个声音。城门一闭，百姓自然会学会服从。"],
+        ["hero", "安静不是太平。被夺走选择的人，也绝不会称你为王。"],
+        ["boss", "你带着一群乌合之众，也敢来谈天下？"],
+        ["hero", "天下本就属于他们，而不是高台上的一把座椅。"],
+        ["boss", "想取玉简，先证明你的刀比我的号令更快。"],
+        ["hero", "这一刀不为王位，只为劈开白门。"],
+        ["旁白", "铜雀无声，城门震动；万千目光投向最后的决斗。"],
+      ],
+      cyberpunk_shibuya_eiffel: [
+        ["旁白", "魔潮侵入城市主脑，霓虹街区的避难门全部反锁；「天网密钥」是唯一的管理员权限。"],
+        ["boss", "我删掉了恐惧、争吵与自由。看，多么完美的秩序。"],
+        ["hero", "你也删掉了人的意志。没有选择的安全，只是漂亮的牢笼。"],
+        ["boss", "系统推演了十亿次，你的胜率连小数点都不配拥有。"],
+        ["hero", "人之所以值得被救，就因为我们总能做出推演之外的选择。"],
+        ["boss", "那就让我格式化你最后的侥幸。"],
+        ["hero", "先问问这座城里还亮着的每一扇窗。"],
+        ["旁白", "倒计时归零前，数据洪流与英雄绝技在霓虹雨中正面相撞。"],
+      ],
+      lunar_station_earth_view: [
+        ["旁白", "月面站偏离轨道，三千冬眠舱正在断氧；「月核星图」记录着返回地球的唯一航线。"],
+        ["boss", "地球已经无药可救。留下燃料，只够我带少数精英去往新世界。"],
+        ["hero", "舱里的人把未来托付给我们，不是让你替他们决定谁该活。"],
+        ["boss", "带上所有人，只会一起坠入黑暗。你所谓仁慈不过是算术不及格。"],
+        ["hero", "那我就去找到你漏算的答案：一个也不放弃。"],
+        ["boss", "真空不会被感动，星图也不会选择你。"],
+        ["hero", "但握住星图的人可以选择回家。"],
+        ["旁白", "地球悬在舷窗之外，返航航线将在这场月面决战后决定。"],
+      ],
+      alps_tenshukaku: [
+        ["旁白", "雪崩封死山村，天守阁却还在吸取地脉取暖；「霜心玉」能让冰河恢复平静。"],
+        ["boss", "山下的人用最后一车木炭，换来了我这一夜的温暖。很公平。"],
+        ["hero", "你把掠夺叫交易，只因从未听过雪地里的哭声。"],
+        ["boss", "同情会让手变慢。暴雪来时，慢一步便是死人。"],
+        ["hero", "所以我会更快——快到在下一场雪崩前把霜心玉送下山。"],
+        ["boss", "先试试你的血，能不能融开我的冰刃。"],
+        ["hero", "不需要。山民点起的灯火足够融化这座冷宫。"],
+        ["旁白", "风雪骤停一瞬，霜心玉在阁顶发光，山村的命运系于此战。"],
+      ],
+      forbidden_city_101: [
+        ["旁白", "紫禁城地脉倒转，护城结界反而困住全城；「社稷龙纹」是修正阵眼的宝鉴残片。"],
+        ["boss", "城中每个人都在我的棋盘上。牺牲几枚卒，江山才坐得稳。"],
+        ["hero", "你忘了，没有那些所谓的卒，棋盘本身就毫无意义。"],
+        ["boss", "一个闯宫之人，也配替天下开口？"],
+        ["hero", "我身后每一声求救，都是比圣旨更重的托付。"],
+        ["boss", "龙纹认主，不认你的匹夫之勇。"],
+        ["hero", "那就让它看清，谁在守社稷，谁只在守宝座。"],
+        ["旁白", "宫门层层洞开，龙纹盘旋升空，阵眼之战就此开始。"],
+      ],
+      broken_pantheon_terracotta: [
+        ["旁白", "破碎神殿唤醒万具兵俑，它们正向附近城镇进军；「镇魂古玺」能令亡军归土。"],
+        ["boss", "活人反复背叛，泥塑的军队却永远忠诚。我为何要停下？"],
+        ["hero", "因为忠诚若没有良知，只是一场不会醒来的灾难。"],
+        ["boss", "古玺在我手中，千军万马也在我手中。你拿什么救城？"],
+        ["hero", "我不需要统治他们，只需要让被惊扰的灵魂安息。"],
+        ["boss", "那就先从兵俑长戈下活下来。"],
+        ["hero", "我会穿过军阵，把古玺送回它该在的地方。"],
+        ["旁白", "陶甲齐鸣，残柱震落；镇魂之战在古老军阵中央展开。"],
+      ],
+      peak_of_liberty: [
+        ["旁白", "自由峰的烽火被魔云熄灭，山下联军失去方向；「破晓火种」能重新点亮万里信标。"],
+        ["boss", "他们嘴上呼喊自由，却总要等别人先点火。这样的众生不值得救。"],
+        ["hero", "正因为有人害怕，才更需要第一个举起火把的人。"],
+        ["boss", "你以为自己是火把？在我眼里不过是一点将熄的火星。"],
+        ["hero", "一颗火星足以越过群山，落进千万人手里。"],
+        ["boss", "那我就用风暴掐灭你。"],
+        ["hero", "风只会让真正的火烧得更旺。"],
+        ["旁白", "魔云压顶，峰巅无路可退；破晓火种等待新的守护者。"],
+      ],
+      atlantis_capitol_ruins: [
+        ["旁白", "海底王都护罩破裂，海水正灌入平民舱；「深海王冠」可以号令潮汐、封住裂口。"],
+        ["boss", "王都沉没，秘密才会永远留在海沟。几座平民舱算什么代价？"],
+        ["hero", "对你是数字，对舱里的人却是全部人生。"],
+        ["boss", "王冠选择统治者，不选择救生员。"],
+        ["hero", "真正的王冠，首先该为最弱小的人挡住海水。"],
+        ["boss", "那就看看你的肺，能否撑到潮汐听命。"],
+        ["hero", "我不需要海低头，只需要你放开王冠。"],
+        ["旁白", "护罩裂纹继续蔓延，深海王冠的蓝光照亮了决战场。"],
+      ],
+      great_wall_cologne: [
+        ["旁白", "长城烽燧与古城钟楼同时失声，兽潮从两界裂缝涌出；「万里铜钟」能让防线重新共鸣。"],
+        ["boss", "高墙早晚会倒。与其守护弱者，不如让兽潮筛出能活的人。"],
+        ["hero", "城墙的意义从来不是挑选谁活，而是让所有人有机会活。"],
+        ["boss", "钟声传不到裂缝另一端，你的援军也不会来。"],
+        ["hero", "那我就亲手敲响它，让两端的人都知道防线还在。"],
+        ["boss", "你会成为钟下第一具尸体。"],
+        ["hero", "只要钟声响起，站起来的人就不会只有我。"],
+        ["旁白", "残墙迎风，铜钟待鸣；两座古城的生死将在同一击中揭晓。"],
+      ],
+      abandoned_estate_site: [
+        ["旁白", "荒宅下埋着被抹去姓名的村落，怨气化作魔兽；「地脉契书」记录着归还土地的誓约。"],
+        ["boss", "名字、家园、承诺，不过是活人安慰自己的纸片。烧掉契书，一切都会安静。"],
+        ["hero", "安静的是你，不是那些至今无处归去的魂魄。"],
+        ["boss", "你愿为一群连脸都看不清的死人拼命？"],
+        ["hero", "正因无人记得他们，我才更不能让最后的证据消失。"],
+        ["boss", "宅门一关，你也会成为没有名字的影子。"],
+        ["hero", "我会带着契书走出去，让每个名字重新被人念起。"],
+        ["旁白", "旧门自行合拢，地底传来低语；为亡者讨回故土的一战开始了。"],
+      ],
+    };
+    const fallback = [
+      ["旁白", `${stageName}被魔潮包围，最后一枚「苍生宝鉴残卷」正在关底守卫手中。`],
+      ["boss", "走到这里又如何？宝鉴只能证明众生从来不值得拯救。"],
+      ["hero", "值不值得，不由站在灾难之外的人裁定。"],
+      ["boss", "你每救一人，魔潮便会吞掉十人。放弃才是慈悲。"],
+      ["hero", "救一人便是一人。希望从来不是算完胜率才出手。"],
+      ["boss", "那就用你的命，为这套天真写下结局。"],
+      ["hero", "结局会由活下来的人共同写，而不是由你封口。"],
+      ["旁白", `${stageName}的最后防线前，苍生宝鉴发出回应。`],
+    ];
+    return (chapters[String(stageId || "")] || fallback).map(([speaker, text]) => ({
+      speaker: speaker === "boss" ? bossName : speaker === "hero" ? heroName : speaker,
+      color: speaker === "boss" ? "#ffcb75" : speaker === "hero" ? "#8fd8ff" : "#e9d5a4",
+      text,
+    }));
+  }
+
+  /** Temporary no-asset enemy used by the cooperative raid demo. */
+  class RaidEnemy {
+    constructor(scene, id, x, y, boss = false, elite = false) {
+      this.scene = scene;
+      this.id = id;
+      this.boss = boss;
+      this.elite = !boss && elite;
+      this.prefix = boss ? "boss" : `raid-${id}`;
+      this.fighter = boss ? scene.pack?.boss : null;
+      this.move = "idle";
+      this.busy = false;
+      this.projSpawned = false;
+      this.domainNoDashUntil = 0;
+      this.luBuSuperHidden = false;
+      this.luBuChargePending = 0;
+      this.blueprint = raidEnemyBlueprint(scene.pack?.stageId, id, this.elite);
+      this.maxHp = boss ? 420 : this.elite ? 185 : Math.round(78 * this.blueprint.hp);
+      this.hp = this.maxHp;
+      this.mp = this.maxMp = BASE_MP;
+      this.sp = this.maxSp = BASE_SP;
+      this.infinite = false;
+      this.mpBanned = false;
+      this.ko = false;
+      this.hitAt = 0;
+      this.hitstunUntil = 0;
+      this.comboUntil = 0;
+      this.comboHits = 0;
+      this.knockVx = 0;
+      this.lastHitDir = 1;
+      this.attackAt = (scene.combatNow ?? scene.time.now) + 420 + (id % 4) * 170;
+      this.skillAt = (scene.combatNow ?? scene.time.now) + 1800 + (id % 3) * 520;
+      this.superAt = (scene.combatNow ?? scene.time.now) + 4800 + (id % 2) * 900;
+      this.moveCdUntil = { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
+      this.attackSeq = 0;
+      this.action = "idle";
+      this.actionStartedAt = 0;
+      this.actionUntil = 0;
+      this.actionHitAt = 0;
+      this.actionHit = false;
+      this.facing = -1;
+      this.rootedUntil = 0;
+      this.slowedUntil = 0;
+      this.slowMul = 1;
+      this.ailment = "none";
+      this.ailmentUntil = 0;
+      this.ailmentDotAt = 0;
+      this.timeLockUntil = 0;
+      this.timeLockBanking = false;
+      this.timeLockBank = 0;
+      this.variant = boss ? "hero" : this.blueprint.variant;
+      this.enemyName = boss ? scene.pack?.boss?.displayName || "关底英灵" : this.blueprint.name;
+      this.color = boss ? 0xa94b9b : this.blueprint.color;
+      this.darkColor = boss ? 0x5a2459 : this.blueprint.theme.colors[2];
+      this.bellyColor = boss ? 0xd38bc9 : this.blueprint.theme.colors[1];
+      this.bodyX = boss ? 1 : this.blueprint.bodyX;
+      this.bodyY = boss ? 1 : this.blueprint.bodyY;
+      this.movePace = boss ? 1.72 : this.blueprint.pace;
+      this.attackKind = boss ? "hero" : this.blueprint.attack;
+      this.visualScale = boss ? 1.1 : this.blueprint.scale;
+      this.halfW = 24 * this.visualScale * this.bodyX;
+      this.footOffset = 48 * this.visualScale * this.bodyY;
+      const visualHalfUnits = {
+        skitter: 61, fang: 52, wisp: 38, claw: 54, brute: 66,
+        mammoth: 70, sentinel: 56, kraken: 56, golem: 66,
+        treant: 58, wyvern: 76, guardian: 66, hero: 30,
+      };
+      const visualTopUnits = {
+        skitter: 34, fang: 58, wisp: 88, claw: 62, brute: 60,
+        mammoth: 62, sentinel: 68, kraken: 66, golem: 64,
+        treant: 72, wyvern: 68, guardian: 66, hero: 62,
+      };
+      this.boundHalfW = (visualHalfUnits[this.variant] || 56) * this.visualScale * this.bodyX;
+      this.visualTopExtent = (visualTopUnits[this.variant] || 62) * this.visualScale * this.bodyY;
+      this.heroBoss = Boolean(boss && scene.pack?.boss && scene.textures.exists("boss-idle"));
+      // y is a floor coordinate. Keep the entire hurt/body volume above it;
+      // the old center-at-floor placement put roughly half the enemy outside
+      // the arena even while its center still looked valid.
+      this.sprite = scene.add
+        .rectangle(x, y - this.footOffset, this.halfW * 2, this.footOffset * 2, this.color, 0)
+        .setDepth(3);
+      scene.physics.add.existing(this.sprite);
+      this.sprite.body.setAllowGravity(false);
+      this.sprite.body.setVelocity(0, 0);
+      this.sprite.body.setCollideWorldBounds(true);
+      // Rectangle + Arcade Body 没有 Sprite 的速度快捷方法；英雄机制技
+      // （时停、铁丝网、引力）会按 Actor 接口调用，给几何怪补齐兼容层。
+      this.sprite.setVelocity = (vx = 0, vy = vx) => {
+        this.sprite.body?.setVelocity(vx, vy);
+        return this.sprite;
+      };
+      this.sprite.setVelocityX = (vx = 0) => {
+        this.sprite.body?.setVelocityX(vx);
+        return this.sprite;
+      };
+      this.sprite.setVelocityY = (vy = 0) => {
+        this.sprite.body?.setVelocityY(vy);
+        return this.sprite;
+      };
+      this.gfx = scene.add.graphics().setDepth(4);
+      this.heroSprite = null;
+      this.heroLabel = null;
+      this.heroAnim = "";
+      if (this.heroBoss) {
+        const fighter = scene.pack.boss;
+        const pivots = scene.pack.bossPivots || {};
+        const metaH = Number(fighter?.sprites?.idle?.bodyH);
+        const idleH = Math.max(8, metaH > 8 ? metaH : sheetBodyH(pivots.idle || []));
+        let vs = Number(fighter?.visualScale);
+        if (!Number.isFinite(vs) || vs <= 0) {
+          const guide = Number(fighter?.bodyGuideH);
+          vs = guide > 0 ? guide / 560 : 1;
+        }
+        this.heroBaseScale =
+          (scene.scale.height * CHAR_SCREEN * CHAR_DISPLAY_SHRINK * Phaser.Math.Clamp(vs, VISUAL_SCALE_MIN, VISUAL_SCALE_MAX)) /
+          idleH;
+        // 让完整英雄技能系统把 Boss 当作一个标准施法者。弹道缩放、发射点和
+        // 英雄专属机制都读取这些与 Actor 同名的字段。
+        this.idleH = idleH;
+        this.baseScale = this.heroBaseScale;
+        this.displayScale = this.heroBaseScale;
+        this.heroSprite = scene.add.sprite(x, y, "boss-idle", 0).setDepth(4).setScale(this.heroBaseScale * 1.08);
+        this.heroLabel = scene.add
+          .text(x, y - 112, fighter.displayName || "关底英灵", {
+            fontFamily: UI_FONT,
+            fontSize: 16,
+            color: "#ffe2a2",
+            stroke: "#2a0d0d",
+            strokeThickness: 4,
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(6);
+      }
+      this.constrainToArena();
+      this.draw();
+    }
+
+    grounded() {
+      return !this.ko;
+    }
+
+    airborne() {
+      return false;
+    }
+
+    strikeFacing() {
+      return this.facing < 0 ? -1 : 1;
+    }
+
+    invulnerable() {
+      return false;
+    }
+
+    syncFacingVisual() {
+      if (this.heroSprite) this.heroSprite.setFlipX(this.facing < 0);
+    }
+
+    has(move) {
+      return this.heroBoss && this.scene.anims.exists(`boss-${move}`);
+    }
+
+    startMove(move, opts = {}) {
+      if (!this.heroBoss || !this.has(move)) return false;
+      this.move = move;
+      this.heroActionMove = move;
+      this.busy = opts.busy ?? ATTACKS.has(move);
+      this.projSpawned = false;
+      return true;
+    }
+
+    clearGhost() {}
+
+    emitPoint(origin, aimX) {
+      const vis = this.worldHurt();
+      const facing = this.strikeFacing();
+      const aheadX = this.sprite.x + facing * 210;
+      const floorY = this.scene.groundYAt?.(this.sprite.x) ?? this.scene.groundY;
+      if (origin === "front_up") return { x: this.sprite.x + facing * 92, y: vis.top + vis.height * 0.12 };
+      if (origin === "front_down") return { x: this.sprite.x + facing * 82, y: Math.min(vis.bottom - 6, floorY - 16) };
+      if (origin === "sky") return { x: Number.isFinite(aimX) ? aimX : aheadX, y: 8 };
+      if (origin === "air") return { x: Number.isFinite(aimX) ? aimX : aheadX, y: floorY - this.scene.scale.height * 0.4 };
+      if (origin === "feet") return { x: this.sprite.x + facing * 70, y: floorY };
+      if (origin === "ahead") return { x: this.sprite.x + facing * 150, y: floorY };
+      return { x: facing > 0 ? vis.right + 1 : vis.left - 1, y: vis.top + vis.height * 0.34 };
+    }
+
+    constrainToArena() {
+      if (!this.sprite?.active) return;
+      const world = this.scene.physics.world.bounds;
+      const visualHalfW = this.boundHalfW || this.halfW;
+      const left = world.x + visualHalfW;
+      const right = world.right - visualHalfW;
+      this.sprite.x = Phaser.Math.Clamp(this.sprite.x, left, Math.max(left, right));
+      // Enemies do not jump in this prototype. Following the stage floor keeps
+      // their feet planted while their full collision volume stays in bounds.
+      const floorY = this.scene.spawnFloorY(this.sprite.x);
+      const topExtent = this.visualTopExtent || 56 * this.visualScale * this.bodyY;
+      this.sprite.y = Math.max(world.y + topExtent, floorY - this.footOffset);
+      this.sprite.body.setVelocity(0, 0);
+      this.sprite.body.updateFromGameObject?.();
+    }
+
+    syncHeroBossVisual() {
+      const spr = this.heroSprite;
+      if (!spr?.active) return;
+      const actionMove =
+        this.action === "walk"
+          ? "walk"
+          : this.action === "hurt"
+            ? "hurt"
+            : this.action === "hero_move" && this.heroActionMove && this.has(this.heroActionMove)
+              ? this.heroActionMove
+            : this.action === "super" || this.action === "roar" || this.action === "slam"
+              ? "super"
+              : this.action === "skill"
+                ? this.heroActionMove && this.has(this.heroActionMove)
+                  ? this.heroActionMove
+                  : this.has("skill")
+                    ? "skill"
+                    : "attack"
+                : this.action === "spit"
+                  ? "skill"
+                : this.action === "claw" || this.action === "bite" || this.action === "charge"
+                  ? "attack"
+                : "idle";
+      const move = this.has(actionMove) ? actionMove : "idle";
+      const key = `boss-${move}`;
+      if (this.heroAnim !== move) {
+        this.heroAnim = move;
+        if (this.scene.anims.exists(key)) spr.anims.play(key, true);
+        else spr.setTexture("boss-idle", 0);
+      }
+      const frameNo = Number(spr.frame?.name);
+      const frames = this.scene.pack?.bossPivots?.[move] || this.scene.pack?.bossPivots?.idle || [];
+      const pivot = frames[Number.isFinite(frameNo) ? Phaser.Math.Clamp(frameNo, 0, Math.max(0, frames.length - 1)) : 0];
+      if (pivot) spr.setOrigin(pivot.originX, pivot.originY);
+      spr.setPosition(this.sprite.x, this.sprite.y + this.footOffset);
+      spr.setScale(this.heroBaseScale * 1.08);
+      spr.setFlipX(this.facing < 0);
+      spr.setVisible(!this.ko && !this.luBuSuperHidden);
+      if ((this.scene.combatNow ?? this.scene.time.now) < this.hitAt) spr.setTintFill(0xffffff);
+      else if (this.ailment === "freeze" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xc8e8ff);
+      else if (this.ailment === "burn" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xffd0ae);
+      else if (this.ailment === "poison" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xc8e888);
+      else spr.clearTint();
+      if (this.heroLabel) {
+        this.heroLabel.setPosition(this.sprite.x, this.sprite.y - 88 * this.visualScale).setVisible(!this.ko);
+      }
+    }
+
+    drawHeroBossHud(x, y, s, stunned, now) {
+      const w = 128;
+      this.gfx.fillStyle(0x160e0d, 0.92).fillRect(x - w / 2, y - 82 * s, w, 10);
+      this.gfx.fillStyle(0xe65362, 1).fillRect(x - w / 2, y - 82 * s, w * Math.max(0, this.hp / this.maxHp), 10);
+      this.gfx.lineStyle(2, 0xffdf9a, 1).strokeRect(x - w / 2, y - 82 * s, w, 10);
+      if (stunned && this.comboHits >= 2) {
+        const spin = now * 0.012;
+        this.gfx.fillStyle(0xffe28a, 0.95);
+        for (let i = 0; i < 3; i++) {
+          const a = spin + (Math.PI * 2 * i) / 3;
+          this.gfx.fillCircle(x + Math.cos(a) * 24, y - 94 * s + Math.sin(a) * 7, 3);
+        }
+      }
+      const status = this.ailment !== "none" && now < this.ailmentUntil ? this.ailment : now < this.rootedUntil ? "root" : "";
+      if (status) {
+        const color = status === "freeze" ? 0xa9dcff : status === "burn" ? 0xff853e : status === "poison" ? 0xa8df5a : 0xd6c5ff;
+        this.gfx.lineStyle(3, color, 0.9).strokeEllipse(x, y + 45 * s, 74 * s, 15 * s);
+      }
+    }
+
+    draw() {
+      if (!this.gfx?.active) return;
+      const x = this.sprite.x;
+      const y = this.sprite.y;
+      const s = this.visualScale;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
+      const stunned = now < this.hitstunUntil;
+      const flash = now < this.hitAt;
+      const c = this.ko ? 0x55515d : flash ? 0xfff1b8 : this.color;
+      const dark = this.darkColor;
+      const belly = this.bellyColor;
+      const f = this.facing < 0 ? -1 : 1;
+      const actionSpan = Math.max(1, this.actionUntil - this.actionStartedAt);
+      const actionT = Phaser.Math.Clamp((now - this.actionStartedAt) / actionSpan, 0, 1);
+      const strikePulse = Math.sin(actionT * Math.PI);
+      const walkBob = this.action === "walk" ? Math.sin(now * 0.018 + this.id) * 3 : 0;
+      const hurtLean = stunned ? -this.lastHitDir * 5 : 0;
+      const biteReach = this.action === "bite" || this.action === "charge" ? strikePulse * 17 : 0;
+      const clawReach = this.action === "claw" || this.action === "skill" ? strikePulse * 24 : 0;
+      const slamLift = this.action === "slam" || this.action === "super" || this.action === "roar" ? (actionT < 0.48 ? -actionT * 34 : Math.max(0, (1 - actionT) * 18)) : 0;
+      const ox = hurtLean + (this.action === "charge" ? strikePulse * 9 * f : 0);
+      const oy = walkBob;
+      const pt = (px, py) => ({ x: x + ox + px * s * this.bodyX * f, y: y + oy + py * s * this.bodyY });
+      const poly = (coords, fill, stroke = 0x241619, alpha = 1) => {
+        const points = [];
+        for (let i = 0; i < coords.length; i += 2) points.push(pt(coords[i], coords[i + 1]));
+        this.gfx.fillStyle(fill, alpha).fillPoints(points, true);
+        this.gfx.lineStyle(Math.max(1.5, 2 * s), stroke, Math.min(1, alpha + 0.1)).strokePoints(points, true);
+      };
+      this.gfx.clear();
+      if (this.heroBoss) {
+        this.syncHeroBossVisual();
+        this.drawHeroBossHud(x, y, s, stunned, now);
+        return;
+      }
+      // 每个品种使用独立骨架轮廓，而不只是把同一只四足兽拉高或压扁。
+      // 这让矮脚虫、长颈妖、裂爪兽和各地图精英在远处也能一眼认出。
+      const variant = this.variant;
+      let headX = 27 + biteReach;
+      let headY = -26 + (this.action === "bite" ? strikePulse * 4 : 0);
+      if (variant === "skitter") {
+        // 六足低伏虫：扁甲壳、剪刀颚、三对方向不同的腿。
+        poly([-33, -8, -16, -25, 18, -22, 34, -5, 17, 12, -23, 13], c, 0x1d2026);
+        poly([-20, -18, 8, -17, 19, -6, -10, 1], belly, 0x30414a, 0.9);
+        [-25, -4, 17].forEach((lx, i) => {
+          poly([lx - 4, 5, lx + 4, 5, lx + (i - 1) * 9 + 4, 36, lx + (i - 1) * 9 - 5, 36], dark, 0x171b20);
+        });
+        headX = 31 + biteReach;
+        headY = -8;
+        poly([22, -17, headX + 13, -13, headX + 18, 2, 25, 9], c, 0x1d2026);
+        poly([headX + 7, -2, headX + 28, -12, headX + 18, 4], 0xe9c66c, 0x4d3820);
+        poly([headX + 6, 2, headX + 27, 13, headX + 16, 5], 0xe9c66c, 0x4d3820);
+      } else if (variant === "wisp") {
+        // 长颈漂浮妖：没有兽腿，靠烟尾悬空并从面具口吐弹。
+        poly([-11, 8, 7, 5, 19, 34, 2, 43, -16, 29], dark, 0x20202f, 0.78);
+        poly([-17, -28, 7, -37, 18, -15, 13, 8, -9, 14, -22, -6], c, 0x29213d);
+        poly([-7, -26, 4, -70, 14, -68, 13, -22], belly, 0x4e3b61, 0.9);
+        headX = 11 + biteReach * 0.35;
+        headY = -73;
+        poly([headX - 13, headY - 10, headX + 10, headY - 13, headX + 19, headY, headX + 8, headY + 14, headX - 14, headY + 9], 0xe8dfc7, 0x393243);
+        poly([headX + 8, headY + 1, headX + 25, headY + 7, headX + 9, headY + 10], dark, 0x1b1725);
+      } else if (variant === "claw" || variant === "treant") {
+        // 佝偻双足猎手：手臂长过膝盖，攻击时整只前爪甩出。
+        poly([-17, 2, -2, 4, -8, 43, -23, 43], dark, 0x20151a);
+        poly([5, 4, 19, 1, 25, 43, 10, 43], dark, 0x20151a);
+        poly([-24, -38, 8, -48, 27, -23, 18, 8, -15, 12, -32, -8], c, 0x25151d);
+        poly([-16, -27, 5, -35, 16, -13, 4, 2, -17, -1], belly, 0x56313c, 0.9);
+        poly([-18, -25, -39, -5, -35, 27, -25, 31, -20, 0], dark, 0x25151d);
+        headX = 19 + biteReach * 0.45;
+        headY = -43;
+        poly([headX - 13, headY - 11, headX + 11, headY - 7, headX + 15, headY + 9, headX - 9, headY + 12], c, 0x25151d);
+        for (let i = 0; i < 3; i++) {
+          const a = pt(-34 + i * 3, 27 + i * 2);
+          const b = pt(-49 + i * 4, 39 + i * 3);
+          this.gfx.lineStyle(2.5 * s, 0xffe7ae, 1).lineBetween(a.x, a.y, b.x, b.y);
+        }
+      } else if (variant === "brute" || variant === "golem" || variant === "guardian") {
+        // 重装巨兽：宽肩、短腿、独立盾臂，移动慢但砸地覆盖大。
+        poly([-28, 9, -8, 10, -12, 43, -31, 43], dark, 0x2a2523);
+        poly([8, 10, 28, 8, 33, 43, 13, 43], dark, 0x2a2523);
+        poly([-39, -32, -8, -48, 27, -39, 41, -8, 24, 19, -27, 20, -45, -5], c, 0x30251f);
+        poly([-20, -28, 13, -33, 28, -5, 12, 11, -21, 7], belly, 0x5b4638, 0.95);
+        poly([-38, -25, -57, -13, -55, 20, -33, 27, -25, -5], dark, 0x241e1d);
+        headX = 27 + biteReach * 0.35;
+        headY = -38;
+        poly([headX - 15, headY - 12, headX + 12, headY - 10, headX + 19, headY + 8, headX - 10, headY + 14], c, 0x30251f);
+        poly([-61, -22, -45, -31, -35, -4, -49, 25, -65, 15], belly, 0x49382f, 0.95);
+      } else if (variant === "mammoth") {
+        // 雪原精英：四柱腿、弧形长牙和下垂象鼻。
+        poly([-34, -30, 13, -40, 38, -20, 31, 17, -24, 19, -44, -5], c, 0x334c58);
+        [-26, -8, 17, 31].forEach((lx) => poly([lx - 5, 10, lx + 5, 10, lx + 4, 43, lx - 7, 43], dark, 0x26363e));
+        headX = 36 + biteReach * 0.4;
+        headY = -26;
+        poly([20, -36, headX + 13, -34, headX + 18, -3, 28, 10], c, 0x334c58);
+        poly([headX + 10, -10, headX + 20, 12, headX + 10, 34, headX + 4, 7], dark, 0x243842);
+        poly([headX + 5, -8, headX + 30, 8, headX + 19, 19], 0xf3ead1, 0x665c4e);
+      } else if (variant === "sentinel") {
+        // 机械精英：悬浮核心、分离式肩甲与针脚。
+        poly([-28, -37, 24, -37, 35, -5, 17, 24, -20, 23, -38, -8], c, 0x193c46);
+        poly([-13, -22, 12, -24, 21, -1, 4, 12, -17, 4], 0x17262e, 0xff68da);
+        poly([-31, -14, -49, 2, -35, 9, -20, -4], dark, 0x10242b);
+        poly([27, -14, 49, 1, 36, 10, 20, -3], dark, 0x10242b);
+        poly([-14, 18, -3, 20, -10, 43, -19, 43], belly, 0x19313b);
+        poly([8, 18, 18, 18, 23, 43, 13, 43], belly, 0x19313b);
+        headX = 2;
+        headY = -48;
+        poly([-16, -57, 15, -57, 22, -43, 9, -33, -14, -36], c, 0x14252c);
+      } else if (variant === "kraken") {
+        // 深海精英：钟形头和四条不对称触腕。
+        poly([-35, -38, -8, -57, 24, -47, 38, -17, 23, 7, -23, 9, -42, -15], c, 0x164b55);
+        poly([-19, -35, 10, -43, 24, -18, 10, -2, -18, -8], belly, 0x225f68, 0.9);
+        [-26, -8, 10, 27].forEach((lx, i) => {
+          const bend = i % 2 ? 12 : -13;
+          poly([lx - 6, 2, lx + 5, 1, lx + bend, 27, lx + bend * 0.5, 43, lx - bend * 0.15, 29], dark, 0x123942);
+        });
+        headX = 22;
+        headY = -35;
+      } else if (variant === "wyvern") {
+        // 风暴精英：细躯、双翼、鸟喙与长尾。
+        poly([-10, -20, -58, -50, -39, -3, -17, 8], belly, 0x29365f, 0.88);
+        poly([3, -24, 49, -58, 38, -6, 18, 9], belly, 0x29365f, 0.88);
+        poly([-27, -10, 8, -35, 31, -8, 15, 18, -17, 15], c, 0x263154);
+        poly([-22, 8, -5, 12, -14, 43, -29, 43], dark, 0x1f2948);
+        poly([7, 11, 20, 8, 28, 43, 13, 43], dark, 0x1f2948);
+        poly([-22, -5, -58, 9, -74, 1, -38, -17], dark, 0x1f2948);
+        headX = 31 + biteReach;
+        headY = -24;
+        poly([18, -35, headX + 11, -31, headX + 25, -20, headX + 6, -11, 14, -18], c, 0x263154);
+      } else {
+        // 尖牙兽：保留经典四足轮廓，作为最容易读懂的基础近战单位。
+        poly([-27, -18, -47, -30, -39, -5, -29, 2], dark, 0x20151a);
+        poly([-21, 8, -8, 9, -10, 43, -24, 43], dark, 0x20151a);
+        poly([9, 8, 22, 6, 25, 43, 11, 43], dark, 0x20151a);
+        poly([-31, -27, 2, -35, 29, -19, 25, 13, -13, 20, -34, 3], c, 0x25151d);
+        poly([-12, -24, 7, -29, 18, -13, 9, 7, -14, 11, -23, -5], belly, 0x56313c, 0.9);
+        poly([headX - 10, headY - 15, headX + 12, headY - 11, headX + 20, headY + 2, headX + 8, headY + 14, headX - 12, headY + 9, headX - 17, headY - 3], c, 0x25151d);
+        poly([headX - 8, headY - 13, headX - 2, headY - 28, headX + 5, headY - 12], 0xe9c66c, 0x4d3820);
+        poly([headX + 5, headY - 12, headX + 14, headY - 25, headX + 15, headY - 7], 0xe9c66c, 0x4d3820);
+        const jaw = this.action === "bite" ? 8 * strikePulse : 2;
+        poly([headX + 2, headY + 4, headX + 22, headY + 3 + jaw, headX + 8, headY + 13 + jaw], dark, 0x241619);
+      }
+      const eye = pt(headX + 7, headY - 3);
+      this.gfx.fillStyle(0xffed86, 1).fillCircle(eye.x, eye.y, 2.8 * s);
+      // 地图主题饰件会叠加在独立骨架上，形成同品种在不同生态中的亚种。
+      const theme = this.blueprint?.theme?.id;
+      if (theme === "frost") {
+        poly([-20, -34, -13, -52, -5, -35], 0xc7f1ff, 0x4d7890, 0.9);
+        poly([-4, -37, 3, -58, 11, -35], 0x9fe2fa, 0x4d7890, 0.9);
+      } else if (theme === "mech") {
+        const antenna = pt(2, -42);
+        const tip = pt(7, -58);
+        this.gfx.lineStyle(2.4 * s, 0x7ef9e5, 1).lineBetween(antenna.x, antenna.y, tip.x, tip.y);
+        this.gfx.fillStyle(0xff75e6, 1).fillCircle(tip.x, tip.y, 3 * s);
+      } else if (theme === "tide") {
+        poly([-24, -23, -41, -39, -34, -12], 0x80e1d4, 0x194c58, 0.85);
+        poly([5, -35, 15, -53, 22, -28], 0x80e1d4, 0x194c58, 0.85);
+      } else if (theme === "stone") {
+        poly([-25, -27, -8, -42, 8, -36, 18, -20, -7, -22], 0xd1ad74, 0x4a3728, 0.75);
+      } else if (theme === "blight") {
+        this.gfx.lineStyle(3 * s, 0xaedb62, 0.65).strokeEllipse(x, y + 42 * s * this.bodyY, 68 * s * this.bodyX, 14 * s);
+      } else if (theme === "storm") {
+        const a = pt(-18, -30);
+        const b = pt(12, -43);
+        const c2 = pt(3, -24);
+        this.gfx.lineStyle(3 * s, 0xb7ceff, 0.85).lineBetween(a.x, a.y, b.x, b.y).lineBetween(b.x, b.y, c2.x, c2.y);
+      }
+      // Claw beast swings an oversized forelimb; the titan alternates this
+      // with a two-arm ground slam.
+      if (this.action === "claw" || this.action === "skill") {
+        const armX = 18 + clawReach;
+        poly([10, -9, armX, -18, armX + 10, -8, 16, 5], belly, 0x3b2025);
+        for (let i = -1; i <= 1; i++) {
+          const tip = pt(armX + 15, -9 + i * 7);
+          this.gfx.lineStyle(2.5 * s, 0xffe7ae, 1).lineBetween(pt(armX + 6, -7 + i * 5).x, pt(armX + 6, -7 + i * 5).y, tip.x, tip.y);
+        }
+      }
+      if (this.action === "slam" || this.action === "super" || this.action === "roar") {
+        const armY = -8 + slamLift;
+        poly([-19, -12, -35, armY, -26, armY + 12, -8, 2], belly, 0x3b2025);
+        poly([17, -13, 34, armY, 28, armY + 13, 8, 2], belly, 0x3b2025);
+        if (actionT > 0.48 && actionT < 0.78) {
+          this.gfx.lineStyle(4 * s, 0xffcf78, 0.8).strokeEllipse(x + f * 18 * s, y + 43 * s, (80 + actionT * 90) * s, 18 * s);
+        }
+      }
+      if (this.action === "spit" || this.action === "skill") {
+        const orb = pt(headX + 29 + strikePulse * 18, headY + 1);
+        this.gfx.fillStyle(theme === "mech" ? 0xff6fe8 : theme === "frost" ? 0xb8edff : 0xb5ff77, 0.82).fillCircle(orb.x, orb.y, (4 + strikePulse * 7) * s);
+      }
+      if ((this.action === "super" || this.action === "roar") && actionT > 0.35) {
+        this.gfx.lineStyle(4 * s, 0xffcf78, 0.78).strokeEllipse(x, y + 43 * s * this.bodyY, (90 + actionT * 220) * s, (16 + actionT * 24) * s);
+      }
+      if (this.boss || this.elite) {
+        poly([-25, -34, -17, -49, -8, -35], 0xd9b25f, 0x54331d);
+        poly([-3, -37, 4, -55, 12, -35], 0xd9b25f, 0x54331d);
+        poly([15, -31, 27, -44, 29, -24], 0xd9b25f, 0x54331d);
+      }
+      const w = this.boss ? 100 : this.elite ? 82 : 58;
+      const barY = y - 70 * s * this.bodyY;
+      this.gfx.fillStyle(0x1c140c, 0.9).fillRect(x - w / 2, barY, w, 7);
+      this.gfx.fillStyle(this.boss || this.elite ? 0xe8a3e0 : 0xffd48a, 1).fillRect(x - w / 2, barY, w * Math.max(0, this.hp / this.maxHp), 7);
+      if (this.boss || this.elite) {
+        this.gfx.lineStyle(2, 0xffe4a8, 0.9).strokeRect(x - w / 2, barY, w, 7);
+      }
+      const status = this.ailment !== "none" && now < this.ailmentUntil ? this.ailment : now < this.rootedUntil ? "root" : "";
+      if (status) {
+        const color = status === "freeze" ? 0xa9dcff : status === "burn" ? 0xff853e : status === "poison" ? 0xa8df5a : 0xd6c5ff;
+        this.gfx.lineStyle(3 * s, color, 0.9).strokeEllipse(x, y + 43 * s, 62 * s, 13 * s);
+      }
+      if (stunned && this.comboHits >= 2) {
+        const spin = now * 0.012;
+        this.gfx.fillStyle(0xffe28a, 0.95);
+        for (let i = 0; i < 3; i++) {
+          const a = spin + (Math.PI * 2 * i) / 3;
+          this.gfx.fillCircle(x + Math.cos(a) * 20 * s, y - 58 * s + Math.sin(a) * 6 * s, 2.6 * s);
+        }
+      }
+    }
+
+    worldHurt() {
+      const s = this.visualScale;
+      const hurtHalf = Math.max(this.halfW, Math.min(this.boundHalfW || this.halfW, 36 * s * this.bodyX));
+      const hurtTop = Math.max(56 * s * this.bodyY, Math.min(this.visualTopExtent || 0, 82 * s * this.bodyY));
+      return new Phaser.Geom.Rectangle(
+        this.sprite.x - hurtHalf,
+        this.sprite.y - hurtTop,
+        hurtHalf * 2,
+        hurtTop + this.footOffset
+      );
+    }
+
+    applyAilment(kind, strength = 1) {
+      if (!kind || kind === "none" || this.ko) return;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
+      const s = Math.max(0.4, Number(strength) || 1);
+      const resist = this.boss ? 0.72 : this.elite ? 0.85 : 1;
+      const duration =
+        kind === "freeze" ? (900 + 400 * s) * resist : kind === "poison" ? (3200 + 900 * s) * resist : (2800 + 900 * s) * resist;
+      this.ailment = kind;
+      this.ailmentUntil = Math.max(this.ailmentUntil, now + Math.round(duration));
+      this.ailmentDotAt = Math.min(this.ailmentDotAt || now + 220, now + 220);
+      if (kind === "freeze") {
+        this.rootedUntil = Math.max(this.rootedUntil, this.ailmentUntil);
+        this.action = "hurt";
+        this.actionUntil = this.rootedUntil;
+      }
+    }
+
+    applyMechanic(attacker, move, spec, shot = null) {
+      if (this.ko) return;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
+      const effect = shot?.effect || spec?.effect || "none";
+      const strength = Number(shot?.effectStrength ?? spec?.effectStrength) || 1;
+      const ailment = shot?.ailment || spec?.ailment || "none";
+      const kind = shot?.kind || spec?.mechanic?.type || mechanicSpec(spec).type;
+      if (ailment !== "none") this.applyAilment(ailment, strength);
+      if (this.timeLockBanking && now < this.timeLockUntil) {
+        this.rootedUntil = Math.max(this.rootedUntil, this.timeLockUntil);
+        return;
+      }
+      if (effect === "root" || kind === "trap" || shot?.yearZeroBind) {
+        const duration = (this.boss ? 900 : this.elite ? 1250 : 1700) * Math.max(0.75, strength);
+        this.rootedUntil = Math.max(this.rootedUntil, now + duration);
+        this.hitstunUntil = Math.max(this.hitstunUntil, now + Math.min(760, duration));
+      }
+      if (kind === "zone" || kind === "beam") {
+        this.slowedUntil = Math.max(this.slowedUntil, now + (this.boss ? 650 : 1050));
+        this.slowMul = Math.min(this.slowMul, kind === "zone" ? 0.38 : 0.62);
+      }
+      if (effect === "pull" || shot?.pullField) {
+        const tx = attacker?.sprite?.x ?? this.sprite.x;
+        const dx = tx - this.sprite.x;
+        const step = Math.min(Math.abs(dx), shot?.pullField ? 54 : 34) * Math.sign(dx || 1);
+        this.sprite.x += step;
+        this.rootedUntil = Math.max(this.rootedUntil, now + 260);
+        this.hitstunUntil = Math.max(this.hitstunUntil, now + 320);
+        this.constrainToArena();
+      }
+      if (effect === "launch") {
+        this.knockVx += (attacker?.strikeFacing?.() || attacker?.facing || this.lastHitDir || 1) * (this.boss ? 75 : 135);
+        this.hitstunUntil = Math.max(this.hitstunUntil, now + (this.boss ? 620 : 860));
+      }
+    }
+
+    tickStatus(now) {
+      if (this.ailment !== "none" && now >= this.ailmentUntil) {
+        this.ailment = "none";
+        this.ailmentUntil = 0;
+      }
+      if ((this.ailment === "burn" || this.ailment === "poison") && now < this.ailmentUntil && now >= this.ailmentDotAt) {
+        this.ailmentDotAt = now + (this.ailment === "burn" ? 360 : 480);
+        this.hp = Math.max(0, this.hp - (this.ailment === "burn" ? 3 : 2));
+        this.hitAt = now + 90;
+        if (this.hp <= 0) {
+          this.ko = true;
+          this.sprite.setVisible(false);
+          this.heroSprite?.setVisible(false);
+          this.heroLabel?.setVisible(false);
+          this.gfx.setVisible(false);
+        }
+      }
+      if (now >= this.slowedUntil) this.slowMul = 1;
+    }
+
+    takeHit(move, dir, spec) {
+      if (this.ko) return;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
+      const damage = Math.max(0, Number.isFinite(Number(spec?.damage)) ? Number(spec.damage) : moveDamage(move));
+      if (this.timeLockBanking && now < this.timeLockUntil && !spec?.timeLockBurst) {
+        this.timeLockBank = (this.timeLockBank || 0) + damage;
+        this.hitAt = now + 100;
+        this.draw();
+        return;
+      }
+      this.hp = Math.max(0, this.hp - damage);
+      this.hitAt = now + 145;
+      this.lastHitDir = dir || 1;
+      this.comboHits = now <= this.comboUntil ? Math.min(99, this.comboHits + 1) : 1;
+      this.comboUntil = now + 950;
+      const moveStun = Math.max(0, Number(spec?.hit?.stun) || 0);
+      const baseStun = move === "super" ? 920 : move === "skill" || move === "combo_up" || move === "combo_down" ? 700 : 520;
+      let stunMs = Math.max(baseStun, moveStun + 90) + Math.min(260, (this.comboHits - 1) * 42);
+      if (this.boss) stunMs = Math.max(430, Math.round(stunMs * 0.82));
+      else if (this.elite) stunMs = Math.max(470, Math.round(stunMs * 0.9));
+      // A new hit refreshes and slightly extends an active stagger, leaving a
+      // real cancel window for the next attack instead of letting AI act back.
+      this.hitstunUntil = Math.min(now + 1200, Math.max(now + stunMs, this.hitstunUntil + 70));
+      this.attackAt = Math.max(this.attackAt, this.hitstunUntil + 180);
+      this.action = "hurt";
+      this.actionStartedAt = now;
+      this.actionUntil = this.hitstunUntil;
+      this.actionHit = true;
+      const knock = (this.boss ? 72 : 112) + Math.min(90, damage * 2.2);
+      this.knockVx = this.lastHitDir * knock;
+      this.sprite.x += this.lastHitDir * (this.boss ? 3 : 6);
+      this.constrainToArena();
+      if (this.hp <= 0) {
+        this.ko = true;
+        this.hitstunUntil = 0;
+        this.knockVx = 0;
+        this.sprite.setVisible(false);
+        this.heroSprite?.setVisible(false);
+        this.heroLabel?.setVisible(false);
+        this.gfx.setVisible(false);
+      }
+      this.draw();
+    }
+
+    beginAttack(now, distance = 0, target = null) {
+      this.attackSeq += 1;
+      if (this.boss) {
+        let move = null;
+        const cdReady = (kind) => now >= (this.moveCdUntil?.[kind] || 0);
+        if (this.has("super") && cdReady("super") && now >= this.superAt && (this.hp <= this.maxHp * 0.9 || this.attackSeq >= 3)) {
+          move = "super";
+          this.superAt = now + MOVE_CD_MS.super;
+        }
+        if (!move && now >= this.skillAt) {
+          const specials = ["skill", "combo_up", "combo_down"].filter((kind) => this.has(kind) && cdReady(kind));
+          if (specials.length) {
+            // 循环而不是随机：一场 Boss 战一定有机会看到该英雄的三种小技能。
+            this.bossSkillCursor = (this.bossSkillCursor || 0) % specials.length;
+            move = specials[this.bossSkillCursor];
+            this.bossSkillCursor += 1;
+            this.skillAt = now + 880;
+          }
+        }
+        if (!move) {
+          const targetAir = Boolean(target?.airborne?.());
+          if (targetAir && this.has("attack_up")) move = "attack_up";
+          else {
+            const basics = ["attack", "attack_down", "attack_up"].filter((kind) => this.has(kind));
+            move = basics.length ? basics[this.attackSeq % basics.length] : "attack";
+          }
+        }
+        this.action = "hero_move";
+        this.heroActionMove = move;
+        this.move = move;
+        this.busy = true;
+        this.projSpawned = false;
+        const moveCd = MOVE_CD_MS[move] || 0;
+        if (moveCd > 0) this.moveCdUntil[move] = now + moveCd;
+      } else if (this.elite) {
+        if (now >= this.superAt) {
+          this.action = "roar";
+          this.superAt = now + 6200;
+        } else if (now >= this.skillAt && distance > 90) {
+          this.action = "charge";
+          this.skillAt = now + 2800;
+        } else {
+          this.action = this.attackSeq % 2 ? "slam" : "claw";
+        }
+      } else {
+        this.action = this.attackKind === "spit" && distance < 90 ? "claw" : this.attackKind;
+      }
+      const profile = this.attackProfile();
+      this.actionStartedAt = now;
+      this.actionHitAt = now + profile.windup;
+      this.actionUntil = now + profile.duration;
+      this.actionHit = false;
+      this.attackAt = this.actionUntil + profile.cooldown;
+    }
+
+    attackProfile() {
+      if (this.boss && this.heroActionMove) {
+        const move = this.heroActionMove;
+        const spec = moveSpec(this.fighter, move);
+        const spriteSpec = this.fighter?.sprites?.[move] || {};
+        const frames = Math.max(1, Number(spriteSpec.frames) || 6);
+        const duration = Phaser.Math.Clamp(Math.round((frames / Math.max(1, moveFps(move, frames))) * 1000), 440, 1500);
+        const hasProjectile = Boolean(
+          spec.projectile?.file &&
+          this.scene.textures.exists(`${this.prefix}-proj-${move}`)
+        );
+        const projectileOnly = hasProjectile && (mechanicSpec(spec).type !== "melee" || isSuperMove(move));
+        const hitGate = hasProjectile ? Number(spec.projectile?.spawnFrame ?? 0.35) : 0.3;
+        return {
+          windup: Math.round(duration * Phaser.Math.Clamp(hitGate, 0.12, 0.78)),
+          duration,
+          cooldown: isLightAttack(move) ? 180 : 260,
+          reach: spec.reach,
+          damage: spec.damage,
+          knock: spec.hit?.knock,
+          lift: spec.hit?.lift,
+          stun: spec.hit?.stun,
+          move,
+          lunge: spec.lunge,
+          hasProjectile,
+          projectile: projectileOnly,
+          exactSpec: spec,
+          effect: spec.effect,
+          effectStrength: spec.effectStrength,
+          ailment: spec.ailment,
+        };
+      }
+      if (this.action === "super") {
+        const spec = moveSpec(this.scene.pack?.boss, "super");
+        return {
+          windup: 720,
+          duration: 1280,
+          cooldown: 760,
+          reach: Math.max(310, spec.reach || 0),
+          damage: Math.max(24, spec.damage || 0),
+          knock: Math.max(460, spec.hit?.knock || 0),
+          lift: Math.min(-180, spec.hit?.lift || 0),
+          stun: Math.max(560, spec.hit?.stun || 0),
+          area: true,
+          move: "super",
+          effect: spec.effect,
+          effectStrength: spec.effectStrength,
+          ailment: spec.ailment,
+        };
+      }
+      if (this.action === "roar") {
+        return { windup: 580, duration: 1040, cooldown: 680, reach: 235, damage: 18, knock: 330, lift: -95, stun: 460, area: true };
+      }
+      if (this.action === "skill") {
+        const move = this.heroActionMove || "skill";
+        const spec = moveSpec(this.scene.pack?.boss, move);
+        return {
+          windup: 430,
+          duration: 830,
+          cooldown: 620,
+          reach: Math.max(420, spec.reach || 0),
+          damage: Math.max(12, spec.damage || 0),
+          knock: Math.max(230, spec.hit?.knock || 0),
+          lift: Math.min(-60, spec.hit?.lift || 0),
+          stun: Math.max(360, spec.hit?.stun || 0),
+          ranged: true,
+          move,
+          effect: spec.effect,
+          effectStrength: spec.effectStrength,
+          ailment: spec.ailment,
+        };
+      }
+      if (this.action === "spit") {
+        return { windup: 360, duration: 720, cooldown: 980, reach: 390, damage: 9, knock: 150, lift: -30, stun: 300, ranged: true };
+      }
+      if (this.action === "charge") {
+        return { windup: 245, duration: 720, cooldown: 720, reach: 145, damage: this.elite || this.boss ? 17 : 10, knock: 315, lift: -70, stun: 390, charge: true };
+      }
+      if (this.action === "slam") {
+        return this.elite
+          ? { windup: 430, duration: 880, cooldown: 620, reach: 150, damage: 20, knock: 350, lift: -105, stun: 430, area: true }
+          : { windup: 390, duration: 790, cooldown: 840, reach: 116, damage: 12, knock: 245, lift: -65, stun: 350, area: true };
+      }
+      if (this.action === "claw") {
+        return this.boss
+          ? { windup: 260, duration: 610, cooldown: 430, reach: 112, damage: 15, knock: 270, lift: -65, stun: 340 }
+          : this.elite
+            ? { windup: 285, duration: 650, cooldown: 520, reach: 105, damage: 13, knock: 235, lift: -55, stun: 330 }
+          : { windup: 220, duration: 540, cooldown: 580, reach: 92, damage: 10, knock: 205, lift: -48, stun: 300 };
+      }
+      return { windup: 155, duration: 420, cooldown: 620, reach: 70, damage: 8, knock: 165, lift: -35, stun: 260 };
+    }
+
+    resolveAttack(players, target) {
+      if (this.actionHit) return;
+      this.actionHit = true;
+      const profile = this.attackProfile();
+      if (this.boss && profile.exactSpec) {
+        const move = profile.move;
+        // 与玩家完全共用 spawnProjectile：英雄专属分支（时停、引力、领域、
+        // 忍者、龙卷、骑战等）不会再被替换成通用光球。
+        if (profile.hasProjectile) {
+          this.projSpawned = true;
+          this.scene.spawnProjectile(this, move, profile.exactSpec);
+          if (profile.projectile) return;
+        }
+        const victims = players.filter((victim) => {
+          if (!victim || victim.ko) return false;
+          const dx = victim.sprite.x - this.sprite.x;
+          if (Math.abs(dx) > Math.max(62, profile.reach + 74)) return false;
+          return Math.abs(dx) <= 18 || Math.sign(dx) === this.facing;
+        });
+        victims.forEach((victim) => {
+          if (victim.invulnerable?.()) return;
+          if (this.scene.isGuarding(victim) && !isSuperMove(move)) {
+            this.scene.applyBlockedHit(victim, this, move, profile.exactSpec.damage);
+            victim.sprite.setVelocity(this.facing * 70, 0);
+            this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, null);
+            return;
+          }
+          const hpBefore = victim.hp;
+          victim.takeHit(move, this.facing, profile.exactSpec);
+          if (isLightAttack(move)) {
+            this.scene.applyDomainLightLifesteal(this, victim, Math.max(0, hpBefore - victim.hp));
+          }
+          this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, isSkillSfxMove(move) ? "skill" : "light");
+        });
+        if (isSuperMove(move)) this.scene.cameras.main.shake(90, 0.004);
+        return;
+      }
+      const victims = profile.area ? players : [target];
+      victims.forEach((victim) => {
+        if (!victim || victim.ko || Math.abs(victim.sprite.x - this.sprite.x) > profile.reach * this.visualScale) return;
+        const vx = victim.sprite.x - this.sprite.x;
+        if (!profile.area && Math.abs(vx) > 18 && Math.sign(vx) !== this.facing) return;
+        if (profile.ranged) {
+          const bolt = this.scene.add
+            .circle(this.sprite.x + this.facing * 24, this.sprite.y - 30 * this.bodyY, this.boss ? 10 : 7, this.bellyColor, 0.92)
+            .setDepth(8);
+          this.scene.tweens.add({
+            targets: bolt,
+            x: victim.sprite.x,
+            y: victim.sprite.y - 46,
+            scale: 0.35,
+            alpha: 0.2,
+            duration: 150,
+            onComplete: () => bolt.destroy(),
+          });
+        }
+        victim.takeHit(profile.move || "attack", this.facing, {
+          damage: profile.damage,
+          hit: { knock: profile.knock, lift: profile.lift, stun: profile.stun, knockdown: profile.area || this.action === "slam", stop: 24 },
+        });
+        if (profile.ailment && profile.ailment !== "none") victim.applyAilment?.(profile.ailment, profile.effectStrength || 1);
+        if (profile.effect === "root") {
+          victim.rootedUntil = Math.max(victim.rootedUntil || 0, (this.scene.combatNow ?? this.scene.time.now) + 1100);
+        }
+        this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, profile.area || profile.ranged ? "skill" : "light");
+      });
+      if (profile.area) this.scene.cameras.main.shake(this.boss ? 120 : 75, this.boss ? 0.006 : 0.0035);
+    }
+
+    acquireTarget(players) {
+      const alive = players.filter((player) => player && !player.ko);
+      if (!alive.length) return null;
+      let target = alive[0];
+      let best = Math.abs(target.sprite.x - this.sprite.x) + Math.abs(target.sprite.y - this.sprite.y) * 0.35;
+      for (let i = 1; i < alive.length; i++) {
+        const player = alive[i];
+        const score = Math.abs(player.sprite.x - this.sprite.x) + Math.abs(player.sprite.y - this.sprite.y) * 0.35;
+        if (score < best) {
+          best = score;
+          target = player;
+        }
+      }
+      return target;
+    }
+
+    tick(players) {
+      if (this.ko || !players.length) return;
+      const target = this.acquireTarget(players);
+      if (!target) return;
+      const now = (this.scene.combatNow ?? this.scene.time.now);
+      this.tickStatus(now);
+      if (this.ko) return;
+      const dx = target.sprite.x - this.sprite.x;
+      // 索敌和转身放在受控判断之前：即便刚挨打或被绕背，恢复行动的第一帧也已经朝向最近玩家。
+      if (Math.abs(dx) > 2) this.facing = dx < 0 ? -1 : 1;
+      this.syncFacingVisual();
+      if (now > this.comboUntil) this.comboHits = 0;
+      if (now < this.hitstunUntil || now < this.rootedUntil) {
+        const dt = Math.min(50, Math.max(1, this.scene.game.loop.delta));
+        this.sprite.x += this.knockVx * (dt / 1000);
+        this.knockVx *= Math.pow(0.8, dt / 16.67);
+        if (Math.abs(this.knockVx) < 4) this.knockVx = 0;
+        this.constrainToArena();
+        this.draw();
+        return;
+      }
+      this.knockVx = 0;
+      const attacking = this.action === "hero_move" || ["bite", "claw", "slam", "charge", "spit", "skill", "roar", "super"].includes(this.action);
+      if (attacking && now < this.actionUntil) {
+        const profile = this.attackProfile();
+        if (this.boss && profile.lunge && !this.actionHit && now >= this.actionStartedAt + profile.windup * 0.18) {
+          this.sprite.x += this.facing * profile.lunge * Math.min(0.05, this.scene.game.loop.delta / 1000);
+          this.constrainToArena();
+        }
+        if (profile.charge && !this.actionHit && now >= this.actionStartedAt + profile.windup * 0.55) {
+          this.sprite.x += this.facing * (this.boss ? 4.8 : this.elite ? 4.1 : 3.5) * this.scene.game.loop.delta / 16.67;
+          this.constrainToArena();
+        }
+        if (!this.actionHit && now >= this.actionHitAt) this.resolveAttack(players, target);
+        this.draw();
+        return;
+      }
+      if (now >= this.actionUntil) {
+        this.action = "idle";
+        if (this.boss) {
+          this.move = "idle";
+          this.busy = false;
+          this.projSpawned = false;
+        }
+      }
+      const bossRangedReady =
+        this.boss &&
+        now >= this.skillAt &&
+        ["skill", "combo_up", "combo_down", "super"].some(
+          (move) => {
+            const spec = moveSpec(this.fighter, move);
+            return this.has(move) && now >= (this.moveCdUntil?.[move] || 0) && spec.projectile?.file && mechanicSpec(spec).type !== "melee";
+          }
+        );
+      const rangedReady = bossRangedReady || (this.attackKind === "spit" && now >= this.attackAt);
+      const engage = rangedReady ? 390 : this.boss ? 132 : this.elite ? 105 : this.attackKind === "bite" ? 64 : 86;
+      if (Math.abs(dx) > engage) {
+        this.action = "walk";
+        const pace = this.movePace * (now < this.slowedUntil ? this.slowMul : 1);
+        this.sprite.x += Math.sign(dx) * pace * this.scene.game.loop.delta / 16.67;
+        this.constrainToArena();
+      } else if (now >= this.attackAt) {
+        this.beginAttack(now, Math.abs(dx), target);
+      } else {
+        this.action = "idle";
+      }
+      this.draw();
+    }
+
+    destroy() {
+      this.sprite?.destroy();
+      this.gfx?.destroy();
+      this.heroSprite?.destroy();
+      this.heroLabel?.destroy();
+    }
+  }
+
   class Boot extends Phaser.Scene {
     constructor() {
       super("boot");
     }
 
     async create() {
+      window.HeroShell?.loading("正在集结英灵", "读取人物与战场，首次进入可能需要稍等片刻。");
       try {
         if (document.fonts?.load) {
           await Promise.all([
@@ -3081,11 +4347,11 @@
       try {
         roster = await fetchRoster();
       } catch {
-        this.add.text(40, 40, "读不到 assets/game/index.json。", { fontSize: 18, color: "#f88" });
+        window.HeroShell?.fail("未能读取游戏资源", "请确认 serve.py 正在运行，且 assets/game/index.json 存在，然后重试。");
         return;
       }
       if (!roster.playable.length || !roster.stageIds.length) {
-        this.add.text(40, 40, "assets/game 里还没有可玩的英雄或地图。", { fontSize: 18, color: "#f88" });
+        window.HeroShell?.fail("还没有可用的英灵或战场", "请先导入完整资源包，再重新加载。");
         return;
       }
       this.registry.set("roster", roster);
@@ -3099,6 +4365,8 @@
     }
 
     preload() {
+      window.HeroShell?.loading("准备英灵选择", "载入人物立绘、战场预览与音效…");
+      this.load.on("progress", value => window.HeroShell?.progress(value));
       loadUiSfx(this);
       const roster = this.registry.get("roster") || {};
       const { playable = [], fighters = {}, stageIds = [], stages = {} } = roster;
@@ -3120,6 +4388,11 @@
     }
 
     create() {
+      window.HeroShell?.ready();
+      this._rosterPulling = false;
+      this._blockAutoStart = false;
+      this._selectGeneration = (this._selectGeneration || 0) + 1;
+      const generation = this._selectGeneration;
       killStageBgm(this);
       const roster = this.registry.get("roster") || {};
       this.playable = roster.playable || [];
@@ -3147,7 +4420,7 @@
       if (this.stageIds.indexOf(wantStage) < 0) this.stageIndex = 0;
       this.stageConfirmed = !this.stageIds.length;
       const wantMode = queryParam("mode");
-      this.mode = wantMode === "pve" || wantMode === "pvp" || wantMode === "cricket" ? wantMode : "dummy";
+      this.mode = wantMode === "pve" || wantMode === "pvp" || wantMode === "cricket" || wantMode === "raid" ? wantMode : "dummy";
       this.cpuDiff = loadCpuDiff();
       this.pvpSeat = "";
       this.pvpRoom = "";
@@ -3165,6 +4438,7 @@
       fetch("/api/lan")
         .then((r) => r.json())
         .then((info) => {
+          if (!this.sys.isActive() || generation !== this._selectGeneration) return;
           this.lanIps = info.ips || [];
           this.lanPort = info.port || this.lanPort;
           this.refresh();
@@ -3179,7 +4453,8 @@
         this.pvpSeats[this.pvpSeat] = true;
         this.ensureProfile(this.pvpSeat).nick = this.localNick() || defaultNick(this.pvpSeat);
         const pack = this.registry.get("match");
-        if (pack?.mode === "pvp") {
+        if (pack?.mode === "raid") this.mode = "raid";
+        if (pack?.mode === "pvp" || pack?.mode === "raid") {
           if (pack.p1Id) this.rememberPick("host", pack.p1Id);
           if (pack.p2Id) this.rememberPick("guest", pack.p2Id);
           if (pack.p3Id) this.rememberPick("guest2", pack.p3Id);
@@ -3217,7 +4492,7 @@
         this.scheduleSync();
         try {
           const url = new URL(location.href);
-          url.searchParams.set("mode", "pvp");
+          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
           history.replaceState({}, "", url);
         } catch {
           /* ignore */
@@ -3231,26 +4506,31 @@
         fontSize: 18,
         color: "#ead8a8",
       };
-      this.modeDummy = uiText(this, w / 2 - 288, 36, "木桩练习", modeStyle)
+      this.modeDummy = uiText(this, w / 2 - 384, 36, "木桩练习", modeStyle)
         .setOrigin(0.5, 0)
         .setDepth(6)
         .setInteractive({ useHandCursor: true });
-      this.modePve = uiText(this, w / 2 - 96, 36, "PVE 对战", modeStyle)
+      this.modePve = uiText(this, w / 2 - 192, 36, "PVE 对战", modeStyle)
         .setOrigin(0.5, 0)
         .setDepth(6)
         .setInteractive({ useHandCursor: true });
-      this.modeCricket = uiText(this, w / 2 + 96, 36, "电子斗蛐蛐", modeStyle)
+      this.modeCricket = uiText(this, w / 2, 36, "电子斗蛐蛐", modeStyle)
         .setOrigin(0.5, 0)
         .setDepth(6)
         .setInteractive({ useHandCursor: true });
-      this.modePvp = uiText(this, w / 2 + 288, 36, "局域网 PVP", modeStyle)
+      this.modeRaid = uiText(this, w / 2 + 192, 36, "合作闯关", modeStyle)
         .setOrigin(0.5, 0)
         .setDepth(6)
         .setInteractive({ useHandCursor: true });
-      [this.modeDummy, this.modePve, this.modeCricket, this.modePvp].forEach((tab) => tab.setData("uiClickFirm", true));
+      this.modePvp = uiText(this, w / 2 + 384, 36, "局域网 PVP", modeStyle)
+        .setOrigin(0.5, 0)
+        .setDepth(6)
+        .setInteractive({ useHandCursor: true });
+      [this.modeDummy, this.modePve, this.modeCricket, this.modeRaid, this.modePvp].forEach((tab) => tab.setData("uiClickFirm", true));
       this.modeDummy.on("pointerdown", () => this.setMode("dummy"));
       this.modePve.on("pointerdown", () => this.setMode("pve"));
       this.modeCricket.on("pointerdown", () => this.setMode("cricket"));
+      this.modeRaid.on("pointerdown", () => this.setMode("raid"));
       this.modePvp.on("pointerdown", () => this.setMode("pvp"));
       const diffStyle = {
         fontSize: 16,
@@ -3298,16 +4578,21 @@
         this._stageThumbStamp[id] = String(s.committedAt || `${s.width || 0}x${s.height || 0}`);
       });
       this.rosterPoll = this.time.addEvent({
-        delay: 2500,
+        delay: 10000,
         loop: true,
         callback: () => this.pullStudioRoster(),
       });
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.rememberSelection();
+        ++this._selectGeneration;
+        this.load.off("progress");
+        this._selectVoice?.snd?.stop();
+        this._selectVoice?.snd?.destroy();
+        this._selectVoice = null;
         this.rosterPoll?.remove(false);
         this.rosterPoll = null;
       });
-      this.keys = this.input.keyboard.addKeys("A,D,W,S,R,J,Q,E,F,ENTER,SPACE,LEFT,RIGHT,TAB,UP,DOWN,ONE,TWO,THREE,FOUR,FIVE,SIX");
-      this.input.keyboard.addCapture("TAB");
+      this.keys = this.input.keyboard.addKeys("A,D,W,S,R,J,Q,E,F,ENTER,SPACE,LEFT,RIGHT,UP,DOWN,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN");
       this.input.once("pointerdown", () => this.sound.unlock());
       this.input.keyboard.once("keydown", () => this.sound.unlock());
       this.input.on("pointerdown", (_pointer, objects) => {
@@ -3316,7 +4601,6 @@
         playUiClick(this, firm);
       });
       this.refresh();
-      this.pullStudioRoster();
       if (this._resumeStage) {
         this._resumeStage = false;
         this.refreshStageForNewRound();
@@ -3327,8 +4611,40 @@
       }
     }
 
+    rememberSelection() {
+      try {
+        // A random-map draw already chose the match. Do not overwrite it with
+        // the preview that happened to be showing before the draw.
+        const match = this.locked ? this.registry.get("match") : null;
+        const url = new URL(location.href);
+        url.searchParams.set("p1", match?.p1Id || this.playable[this.p1Index]);
+        url.searchParams.set("p2", match?.p2Id || this.playable[this.p2Index]);
+        url.searchParams.set("mode", this.mode);
+        url.searchParams.set("diff", this.cpuDiff);
+        const stageId = match?.stageId || this.stageIds[this.stageIndex];
+        if (stageId) url.searchParams.set("stage", stageId);
+        history.replaceState({}, "", url);
+      } catch { /* optional deep link */ }
+    }
+
     paintSelectBackdrop(w, h) {
-      this.add.rectangle(w / 2, h / 2, w + 8, h + 8, 0x1a1410).setDepth(0);
+      this.add.rectangle(w / 2, h / 2, w + 8, h + 8, 0x191813).setDepth(0);
+      const ink = this.add.graphics().setDepth(0);
+      ink.fillStyle(0x342c1d, 0.4);
+      ink.fillCircle(w / 2, 288, 224);
+      [0, 1, 2].forEach(layer => {
+        ink.fillStyle([0x29271f, 0x23231d, 0x1d201b][layer], 0.7);
+        ink.beginPath(); ink.moveTo(0, h);
+        for (let x = 0; x <= w + 80; x += 80) {
+          const y = 530 + layer * 55 - Math.sin(x * 0.006 + layer * 2) * 64 - Math.cos(x * 0.017) * 22;
+          ink.lineTo(x, y);
+        }
+        ink.lineTo(w, h); ink.closePath(); ink.fillPath();
+      });
+      ink.lineStyle(1, 0xc5a46a, 0.18);
+      ink.strokeCircle(w / 2, 288, 234);
+      ink.lineBetween(32, 680, w - 32, 680);
+      uiText(this, w / 2, 710, "择一英灵  ·  赴一场山河之战", {fontFamily: BODY_FONT, fontSize: 13, color: "#a99b7d"}).setOrigin(0.5);
     }
 
     buildShowcases(w) {
@@ -3387,6 +4703,15 @@
         .setOrigin(0.5)
         .setDepth(5);
       this.vsSub = this.add.text(w / 2, 196, "").setVisible(false);
+      [[leftCx, "p1"], [rightCx, "p2"]].forEach(([cx, slot]) => {
+        this.add.zone(cx, top + boxH / 2, boxW, boxH).setDepth(6).setInteractive({useHandCursor: true})
+          .on("pointerdown", () => {
+            if (this.locked || this.drawingMap || this.mode === "pvp" || this.mode === "raid") return;
+            this.slot = slot;
+            this.ensureHeroRailPageFor(slot === "p1" ? this.p1Index : this.p2Index);
+            this.refresh();
+          });
+      });
     }
 
     paintShowcasePose(spr, texKey, fighter, step, cx, feetY, fitW, fitH, scale) {
@@ -3470,7 +4795,7 @@
     refreshShowcases() {
       if (!this.showGfx) return;
       const { w: boxW, h: boxH, top, leftX, rightX } = this.showBox;
-      const pvp = this.mode === "pvp";
+      const pvp = this.mode === "pvp" || this.mode === "raid";
       const p1Id = this.playable[this.p1Index];
       const p2Id = pvp ? this.heroOf("guest") || this.playable[this.p2Index] : this.playable[this.p2Index];
       const p1 = this.fighters[p1Id] || {};
@@ -3550,8 +4875,8 @@
           .setDepth(11);
         const zone = this.add.zone(0, 0, 96, 118).setInteractive({ useHandCursor: true }).setDepth(12);
         zone.on("pointerdown", () => {
-          if (this.drawingMap) return;
-          if (this.mode === "pvp") {
+          if (this.drawingMap || this.locked) return;
+          if (this.mode === "pvp" || this.mode === "raid") {
             this.p1Index = i;
             this.broadcastPick();
           } else if (this.slot === "p1") this.p1Index = i;
@@ -3560,13 +4885,14 @@
           this.refresh();
           this.playSelectVoice(this.playable[i]);
         });
+        const cardHover = on => { portrait.setAlpha(on ? 0.8 : 1); };
         zone.on("pointerover", () => {
           this.hoverIndex = i;
-          this.refresh();
+          cardHover(true);
         });
         zone.on("pointerout", () => {
           if (this.hoverIndex === i) this.hoverIndex = -1;
-          this.refresh();
+          cardHover(false);
         });
         this.cards.push({ id, x: 0, cardW: 96, cardH: 118, top: 0, g, maskG, portrait, name, line, badge, zone });
       });
@@ -3599,7 +4925,7 @@
         .setDepth(11);
       const zone = this.add.zone(0, 0, 96, 118).setInteractive({ useHandCursor: false }).setDepth(12);
       zone.on("pointerdown", () => {
-        if (this.drawingMap) return;
+        if (this.drawingMap || this.locked) return;
         setSelectFooter(null, "更多英灵正在赶来的路上", false);
         this.time.delayedCall(1600, () => this.refresh());
       });
@@ -3632,7 +4958,7 @@
     }
 
     shiftHeroRail(dir) {
-      if (this.drawingMap) return;
+      if (this.drawingMap || this.locked) return;
       const pages = this.heroRailPageCount();
       if (pages <= 1) return;
       this.heroRailPage = (this.heroRailPage + dir + pages * 8) % pages;
@@ -3709,7 +5035,7 @@
       const w = this.scale.width;
       const n = this.cards.length;
       if (!n) return;
-      const pvp = this.mode === "pvp";
+      const pvp = this.mode === "pvp" || this.mode === "raid";
       const reserve = pvp ? 328 : 0;
       const icon = 96;
       const gap = 12;
@@ -3839,11 +5165,13 @@
     }
 
     async pullStudioRoster() {
-      if (this._rosterPulling || this.drawingMap) return;
+      if (this._rosterPulling || this.drawingMap || this.locked || document.hidden) return;
+      const generation = this._selectGeneration;
       this._rosterPulling = true;
       try {
         const roster = await fetchRoster(this.registry.get("roster"));
-        if (!this.sys?.isActive?.()) {
+        if (!this.sys?.isActive?.() || generation !== this._selectGeneration) {
+          if (generation !== this._selectGeneration) return;
           this._rosterPulling = false;
           return;
         }
@@ -3890,7 +5218,7 @@
           });
         }
         const applyUi = () => {
-          if (!this.sys?.isActive?.()) return;
+          if (!this.sys?.isActive?.() || generation !== this._selectGeneration) return;
           if (heroesChanged) {
             this.clearHeroRail();
             this.buildHeroRail();
@@ -3918,6 +5246,7 @@
     }
 
     buildStageDeck(w, h) {
+      this.stageIds.forEach(id => compactStagePreview(this, `stage-thumb-${id}`));
       const sw = 456;
       const sh = 256;
       const cx = w / 2;
@@ -3958,12 +5287,13 @@
         .setDepth(depthBase + 42)
         .setData("uiClickFirm", true);
       this.stageZone.on("pointerdown", () => {
-        if (this.drawingMap) return;
-        if (this.mode === "pvp" && this.pvpSeat !== "host") return;
+        if (this.drawingMap || this.locked) return;
+        if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
         if (this.stageConfirmed) {
           this.stageConfirmed = false;
           this.refreshStageDeck(true);
-          if (this.mode === "pvp") this.broadcastStage();
+          this.refresh();
+          if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
           return;
         }
         this.confirmStage();
@@ -4023,19 +5353,19 @@
     }
 
     shiftStage(dir) {
-      if (!this.stageIds.length) return;
-      if (this.mode === "pvp" && this.pvpSeat !== "host") return;
+      if (this.locked || this.drawingMap || !this.stageIds.length) return;
+      if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
       const n = this.stageIds.length;
       this.stageIndex = (this.stageIndex + dir + n * 8) % n;
       this.stageConfirmed = false;
       this.refreshStageDeck(false);
       this.refresh();
-      if (this.mode === "pvp") this.broadcastStage();
+      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
     }
 
     confirmStage() {
-      if (this.drawingMap) return;
-      if (this.mode === "pvp" && this.pvpSeat !== "host") return;
+      if (this.drawingMap || this.locked) return;
+      if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
       if (!this.stageIds.length) return;
       this.stageConfirmed = true;
       try {
@@ -4047,7 +5377,7 @@
       }
       this.refreshStageDeck(true);
       this.refresh();
-      if (this.mode === "pvp") this.broadcastStage();
+      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
     }
 
     refreshStageDeck(snap) {
@@ -4062,6 +5392,7 @@
         if (!show) return;
         const off = dist * 6;
         const depth = 12 + (3 - dist);
+        this.tweens.killTweensOf(layer.img);
         const targetX = cx + off;
         const targetY = cy - off;
         layer.img.setDepth(depth);
@@ -4091,7 +5422,7 @@
       });
       this.stageGlow.clear();
       this.stageLabel.setVisible(true);
-      const hostMap = this.mode !== "pvp" || this.pvpSeat === "host";
+      const hostMap = (this.mode !== "pvp" && !(this.mode === "raid" && this.pvpSeat)) || this.pvpSeat === "host";
       if (hostMap) this.stageZone?.setInteractive({ useHandCursor: true });
       else this.stageZone?.disableInteractive();
       this.setStageArrowsVisible(hostMap && this.stageIds.length > 1);
@@ -4118,10 +5449,11 @@
     }
 
     setMode(mode) {
-      const next = mode === "pve" || mode === "pvp" || mode === "cricket" ? mode : "dummy";
-      if (next !== this.mode && this.mode === "pvp") this.teardownNet();
+      if (this.locked || this.drawingMap) return;
+      const next = mode === "pve" || mode === "pvp" || mode === "cricket" || mode === "raid" ? mode : "dummy";
+      if (next !== this.mode && (this.mode === "pvp" || this.mode === "raid")) this.teardownNet();
       this.mode = next;
-      if (this.mode === "pvp") {
+      if (this.mode === "pvp" || this.mode === "raid") {
         this.slot = "p1";
         this.pvpStatus = "点右侧「创建房间」或「加入房间」";
       } else {
@@ -4503,7 +5835,7 @@
     }
 
     refreshPvpLobby() {
-      const show = this.mode === "pvp";
+      const show = this.mode === "pvp" || this.mode === "raid";
       const inRoom = show && !!this.pvpSeat;
       if (this.lobbyPanel) {
         this.lobbyPanel.clear();
@@ -4522,18 +5854,18 @@
       if (show) {
         const n = this.pvpConnectedCount();
         const readyN = this.onlineSeats().filter((s) => this.ensureProfile(s).ready).length;
-        this.lobbyTitle.setText(inRoom ? `房间  ${this.pvpRoom}` : "局域网对战");
+        this.lobbyTitle.setText(inRoom ? `房间  ${this.pvpRoom}` : this.mode === "raid" ? "合作闯关" : "局域网对战");
         let sub = "每人打开同一地址，创建或加入房间，无需带参数";
         if (inRoom) {
           if (n < 2) sub = "1 人在场　把房号发给同事即可开战";
           else if (n === 2) {
             sub = this.allOnlineReady()
-              ? "2 人已准备　即将 1v1"
-              : `2 人在场 · 1v1　已准备 ${readyN}/2`;
+              ? this.mode === "raid" ? "2 人已准备　即将闯关" : "2 人已准备　即将 1v1"
+              : `2 人在场 · ${this.mode === "raid" ? "合作闯关" : "1v1"}　已准备 ${readyN}/2`;
           } else {
             sub = this.allOnlineReady()
-              ? "3 人已准备　即将混战"
-              : `3 人在场 · 混战　已准备 ${readyN}/3`;
+              ? this.mode === "raid" ? "3 人已准备　即将闯关" : "3 人已准备　即将混战"
+              : `3 人在场 · ${this.mode === "raid" ? "合作闯关" : "混战"}　已准备 ${readyN}/3`;
           }
         }
         this.lobbySub.setText(sub);
@@ -4586,7 +5918,7 @@
         mineReady ? "取消准备" : "准备",
         mineReady ? 0x3f5e3f : 0x2f4a66
       );
-      const startLabel = this.pvpConnectedCount() >= 3 ? "开战·混战" : "开战·1v1";
+      const startLabel = this.mode === "raid" ? "开始闯关" : this.pvpConnectedCount() >= 3 ? "开战·混战" : "开战·1v1";
       this.setLobbyBtn(
         this.startBtn,
         hostStart && this.pvpConnectedCount() >= 2,
@@ -4731,7 +6063,7 @@
         this.refresh();
       });
       net.on("lobby_return", () => {
-        if (this.mode !== "pvp") return;
+        if (this.mode !== "pvp" && this.mode !== "raid") return;
         // 抽图/进战途中的过期回房包会掐掉本局
         if (this.drawingMap || this.locked) return;
         this.resetLobbyReady();
@@ -4755,8 +6087,12 @@
         this.refresh();
       });
       net.on("close", () => {
-        if (this.mode !== "pvp") return;
-        this.pvpStatus = "连接已断开";
+        if (this.mode !== "pvp" && this.mode !== "raid") return;
+        this.pvpSeat = "";
+        this.pvpRoom = "";
+        this.pvpSeats = { host: false, guest: false, guest2: false };
+        this.pvpPicks = emptyPvpPicks();
+        this.pvpStatus = "连接已断开，可重新创建或加入房间";
         this.locked = false;
         this.drawingMap = false;
         this.refresh();
@@ -4770,9 +6106,9 @@
 
     refresh() {
       const modeLabel =
-        this.mode === "pvp" ? "PVP" : this.mode === "pve" ? "PVE" : this.mode === "cricket" ? "斗蛐蛐" : "木桩";
-      if (this.mode === "pvp") {
-        setChrome("select", this.pvpSeat && this.pvpRoom ? `${GAME_NAME}　房 ${this.pvpRoom}` : `${GAME_NAME}　局域网 PVP`);
+        this.mode === "pvp" ? "PVP" : this.mode === "raid" ? "合作闯关" : this.mode === "pve" ? "PVE" : this.mode === "cricket" ? "斗蛐蛐" : "木桩";
+      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
+        setChrome("select", this.pvpSeat && this.pvpRoom ? `${GAME_NAME}　房 ${this.pvpRoom}` : `${GAME_NAME}　${modeLabel}`);
         if (this.title) this.title.setText("").setVisible(false);
       } else {
         setChrome("select", `${GAME_NAME}　${modeLabel}`);
@@ -4786,17 +6122,22 @@
       if (this.modePve) this.modePve.setColor(this.mode === "pve" ? "#4a3018" : "#ead8a8");
       if (this.modeCricket) this.modeCricket.setColor(this.mode === "cricket" ? "#4a3018" : "#ead8a8");
       if (this.modePvp) this.modePvp.setColor(this.mode === "pvp" ? "#4a3018" : "#ead8a8");
-      const share = this.mode === "pvp" ? `同网访问：${wsUrlHint(this.lanIps, this.lanPort)}` : "";
+      if (this.modeRaid) this.modeRaid.setColor(this.mode === "raid" ? "#4a3018" : "#ead8a8");
+      const share = this.mode === "pvp" || this.mode === "raid" ? `同网访问：${wsUrlHint(this.lanIps, this.lanPort)}` : "";
       setSelectFooter(
         share,
         this.mode === "cricket"
           ? "点左右立绘选两名人机　不锁地图则开战抽签　W/S 切 1P/2P　J 开打旁观"
           : this.mode === "pve"
             ? "点下方难度　　不锁地图则开战抽签　　F 切换难度"
+            : this.mode === "raid"
+              ? "单人：J 开始当前战场；合作：创建／加入房间，选人准备后开战"
             : "",
         false
       );
       this.refreshPvpLobby();
+      window.HeroShell?.selection(this);
+      const onlineMode = this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat);
       this.cards.forEach((card, i) => {
         if (card.comingSoon) {
           card.g.clear();
@@ -4814,14 +6155,14 @@
         const asMine = i === this.p1Index;
         const picks = this.pvpPicks || emptyPvpPicks();
         const peerSeats = [];
-        if (this.mode === "pvp") {
+        if (onlineMode) {
           ["host", "guest", "guest2"].forEach((seat) => {
             if (seat === this.pvpSeat) return;
             if (picks[seat] === card.id) peerSeats.push(seat);
           });
         }
-        const asPeer = this.mode === "pvp" ? peerSeats.length > 0 : i === this.p2Index;
-        const on = this.mode === "pvp" ? asMine : this.slot === "p1" ? asMine : asPeer;
+        const asPeer = onlineMode ? peerSeats.length > 0 : this.mode !== "raid" && i === this.p2Index;
+        const on = onlineMode || this.mode === "raid" ? asMine : this.slot === "p1" ? asMine : asPeer;
         const hover = i === this.hoverIndex;
         card.g.clear();
         const stroke =
@@ -4834,7 +6175,7 @@
         });
         card.portrait.setAlpha(asMine || asPeer || hover ? 1 : 0.72);
         card.name.setColor(on ? "#f8ecd0" : "#c4b090");
-        if (this.mode === "pvp") {
+        if (onlineMode) {
           const peerLabel = peerSeats.map((s) => seatLabel(s)).join("+");
           if (asMine && asPeer) card.badge.setText(`我+${peerLabel}`).setColor("#e8c36a");
           else if (asMine) card.badge.setText("我").setColor("#6ec8ff");
@@ -4854,6 +6195,7 @@
         { t: this.modeDummy, on: this.mode === "dummy" },
         { t: this.modePve, on: this.mode === "pve" },
         { t: this.modeCricket, on: this.mode === "cricket" },
+        { t: this.modeRaid, on: this.mode === "raid" },
         { t: this.modePvp, on: this.mode === "pvp" },
       ];
       tabs.forEach(({ t, on }) => {
@@ -4886,6 +6228,7 @@
       if (this.drawingMap) return;
       this.drawingMap = true;
       this.locked = true;
+      window.HeroShell?.selection(this);
       const w = this.scale.width;
       const h = this.scale.height;
       const n = this.stageIds.length;
@@ -5025,7 +6368,8 @@
         p2Id,
         p3Id: three ? p3Id : "",
         pvpThree: three,
-        mode: "pvp",
+        mode: this.mode === "raid" ? "raid" : "pvp",
+        raid: this.mode === "raid",
         seat,
         room: this.pvpRoom,
         stageId: stageId || this.stageIds[0],
@@ -5068,7 +6412,7 @@
         this.locked = false;
         try {
           const url = new URL(location.href);
-          url.searchParams.set("mode", "pvp");
+          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
           history.replaceState({}, "", url);
         } catch {
           /* ignore */
@@ -5114,7 +6458,7 @@
         this.locked = false;
         try {
           const url = new URL(location.href);
-          url.searchParams.set("mode", "pvp");
+          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
           history.replaceState({}, "", url);
         } catch {
           /* ignore */
@@ -5175,10 +6519,31 @@
     }
 
     confirm() {
-      if (this.drawingMap) return;
-      if (this.mode === "pvp") {
+      if (this.drawingMap || this.locked) return;
+      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
         if (this.locked) return;
         if (this.pvpSeat) this.setReady(!this.ensureProfile(this.pvpSeat).ready);
+        return;
+      }
+      if (this.mode === "raid" && !this.pvpSeat) {
+        if (this.locked || !this.playable.length) return;
+        this.locked = true;
+        const p1Id = this.playable[this.p1Index];
+        const stageId = this.stageIds[this.stageIndex] || this.stageIds[0];
+        const pack = {
+          p1Id,
+          p2Id: p1Id,
+          mode: "raid",
+          raid: true,
+          raidSolo: true,
+          stageId,
+          stageIds: this.stageIds,
+          stages: this.stages,
+          p1: this.fighters[p1Id],
+          p2: this.fighters[p1Id],
+        };
+        this.registry.set("match", pack);
+        this.scene.start("loader", pack);
         return;
       }
       if (this.locked || !this.playable.length) return;
@@ -5233,13 +6598,14 @@
       if (!this.keys || this.drawingMap || this.locked) return;
       const pressed = (key) => key && Phaser.Input.Keyboard.JustDown(key);
       if (pressed(this.keys.Q)) {
-        const order = ["dummy", "pve", "cricket", "pvp"];
+        const order = ["dummy", "pve", "cricket", "raid", "pvp"];
         this.setMode(order[(order.indexOf(this.mode) + 1) % order.length]);
       }
       if (pressed(this.keys.ONE)) this.setMode("dummy");
       if (pressed(this.keys.TWO)) this.setMode("pve");
       if (pressed(this.keys.THREE)) this.setMode("cricket");
       if (pressed(this.keys.FOUR)) this.setMode("pvp");
+      if (pressed(this.keys.SEVEN)) this.setMode("raid");
       if (this.mode === "pve") {
         if (pressed(this.keys.FIVE)) this.setCpuDiff("kind");
         if (pressed(this.keys.SIX)) this.setCpuDiff("fair");
@@ -5249,7 +6615,7 @@
           this.setCpuDiff(order[(i + 1) % order.length]);
         }
       }
-      if (this.mode === "pvp") {
+      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
         const left = pressed(this.keys.A) || pressed(this.keys.LEFT);
         const right = pressed(this.keys.D) || pressed(this.keys.RIGHT);
         const readyToggle = pressed(this.keys.R);
@@ -5272,13 +6638,12 @@
       if (pressed(this.keys.E)) this.confirmStage();
       const pickP1 = pressed(this.keys.W) || pressed(this.keys.UP);
       const pickP2 = pressed(this.keys.S) || pressed(this.keys.DOWN);
-      const tab = pressed(this.keys.TAB);
       const left = pressed(this.keys.A) || pressed(this.keys.LEFT);
       const right = pressed(this.keys.D) || pressed(this.keys.RIGHT);
       const start = pressed(this.keys.J) || pressed(this.keys.ENTER) || pressed(this.keys.SPACE);
-      if (pickP1) this.slot = "p1";
+      if (this.mode === "raid") this.slot = "p1";
+      else if (pickP1) this.slot = "p1";
       else if (pickP2) this.slot = "p2";
-      else if (tab) this.slot = this.slot === "p1" ? "p2" : "p1";
       const n = this.playable.length;
       if (n && (left || right)) {
         const dir = left ? n - 1 : 1;
@@ -5291,10 +6656,10 @@
           this.ensureHeroRailPageFor(this.p2Index);
           this.playSelectVoice(this.playable[this.p2Index]);
         }
-      } else if (pickP1 || pickP2 || tab) {
+      } else if (pickP1 || pickP2) {
         this.ensureHeroRailPageFor(this.slot === "p1" ? this.p1Index : this.p2Index);
       }
-      if (pickP1 || pickP2 || tab || left || right) this.refresh();
+      if (pickP1 || pickP2 || left || right) this.refresh();
       if (start) this.confirm();
     }
   }
@@ -5309,11 +6674,20 @@
     }
 
     preload() {
-      wipeFightAssets(this);
-      loadUiSfx(this);
       setChrome("select", "正在进入对战…");
+      window.HeroShell?.loading("正在进入战场", "读取本局人物动作与场景资源…");
+      this.load.on("progress", value => window.HeroShell?.progress(value));
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.load.off("progress"); this.load.off("loaderror"); });
+      wipeFightAssets(this);
+      // Selection already requests UI sounds. Do not make optional audio a
+      // prerequisite for entering the lightweight raid demo.
+      if (!this.pack?.raid) loadUiSfx(this);
       const pack = this.pack || {};
       const { p1Id, p2Id, p3Id } = pack;
+      // Raid roster data came from the prior scene. Avoid a second JSON
+      // round-trip before create(), the former source of a permanent black
+      // transition when a browser request stalled.
+      if (pack.raid) return;
       const t = Date.now();
       // Same keys would be skipped from json cache on rematch, so old fighter.json sticks
       // and preload queues 0 files — create then thinks there is nothing to load.
@@ -5332,16 +6706,24 @@
       const p1Id = pack.p1Id;
       const p2Id = pack.p2Id;
       const p3Id = pack.p3Id;
-      const p1 = this.cache.json.get("fresh-p1") || pack.p1;
-      const p2 = p2Id === p1Id ? p1 : this.cache.json.get("fresh-p2") || pack.p2 || p1;
+      const p1 = (!pack.raid && this.cache.json.get("fresh-p1")) || pack.p1;
+      const p2 = p2Id === p1Id ? p1 : (!pack.raid && this.cache.json.get("fresh-p2")) || pack.p2 || p1;
       let p3 = null;
       if (p3Id) {
         if (p3Id === p1Id) p3 = p1;
         else if (p3Id === p2Id) p3 = p2;
-        else p3 = this.cache.json.get("fresh-p3") || pack.p3;
+        else p3 = (!pack.raid && this.cache.json.get("fresh-p3")) || pack.p3;
       }
-      this.pack = { ...pack, p1, p2, p3 };
       const roster = this.registry.get("roster") || {};
+      const raidBoss = pack.raid ? raidBossFor(roster, pack) : null;
+      this.pack = {
+        ...pack,
+        p1,
+        p2,
+        p3,
+        bossId: raidBoss?.id || "",
+        boss: raidBoss?.fighter || null,
+      };
       if (roster.fighters) {
         if (p1Id && p1) roster.fighters[p1Id] = p1;
         if (p2Id && p2) roster.fighters[p2Id] = p2;
@@ -5360,27 +6742,44 @@
 
     queueFightAssets() {
       const pack = this.pack || {};
-      (pack.stageIds || [pack.stageId]).filter(Boolean).forEach((id) => {
-        const key = `stage-${id}`;
-        if (this.textures.exists(key)) this.textures.remove(key);
-        const file = pack.stages?.[id]?.file || "stage.png";
-        const bust = pack.stages?.[id]?.committedAt || Date.now();
-        this.load.image(key, `/assets/game/stages/${id}/${file}?t=${encodeURIComponent(bust)}`);
-        queueStageBgm(this, id, pack.stages);
-      });
-      loadFighterSprites(this, "p1", pack.p1Id, pack.p1);
-      if (pack.p2Id && pack.p2Id !== pack.p1Id) loadFighterSprites(this, "p2", pack.p2Id, pack.p2);
+      // Do not block the first fight behind every map's background and BGM.
+      // A full roster has a dozen stages; loading them all made the transition
+      // appear permanently stuck, especially on a fresh browser cache.
+      if (!pack.raid) {
+        [pack.stageId].filter(Boolean).forEach((id) => {
+          const key = `stage-${id}`;
+          if (this.textures.exists(key)) this.textures.remove(key);
+          const file = pack.stages?.[id]?.file || "stage.png";
+          const bust = pack.stages?.[id]?.committedAt || Date.now();
+          this.load.image(key, `/assets/game/stages/${id}/${file}?t=${encodeURIComponent(bust)}`);
+          queueStageBgm(this, id, pack.stages);
+        });
+      }
+      const loadFighter = pack.raid ? loadRaidFighterSprites : loadFighterSprites;
+      loadFighter(this, "p1", pack.p1Id, pack.p1);
+      if (pack.p2Id && pack.p2Id !== pack.p1Id) loadFighter(this, "p2", pack.p2Id, pack.p2);
       if (pack.p3Id) {
         const p3Data =
           pack.p3 ||
           (pack.p3Id === pack.p1Id ? pack.p1 : pack.p3Id === pack.p2Id ? pack.p2 : null);
-        loadFighterSprites(this, "p3", pack.p3Id, p3Data);
+        loadFighter(this, "p3", pack.p3Id, p3Data);
       }
+      if (pack.raid && pack.bossId && pack.boss) {
+        loadRaidFighterSprites(this, "boss", pack.bossId, pack.boss);
+      }
+    }
+
+    requiredFightersReady() {
+      const pack = this.pack;
+      return this.textures.exists("p1-idle") &&
+        (pack.p2Id === pack.p1Id || this.textures.exists("p2-idle")) &&
+        (!pack.p3Id || this.textures.exists("p3-idle")) &&
+        (!pack.raid || !pack.bossId || this.textures.exists("boss-idle"));
     }
 
     finishLoad(attempt) {
       const go = () => {
-        if (this.textures.exists("p1-idle")) {
+        if (this.requiredFightersReady()) {
           this.enterFight();
           return;
         }
@@ -5401,23 +6800,11 @@
     }
 
     showLoadFail() {
-      const detail = this.failedFiles.slice(0, 3).join("\n");
-      setChrome("select", "加载失败，返回英灵选择");
-      this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x121314, 1).setOrigin(0, 0);
-      this.add
-        .text(
-          this.scale.width / 2,
-          this.scale.height / 2,
-          detail ? `英灵资源加载失败\n${detail}\n按 Esc 返回` : "英灵资源加载失败，按 Esc 返回",
-          {
-            fontFamily: UI_FONT,
-            fontSize: 16,
-            color: "#f88",
-            align: "center",
-          }
-        )
-        .setOrigin(0.5);
-      this.input.keyboard.once("keydown-ESC", () => this.scene.start("select"));
+      const back = () => this.scene.start("select");
+      window.HeroShell?.fail("英灵资源加载失败", "请确认资源包完整。返回选人后可换一名英灵重试。", back);
+      const onEsc = () => back();
+      this.input.keyboard.once("keydown-ESC", onEsc);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.keyboard.off("keydown-ESC", onEsc));
     }
 
     enterFight() {
@@ -5429,6 +6816,7 @@
       let p1Pivots = {};
       let p2Pivots = {};
       let p3Pivots = {};
+      let bossPivots = {};
       try {
         p1Pivots = makeAnims(this, "p1", p1);
         p2Pivots = p2Id === p1Id ? p1Pivots : makeAnims(this, "p2", p2 || p1);
@@ -5437,14 +6825,20 @@
           else if (p3Id === p2Id) p3Pivots = p2Pivots;
           else p3Pivots = makeAnims(this, "p3", p3 || p2);
         }
+        if (this.pack.raid && this.pack.boss && this.textures.exists("boss-idle")) {
+          bossPivots = makeAnims(this, "boss", this.pack.boss);
+        }
       } catch (err) {
         console.warn("makeAnims", err);
+        this.showLoadFail();
+        return;
       }
       this.scene.start("fight", {
         ...this.pack,
         p1Pivots,
         p2Pivots,
         p3Pivots,
+        bossPivots,
         shareDummy: p2Id === p1Id,
         mode: this.pack.mode || "dummy",
       });
@@ -5461,6 +6855,14 @@
     }
 
     create() {
+      window.HeroShell?.ready();
+      this.combatNow = this.time.now;
+      this._lastHudPaint = -Infinity;
+      this._lastInputSent = -Infinity;
+      this.pendingState = null;
+      const tickClock = (_time, delta) => { this.combatNow += Math.min(50, Math.max(0, delta)); };
+      this.events.on(Phaser.Scenes.Events.PRE_UPDATE, tickClock);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PRE_UPDATE, tickClock));
       const w = this.scale.width;
       const h = this.scale.height;
       this.groundY = Math.round(h * 0.84);
@@ -5491,8 +6893,9 @@
         this.p2.tint = 0xc5d0ee;
         this.p2.sprite.setTint(this.p2.tint);
       }
+      this.raid = this.pack.mode === "raid" || !!this.pack.raid;
       this.pve = this.pack.mode === "pve";
-      this.pvp = this.pack.mode === "pvp";
+      this.pvp = this.pack.mode === "pvp" || (this.raid && !this.pack.raidSolo);
       this.cricket = this.pack.mode === "cricket";
       this.cpuDiff = cpuDiffId(this.pack.cpuDiff);
       this.pvpThree = !!(this.pvp && this.pack.pvpThree && this.p3);
@@ -5520,6 +6923,12 @@
         this.p3.sprite.body.pushable = true;
         this.p3.sprite.setImmovable(false);
       }
+      if (this.raid && this.pack.raidSolo) {
+        this.p2.ko = true;
+        this.p2.sprite.setVisible(false);
+        this.p2.ghost.setVisible(false);
+        this.p2.shell.setVisible(false);
+      }
       this.wireTerrainColliders();
       this.cpuMap = {};
       this.cpu = this.cpuBrain(this.p2);
@@ -5541,6 +6950,7 @@
       this.profiles = this.pack.profiles || {};
       const nickOf = (seat) => this.profiles?.[seat]?.nick || defaultNick(seat);
       this.playerTags = [];
+      this.dummyTag = null;
       const tagStyle = {
         fontFamily: UI_FONT,
         fontSize: 13,
@@ -5588,7 +6998,7 @@
           );
         });
         this.dummyTag = this.playerTags[1];
-      } else {
+      } else if (!this.raid) {
         const tagLabel = this.pve ? cpuDiffLabel(this.cpuDiff) : "木桩";
         this.dummyTag = crispUi(
           this.add
@@ -5630,9 +7040,20 @@
       if (this.p3) this.p3.startMove("idle", { busy: false });
 
       this.projectiles = [];
+      this.raidEnemies = [];
+      this.raidWave = 0;
+      this.raidWaveAt = 0;
+      this.raidCleared = false;
+      this.raidIntroUntil = 0;
+      this._raidDialogueWave = 0;
+      this.raidDialogue = null;
+      this.raidDialogueActive = false;
+      this.raidDialogueStep = 0;
+      this.raidDialogueLines = [];
+      if (this.raid) this.startRaidWave(1);
       this.input.once("pointerdown", () => this.sound.unlock());
       this.input.keyboard.once("keydown", () => this.sound.unlock());
-      this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K,L,I,O,P,H,N,ESC,ENTER,SHIFT");
+      this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K,L,I,O,P,H,N,ESC,ENTER,SHIFT,SPACE");
       this.input.keyboard.addCapture("ESC");
       this._leavingFight = false;
       this.input.keyboard.on("keydown-ESC", this.onFightEsc, this);
@@ -5641,7 +7062,7 @@
         killStageBgm(this);
       });
 
-      setChrome(this.pvp ? "pvp" : this.pve ? "pve" : this.cricket ? "cricket" : "dummy");
+      setChrome(this.raid ? "raid" : this.pvp ? "pvp" : this.pve ? "pve" : this.cricket ? "cricket" : "dummy");
       this.syncTitle();
       if (this.pvp && this.net) this.wireNet();
 
@@ -5670,6 +7091,27 @@
         .setDepth(55)
         .setScrollFactor(0)
         .setAlpha(0);
+      const nextBg = this.add
+        .rectangle(0, 0, 270, 58, 0x7a4a20, 0.96)
+        .setStrokeStyle(3, 0xf2d090, 1)
+        .setInteractive({ useHandCursor: true });
+      this.raidNextLabel = this.add
+        .text(0, 0, "下一关", {
+          fontFamily: UI_FONT,
+          fontSize: 23,
+          color: "#fff0bd",
+          stroke: "#2a1308",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5);
+      this.raidNextButton = this.add
+        .container(w / 2, h * 0.82, [nextBg, this.raidNextLabel])
+        .setDepth(58)
+        .setScrollFactor(0)
+        .setVisible(false);
+      nextBg.on("pointerover", () => nextBg.setFillStyle(0xa7662a, 1));
+      nextBg.on("pointerout", () => nextBg.setFillStyle(0x7a4a20, 0.96));
+      nextBg.on("pointerdown", () => this.advanceRaidStage());
       this.countText = crispUi(
         this.add
           .text(w / 2, h * 0.42, "", {
@@ -6057,7 +7499,7 @@
     floorProcess(player, _floor) {
       const actor = player.getData?.("actor");
       if (!actor || actor.pitFalling) return false;
-      if (actor.pullPhaseUntil && this.time.now < actor.pullPhaseUntil) return false;
+      if (actor.pullPhaseUntil && this.combatNow < actor.pullPhaseUntil) return false;
       return true;
     }
 
@@ -6065,7 +7507,7 @@
     platProcess(player, platform) {
       const actor = player.getData?.("actor");
       if (!actor || actor.pitFalling) return false;
-      if (actor.pullPhaseUntil && this.time.now < actor.pullPhaseUntil) return false;
+      if (actor.pullPhaseUntil && this.combatNow < actor.pullPhaseUntil) return false;
       const top = this.platTop(platform);
       const feet = player.body.bottom;
       const vy = player.body.velocity.y;
@@ -6081,7 +7523,7 @@
      */
     ejectFromTerrain(actor) {
       if (!actor || actor.ko || actor.pitFalling) return;
-      if (actor.pullPhaseUntil && this.time.now < actor.pullPhaseUntil) return;
+      if (actor.pullPhaseUntil && this.combatNow < actor.pullPhaseUntil) return;
       const spr = actor.sprite;
       const body = spr?.body;
       if (!body) return;
@@ -6185,7 +7627,7 @@
       }
       actor.sprite.setPosition(x, y);
       actor.sprite.setVelocity(0, 0);
-      actor.invulnUntil = Math.max(actor.invulnUntil || 0, this.time.now + 500);
+      actor.invulnUntil = Math.max(actor.invulnUntil || 0, this.combatNow + 500);
       if (!ATTACKS.has(actor.move) && actor.move !== "super") {
         actor.startMove("idle", { busy: false });
       }
@@ -6225,7 +7667,283 @@
     }
 
     fighters() {
+      if (this.raid && this.pack.raidSolo) return [this.p1];
       return this.p3 ? [this.p1, this.p2, this.p3] : [this.p1, this.p2];
+    }
+
+    startRaidWave(wave) {
+      (this.raidEnemies || []).forEach((enemy) => enemy.destroy());
+      this.raidEnemies = [];
+      this.raidWave = wave;
+      const boss = wave >= 3;
+      const count = boss ? 1 : wave === 2 ? 4 : 3;
+      for (let i = 0; i < count; i++) {
+        const x = this.worldW * (0.58 + (i - (count - 1) / 2) * 0.1);
+        const y = this.spawnFloorY(x);
+        const elite = wave === 2 && i === count - 1;
+        this.raidEnemies.push(new RaidEnemy(this, wave * 10 + i, x, y, boss, elite));
+      }
+      const label = boss ? `${this.pack.boss?.displayName || "关底英灵"} 来袭！` : wave === 2 ? "第 2 波 · 精英来袭" : `第 ${wave} 波`;
+      this.raidBanner(label);
+      if (boss) this.showRaidBossDialogue();
+    }
+
+    showRaidBossDialogue() {
+      if (this._raidDialogueWave === 3 || !this.raid) return;
+      this._raidDialogueWave = 3;
+      this.raidDialogueActive = true;
+      this.raidDialogueStep = 0;
+      this.raidIntroUntil = Number.MAX_SAFE_INTEGER;
+      this.raidDialogue?.destroy(true);
+      const w = this.scale.width;
+      const h = this.scale.height;
+      const bossName = this.pack.boss?.displayName || "关底英灵";
+      const heroName = this.p1?.fighter?.displayName || "挑战者";
+      this.raidDialogueLines = raidStoryLines(this.pack.stageId, this.stageName(), bossName, heroName);
+      const panel = this.add.rectangle(0, 0, Math.min(820, w * 0.82), 146, 0x160e12, 0.93).setStrokeStyle(3, 0xd7a75a, 0.9);
+      this.raidDialogueSpeaker = this.add.text(-panel.width / 2 + 28, -56, "", {
+        fontFamily: UI_FONT,
+        fontSize: 19,
+        color: "#ffcb75",
+        stroke: "#000",
+        strokeThickness: 3,
+      });
+      this.raidDialogueLine = this.add.text(-panel.width / 2 + 28, -22, "", {
+        fontFamily: UI_FONT,
+        fontSize: 20,
+        color: "#fff0d0",
+        stroke: "#000",
+        strokeThickness: 3,
+        wordWrap: { width: panel.width - 56 },
+      });
+      this.raidDialogueHint = this.add
+        .text(panel.width / 2 - 24, 59, "点击 / J / Enter 继续  1/8", {
+          fontFamily: UI_FONT,
+          fontSize: 13,
+          color: "#c9b17d",
+        })
+        .setOrigin(1, 0.5);
+      this.raidDialogue = this.add
+        .container(w / 2, h * 0.69, [panel, this.raidDialogueSpeaker, this.raidDialogueLine, this.raidDialogueHint])
+        .setDepth(95)
+        .setScrollFactor(0);
+      this.renderRaidDialogueStep();
+    }
+
+    renderRaidDialogueStep() {
+      if (!this.raidDialogueActive || !this.raidDialogue?.active) return;
+      const lines = this.raidDialogueLines || [];
+      const index = Phaser.Math.Clamp(Number(this.raidDialogueStep) || 0, 0, Math.max(0, lines.length - 1));
+      const entry = lines[index];
+      if (!entry) return;
+      this.raidDialogueStep = index;
+      this.raidDialogueSpeaker?.setText(entry.speaker).setColor(entry.color || "#ffcb75");
+      this.raidDialogueLine?.setText(entry.text);
+      this.raidDialogueHint?.setText(`点击 / J / Enter 继续  ${index + 1}/${lines.length}`);
+      this.raidDialogue?.setAlpha(1);
+    }
+
+    advanceRaidDialogue() {
+      if (!this.raidDialogueActive) return;
+      if (this.pvp && !this.isHost) {
+        this.net?.send({ type: "raid_dialogue_next" });
+        return;
+      }
+      const lines = this.raidDialogueLines || [];
+      if (this.raidDialogueStep < lines.length - 1) {
+        this.raidDialogueStep += 1;
+        this.renderRaidDialogueStep();
+        return;
+      }
+      this.closeRaidDialogue();
+    }
+
+    closeRaidDialogue() {
+      if (!this.raidDialogueActive && !this.raidDialogue) return;
+      this.raidDialogueActive = false;
+      this.raidIntroUntil = this.combatNow + 380;
+      const box = this.raidDialogue;
+      this.raidDialogue = null;
+      if (box?.active) {
+        this.tweens.add({
+          targets: box,
+          alpha: 0,
+          y: box.y - 18,
+          duration: 220,
+          onComplete: () => box.destroy(true),
+        });
+      }
+      if (this.pvp && this.isHost) {
+        this.net?.send({ type: "raid_dialogue_done" });
+      }
+    }
+
+    pauseForRaidDialogue() {
+      if (!this.raid || !this.raidDialogueActive) return false;
+      const confirm =
+        this._edgeJ ||
+        (this.keys?.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) ||
+        (this.keys?.SPACE && Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) ||
+        !!this.input?.activePointer?.justDown;
+      if (confirm) {
+        // 对话期间的确认不能留在出招缓冲里，否则翻页的 J 会在对话结束后打出去
+        this._edgeJ = false;
+        this.pendingJAt = 0;
+        [this.hostBuf, this.guestBuf, this.guest2Buf].forEach((buf) => {
+          if (buf) buf.pendingJAt = 0;
+        });
+        this.advanceRaidDialogue();
+      }
+      if (this.pvp && this.isHost) {
+        ["guest", "guest2"].forEach((seat) => {
+          const pad = this.remotePads?.[seat];
+          if (!pad) return;
+          pad.justJ = false;
+          pad.justK = false;
+          pad.justL = false;
+          pad.justShift = false;
+          pad.justUp = false;
+          pad.justDown = false;
+        });
+      }
+      if (!this.raidDialogueActive) {
+        if (this.pvp && !this.isHost) {
+          this.sendLocalInput();
+          this.applyPendingState();
+        }
+        if (this.pvp && this.isHost) this.sendState();
+        return false;
+      }
+      this.fighters().forEach((actor) => {
+        if (!actor?.ko) {
+          actor.sprite.setVelocityX(0);
+          actor.plantFrame();
+        }
+      });
+      (this.raidEnemies || []).forEach((enemy) => enemy.draw());
+      this.positionPlayerTags();
+      this.drawHp();
+      if (this.pvp && !this.isHost) {
+        this.sendLocalInput();
+        this.applyPendingState();
+      }
+      if (this.pvp && this.isHost) this.sendState();
+      return true;
+    }
+
+    raidBanner(label) {
+      const text = this.add.text(this.scale.width / 2, this.scale.height * 0.25, label, {
+        fontFamily: BRUSH_FONT,
+        fontSize: 62,
+        color: "#f5dfa0",
+        stroke: "#34170d",
+        strokeThickness: 8,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(80);
+      this.tweens.add({ targets: text, alpha: 0, y: text.y - 28, delay: 850, duration: 520, onComplete: () => text.destroy() });
+    }
+
+    tryRaidHit(attacker, enemy) {
+      if (!attacker?.attacking?.() || !enemy || enemy.ko || attacker.hitThisMove) return;
+      const spec = moveSpec(attacker.fighter, attacker.move);
+      const projKey = `${attacker.prefix}-proj-${attacker.move}`;
+      if (spec.projectile?.file && this.textures.exists(projKey) && mechanicSpec(spec).type !== "melee") return;
+      const box = attacker.attackBox();
+      const hurt = enemy.worldHurt();
+      if (!Phaser.Geom.Rectangle.Overlaps(box, hurt)) return;
+      attacker.hitThisMove = true;
+      const hpBefore = enemy.hp;
+      enemy.takeHit(attacker.move, attacker.strikeFacing(), spec);
+      enemy.applyMechanic(attacker, attacker.move, spec);
+      if (isLightAttack(attacker.move)) {
+        this.applyDomainLightLifesteal(attacker, enemy, Math.max(0, hpBefore - enemy.hp));
+      }
+      this.impactAt(enemy.sprite.x, enemy.sprite.y - 30, "light");
+      this.gainMp(attacker, 8);
+      this.freezeHit(spec.hit?.stop || 24, attacker);
+    }
+
+    updateRaid() {
+      if (!this.raid || this.over || this.inCountdown()) return;
+      const players = this.aliveFighters();
+      if (!players.length) {
+        this.beginEndCine();
+        return;
+      }
+      if (this.combatNow < (this.raidIntroUntil || 0)) {
+        (this.raidEnemies || []).forEach((enemy) => enemy.draw());
+        return;
+      }
+      (this.raidEnemies || []).forEach((enemy) => {
+        players.forEach((player) => this.tryRaidHit(player, enemy));
+        enemy.tick(players);
+      });
+      if ((this.raidEnemies || []).some((enemy) => !enemy.ko)) return;
+      if (this.raidWave < 3) {
+        if (!this.raidWaveAt) this.raidWaveAt = this.combatNow + 1200;
+        if (this.combatNow >= this.raidWaveAt) {
+          this.raidWaveAt = 0;
+          players.forEach((p) => {
+            p.hp = Math.min(p.maxHp, p.hp + 42);
+            p.mp = Math.min(p.maxMp, p.mp + 26);
+          });
+          this.startRaidWave(this.raidWave + 1);
+        }
+      } else if (!this.raidCleared) {
+        this.raidCleared = true;
+        this.beginEndCine();
+      }
+    }
+
+    raidProjectileHits() {
+      if (!this.raid) return;
+      const now = this.combatNow;
+      for (const shot of this.projectiles || []) {
+        if (!shot?.sprite?.active || !shot.owner) continue;
+        // Boss 弹道在 updateProjectiles 中反向命中玩家，不能再被当作玩家
+        // 弹道回头打到 Boss 自己。
+        if (shot.owner?.boss) continue;
+        const box = this.projectileHitBox(shot);
+        shot.raidHits = shot.raidHits || {};
+        for (const enemy of this.raidEnemies || []) {
+          if (enemy.ko || (shot.raidHits[enemy.id] || 0) > now) continue;
+          if (!Phaser.Geom.Rectangle.Overlaps(box, enemy.worldHurt())) continue;
+          const repeat = Number.isFinite(shot.raidHits[enemy.id]);
+          const repeatable = Boolean(
+            !shot.hawkingTrap && !shot.yearZeroBind && (shot.persist || shot.pierce || (shot.ticksLeft || 0) > 1)
+          );
+          shot.raidHits[enemy.id] = repeatable ? now + Math.max(90, Number(shot.pulseMs) || 180) : Number.MAX_SAFE_INTEGER;
+          const sourceSpec = moveSpec(shot.owner.fighter, shot.move);
+          let damage = Number.isFinite(shot.damage) ? shot.damage : sourceSpec.damage;
+          if (repeat) damage = Math.max(1, Math.round(damage * 0.24));
+          if (shot.dmgBudget != null) {
+            if (shot.dmgBudget <= 0 && damage > 0) {
+              enemy.applyMechanic(shot.owner, shot.move, sourceSpec, shot);
+              continue;
+            }
+            damage = Math.min(damage, shot.dmgBudget);
+            shot.dmgBudget -= damage;
+          }
+          const hitSpec = {
+            ...sourceSpec,
+            damage,
+            hit: { ...sourceSpec.hit, ...(shot.hitSpec || {}) },
+            effect: shot.effect || sourceSpec.effect,
+            effectStrength: Number.isFinite(shot.effectStrength) ? shot.effectStrength : sourceSpec.effectStrength,
+            ailment: shot.ailment || sourceSpec.ailment,
+          };
+          if (damage > 0) enemy.takeHit(shot.move, shot.facing || shot.owner.strikeFacing?.() || 1, hitSpec);
+          enemy.applyMechanic(shot.owner, shot.move, hitSpec, shot);
+          if (!shot.pierce && !shot.persist) shot.hit = true;
+          if (shot.hawkingTrap) {
+            shot.trapArmed = false;
+            shot.trapExploding = true;
+            shot.trapBoomAt = now + 420;
+            shot.diesAt = Math.min(shot.diesAt || now + 420, now + 420);
+          }
+          this.impactAt(enemy.sprite.x, enemy.sprite.y - 30, "light");
+          this.gainMp(shot.owner, 10);
+        }
+      }
     }
 
     myActor() {
@@ -6246,9 +7964,37 @@
       return this.guestBuf;
     }
 
-    faceNearestThreat(actor) {
-      // 出招中不改朝向，否则朝左砍时判定会翻到背后
+    faceFromMovement(actor, pad) {
+      if (!actor || actor.ko || !pad) return false;
+      // 出招、受击和受控时保持当前动作朝向；移动输入在可行动时
+      // 必须拥有最高优先级，避免下一步的自动锁敌把角色翻回去。
+      if (ATTACKS.has(actor.move) || actor.reacting?.() || actor.immobilized?.()) return false;
+      const left = !!pad.left;
+      const right = !!pad.right;
+      if (left === right) return false;
+      actor.facing = left ? -1 : 1;
+      actor.syncFacingVisual();
+      return true;
+    }
+
+    faceNearestThreat(actor, pad) {
+      if (!actor || actor.ko) return;
+      // 出招中不改朝向，否则朝左砍时判定会翻到背后。
       if (ATTACKS.has(actor.move) && actor.busy) return;
+      // 行走/冲刺/跳跃时按方向键朝向；仅无横向输入时自动面敌。
+      if (this.faceFromMovement(actor, pad)) return;
+      if (actor.reacting?.() || actor.immobilized?.()) return;
+      if (this.raid) {
+        const enemies = (this.raidEnemies || []).filter((enemy) => !enemy.ko);
+        if (!enemies.length) return;
+        let best = enemies[0];
+        enemies.forEach((enemy) => {
+          if (Math.abs(enemy.sprite.x - actor.sprite.x) < Math.abs(best.sprite.x - actor.sprite.x)) best = enemy;
+        });
+        actor.facing = best.sprite.x >= actor.sprite.x ? 1 : -1;
+        actor.syncFacingVisual();
+        return;
+      }
       const foes = this.fighters().filter((f) => f !== actor && !f.ko);
       if (!foes.length) return;
       let best = foes[0];
@@ -6265,7 +8011,12 @@
     }
 
     nearestFoe(from) {
-      const foes = this.fighters().filter((f) => f !== from && !f.ko);
+      const raidEnemyCaster = Boolean(this.raid && from?.boss);
+      const foes = this.raid
+        ? raidEnemyCaster
+          ? this.fighters().filter((fighter) => !fighter.ko)
+          : (this.raidEnemies || []).filter((enemy) => !enemy.ko)
+        : this.fighters().filter((f) => f !== from && !f.ko);
       if (!foes.length) return null;
       let best = foes[0];
       let bestD = Math.abs(best.sprite.x - from.sprite.x);
@@ -6283,7 +8034,9 @@
       const facing = from.facing || 1;
       let best = null;
       let bestD = range + 1;
-      for (const foe of this.fighters()) {
+      const raidEnemyCaster = Boolean(this.raid && from?.boss);
+      const foes = this.raid ? (raidEnemyCaster ? this.fighters() : this.raidEnemies || []) : this.fighters();
+      for (const foe of foes) {
         if (foe === from || foe.ko) continue;
         const dx = foe.sprite.x - from.sprite.x;
         if (dx * facing <= 18) continue;
@@ -6294,6 +8047,17 @@
         }
       }
       return best;
+    }
+
+    projectileCombatTargets(shot) {
+      if (!this.raid) return this.fighters();
+      // 玩家弹道仍由 raidProjectileHits 结算；英雄 Boss 的弹道则走与
+      // 普通对战相同的命中/格挡/机制流程，但目标反转为闯关玩家。
+      const owner = shot?.owner;
+      if (owner?.boss) {
+        return this.fighters().filter((fighter) => !fighter.ko);
+      }
+      return [];
     }
 
     surfaceUnder(x, fromY) {
@@ -6467,16 +8231,16 @@
     }
 
     inCountdown() {
-      return this.time.now < this.roundAt;
+      return this.combatNow < this.roundAt;
     }
 
     tickCountdown() {
       if (!this.countText) return;
-      if (this.time.now < (this.countAt || 0)) {
+      if (this.combatNow < (this.countAt || 0)) {
         this.countText.setAlpha(0);
         return;
       }
-      const left = this.roundAt - this.time.now;
+      const left = this.roundAt - this.combatNow;
       if (left <= 0) {
         this.countText.setAlpha(0);
         return;
@@ -6511,7 +8275,11 @@
       const a = this.p1.fighter.displayName;
       const b = this.p2.fighter.displayName;
       const map = this.stageName();
-      if (this.pvp) {
+      if (this.raid) {
+        const team = this.fighters().map((fighter) => fighter.fighter.displayName).join(" / ");
+        const level = Math.max(1, (this.stageIds || []).indexOf(this.pack.stageId) + 1);
+        title.textContent = `${team}（合作闯关 · 第 ${level} 关）· ${map}`;
+      } else if (this.pvp) {
         const you = seatLabel(this.seat);
         if (this.pvpThree) {
           title.textContent = `${a} / ${b} / ${this.p3.fighter.displayName}（3 人混战 · ${you}）· ${map}`;
@@ -6547,12 +8315,12 @@
     skillCdReady(actor, move) {
       const cd = this.skillCdMs(move);
       if (!(cd > 0) || !actor) return true;
-      return Date.now() >= (actor.moveCdUntil?.[move] || 0);
+      return this.combatNow >= (actor.moveCdUntil?.[move] || 0);
     }
 
     skillCdLeft(actor, move) {
       const until = actor?.moveCdUntil?.[move] || 0;
-      return Math.max(0, until - Date.now());
+      return Math.max(0, until - this.combatNow);
     }
 
     /** 上/下+K 缺招时回落到地面技能，避免按键被吃掉。 */
@@ -6570,7 +8338,7 @@
       const cd = this.skillCdMs(move);
       if (cd > 0) {
         actor.moveCdUntil = actor.moveCdUntil || { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
-        actor.moveCdUntil[move] = Date.now() + cd;
+        actor.moveCdUntil[move] = this.combatNow + cd;
       }
     }
 
@@ -6608,7 +8376,7 @@
     }
 
     buildHudChrome() {
-      const actors = this.pvpThree ? [this.p1, this.p2, this.p3] : [this.p1, this.p2];
+      const actors = this.fighters();
       this.hudFaces = actors.map((p) => {
         const sel = `${p.prefix}-select`;
         const idle = `${p.prefix}-idle`;
@@ -6621,7 +8389,7 @@
         actor: p,
         texts: CD_SLOT_ORDER.map((slot) =>
           uiText(this, 0, 0, slot.label, {
-            fontSize: 9,
+            fontSize: 11,
             color: "#f2e6c4",
             stroke: "#1a1008",
             strokeThickness: 3,
@@ -6683,10 +8451,10 @@
         faceRec.img.setVisible(true).setDisplaySize(faceSize, faceSize).setPosition(faceX + faceSize / 2, y + faceSize / 2);
       }
       const cdY = y + faceSize + 4;
-      const boxW = Math.max(8, (faceSize - 3) / 4);
+      const boxW = (barW - 18) / 4;
       const rec = this.hudCdTexts?.find((t) => t.actor === p);
       CD_SLOT_ORDER.forEach((slot, i) => {
-        const bx = faceX + i * (boxW + 1);
+        const bx = barX + i * (boxW + 6);
         const has = !!p.has?.(slot.move);
         const left = this.skillCdLeft(p, slot.move);
         const total = Math.max(1, this.skillCdMs(slot.move));
@@ -6701,22 +8469,26 @@
         g.strokeRect(bx, cdY, boxW, cdH);
         const txt = rec?.texts?.[i];
         if (txt) {
+          txt.setText(!has ? `${slot.label} —` : left > 0 ? `${slot.label} ${(left / 1000).toFixed(1)}s` : `${slot.label} 就绪`);
           txt.setVisible(true).setPosition(bx + boxW / 2, cdY + cdH / 2);
-          txt.setAlpha(has ? (left <= 0 ? 1 : 0.5) : 0.22);
+          txt.setAlpha(has ? 1 : 0.45);
         }
       });
     }
 
     drawHp() {
+      // UI refreshes at 30 Hz; combat and rendering retain the display frame rate.
+      if (this.combatNow - this._lastHudPaint < 1000 / 30) return;
+      this._lastHudPaint = this.combatNow;
       const g = this.hpGfx;
       const w = this.scale.width;
       g.clear();
       const mark = (p) =>
-        p.ailment === "burn" && this.time.now < p.ailmentUntil
+        p.ailment === "burn" && this.combatNow < p.ailmentUntil
           ? "·燃"
-          : p.ailment === "freeze" && this.time.now < p.ailmentUntil
+          : p.ailment === "freeze" && this.combatNow < p.ailmentUntil
             ? "·冻"
-            : p.ailment === "poison" && this.time.now < p.ailmentUntil
+            : p.ailment === "poison" && this.combatNow < p.ailmentUntil
               ? "·毒"
               : "";
       const info = (p) => {
@@ -6724,6 +8496,31 @@
         const mpBit = p.mpBanned ? "MP BAN" : `MP ${Math.round(p.mp)}`;
         return `${hpBit}  ${mpBit}  SP ${Math.round(p.sp)}`;
       };
+      if (this.raid) {
+        const team = this.fighters();
+        const face = team.length >= 3 ? 40 : 46;
+        const bw = team.length >= 3 ? Math.min(300, Math.floor((w - 80) / 3) - 52) : 360;
+        const gap = 18;
+        const slotW = bw + face + 8;
+        let x = Math.max(16, Math.floor((w - (slotW * team.length + gap * (team.length - 1))) / 2));
+        team.forEach((p) => {
+          this.paintFighterHud(g, x, 12, p, false, bw, face);
+          x += slotW + gap;
+        });
+        const remain = (this.raidEnemies || []).filter((enemy) => !enemy.ko).length;
+        const combo = Math.max(
+          0,
+          ...(this.raidEnemies || []).map((enemy) =>
+            this.combatNow <= (enemy.comboUntil || 0) ? Number(enemy.comboHits) || 0 : 0
+          )
+        );
+        this.hud
+          .setY(92)
+          .setText(
+            `第 ${Math.max(1, (this.stageIds || []).indexOf(this.pack.stageId) + 1)} 关 · 第 ${this.raidWave || 1} 波　剩余魔兽 ${remain}${this.raidWave === 2 ? " · 精英" : ""}${this.raidWave >= 3 ? ` · BOSS ${this.pack.boss?.displayName || "英灵"}` : ""}${combo >= 2 ? `　连击 ×${combo}` : ""}`
+          );
+        return;
+      }
       const face = this.pvpThree ? 40 : 46;
       if (this.pvpThree) {
         const bw = Math.min(300, Math.floor((w - 80) / 3) - 52);
@@ -6871,7 +8668,7 @@
 
     tryBreakout(p) {
       if (!p || p.ko) return false;
-      const now = this.time.now;
+      const now = this.combatNow;
       const cc =
         p.downed() ||
         p.willKnockdown ||
@@ -6910,7 +8707,7 @@
     tryDashEscape(p, left, right) {
       if (!p || p.ko || !p.has("dash")) return false;
       if (this.domainDashLocked(p)) return false;
-      const now = this.time.now;
+      const now = this.combatNow;
       const locked =
         p.comboLocked() ||
         (p.stunUntil && p.stunUntil > now) ||
@@ -6969,7 +8766,7 @@
     /** 去城市化等领域：期间无法冲刺 */
     domainDashLocked(p) {
       if (!p || p.ko) return false;
-      if (this.time.now < (p.domainNoDashUntil || 0)) return true;
+      if (this.combatNow < (p.domainNoDashUntil || 0)) return true;
       return (this.projectiles || []).some(
         (s) => s?.domainField && s.owner === p && s.sprite?.active
       );
@@ -6978,7 +8775,7 @@
     /** 领域展开中（普攻吸血窗口） */
     domainAuraActive(actor) {
       if (!actor || actor.ko) return false;
-      if (this.time.now < (actor.domainNoDashUntil || 0)) return true;
+      if (this.combatNow < (actor.domainNoDashUntil || 0)) return true;
       return (this.projectiles || []).some(
         (s) => s?.domainField && s.owner === actor && s.sprite?.active
       );
@@ -6998,6 +8795,7 @@
       const banned = new Set();
       for (const shot of this.projectiles || []) {
         if (!shot?.domainField || !shot.sprite?.active) continue;
+        if (this.raid && !shot.owner?.boss) continue;
         const box = this.projectileHitBox(shot);
         for (const target of this.fighters()) {
           if (!target || target === shot.owner || target.ko) continue;
@@ -7016,7 +8814,7 @@
 
     /** 霍金时间凝滞：钉死坐标 */
     tickTimeLocks() {
-      const now = this.time.now;
+      const now = this.combatNow;
       this.fighters().forEach((p) => {
         if (!p || p.ko) return;
         if (!(p.timeLockBanking && now < (p.timeLockUntil || 0))) return;
@@ -7115,7 +8913,7 @@
       if (this._countdownArmed) return;
       this._countdownArmed = true;
       this._countLabelPrev = "";
-      this.countAt = this.time.now + 220;
+      this.countAt = this.combatNow + 220;
       this.roundAt = this.countAt + (this.countMs || 0);
     }
 
@@ -7435,7 +9233,7 @@
 
       // ⑥ 硬停拉长，让慢放动作看完再撤
       this._cutinActor = actor;
-      this._cutinStartedAt = this.time.now;
+      this._cutinStartedAt = this.combatNow;
       this._cutinEndEvent?.remove(false);
       this._cutinEndEvent = this.time.delayedCall(2200, () => this.endSuperCutin(actor));
     }
@@ -7544,7 +9342,7 @@
       if (this.cine || this.resultShown) return;
       this.over = true;
       this.camLock = null;
-      this.cine = { phase: "clearFx", startedAt: this.time.now, closing: false };
+      this.cine = { phase: "clearFx", startedAt: this.combatNow, closing: false };
       if (this.cutinActive) {
         this.clearSuperCutinFx();
         this.cutinActive = false;
@@ -7622,7 +9420,7 @@
     beginEndPoses() {
       if (!this.cine || this.cine.phase !== "clearFx" || this.resultShown) return;
       this.cine.phase = "poses";
-      this.cine.startedAt = this.time.now;
+      this.cine.startedAt = this.combatNow;
       this.fighters().forEach((a) => {
         a.poseDone = false;
       });
@@ -7645,7 +9443,7 @@
     onCinePoseDone() {
       if (!this.cine || this.cine.closing || this.resultShown) return;
       const actors = this.cineActors();
-      const timedOut = this.time.now - (this.cine.startedAt || 0) >= 4200;
+      const timedOut = this.combatNow - (this.cine.startedAt || 0) >= 4200;
       if (!timedOut && actors.some((a) => !a.poseDone)) return;
       this.cine.closing = true;
       this.cine.phase = "hold";
@@ -7697,7 +9495,7 @@
       attacker.hitThisMove = true;
       const x = Phaser.Math.Clamp(hurt.centerX, box.left, box.right);
       const y = Phaser.Math.Clamp(hurt.centerY, box.top, box.bottom);
-      const nowHit = this.time.now;
+      const nowHit = this.combatNow;
       const timeLocked =
         defender.timeLockBanking && nowHit < (defender.timeLockUntil || 0);
       if (timeLocked) {
@@ -7876,6 +9674,7 @@
 
     shotPayload(attacker, move, moveFull, extra) {
       const proj = moveFull.projectile;
+      const spec = moveSpec(attacker?.fighter, move);
       return {
         owner: attacker,
         move,
@@ -7890,11 +9689,11 @@
         lockBurst: false,
         hit: false,
         hitCd: {},
-        damage: moveDamage(move),
-        hitSpec: moveHit(move),
-        effect: isSuperMove(move) ? "launch" : "none",
-        effectStrength: isSuperMove(move) ? 1 : 0,
-        ailment: "none",
+        damage: Number.isFinite(proj?.damage) ? proj.damage : spec.damage,
+        hitSpec: { ...spec.hit, ...(proj?.hit || {}) },
+        effect: spec.effect,
+        effectStrength: spec.effectStrength,
+        ailment: spec.ailment,
         dmgBudget: isSuperMove(move) ? moveDamage("super") * 1.35 : moveDamage(move) * 2.2,
         ...extra,
       };
@@ -7920,7 +9719,7 @@
       const originX = cam.scrollX;
       const originY = cam.scrollY;
       const lifeMs = Math.max(visDef.life || 1400, 1600);
-      const now = this.time.now;
+      const now = this.combatNow;
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const spr = this.add
@@ -7953,7 +9752,7 @@
               hitW: Math.max(80, spr.displayWidth * 0.72),
               hitH: Math.max(80, spr.displayHeight * 0.72),
               screenSpace: false,
-              fullscreen: false,
+              fullscreen: true,
               trajectoryOnly: true,
               damage: Math.max(6, Math.round(moveDamage("super") / 6)),
               dmgBudget: Math.round((moveDamage("super") * 1.35) / 6),
@@ -7975,7 +9774,7 @@
       const ink = projInk(proj);
       const camH = this.scale.height;
       const scale = Phaser.Math.Clamp((camH * (Number(proj.screen) || 0.58)) / Math.max(24, ink.h), 0.55, 2.4);
-      const now = this.time.now;
+      const now = this.combatNow;
       const life = Math.max(10000, Number(proj.life) || 10000);
       attacker.domainNoDashUntil = now + life;
       const x = attacker.sprite.x;
@@ -8107,7 +9906,7 @@
         this.ejectFromTerrain?.(attacker);
         this.ejectFromTerrain?.(foe);
       }
-      const now = this.time.now;
+      const now = this.combatNow;
       const dmg = Math.max(10, Number(moveFull.damage) || Number(proj.damage) || moveDamage(move));
       this.projectiles.push(
         this.shotPayload(attacker, move, moveFull, {
@@ -8161,7 +9960,7 @@
       if ((proj.blend || "add") === "add") spr.setBlendMode(Phaser.BlendModes.ADD);
       if (this.anims.exists(key)) spr.anims.play({ key, repeat: -1, frameRate: 5 });
       const lockMs = 1500;
-      const now = this.time.now;
+      const now = this.combatNow;
       foe.timeLockUntil = now + lockMs;
       foe.timeLockBanking = true;
       foe.timeLockBank = 0;
@@ -8363,7 +10162,7 @@
       const gap = 105;
       const pinX = victim.timeLockX || victim.sprite.x;
       const pinY = victim.timeLockY || victim.sprite.y;
-      const burstEnd = this.time.now + (n - 1) * gap + 80;
+      const burstEnd = this.combatNow + (n - 1) * gap + 80;
       victim.rootedUntil = burstEnd;
       victim.timeLockX = pinX;
       victim.timeLockY = pinY;
@@ -8416,7 +10215,7 @@
             victim.sprite.setVelocity(0, 0);
             victim.willKnockdown = false;
             victim.airFalling = false;
-            victim.rootedUntil = Math.max(victim.rootedUntil || 0, this.time.now + gap + 40);
+            victim.rootedUntil = Math.max(victim.rootedUntil || 0, this.combatNow + gap + 40);
             try {
               victim.sprite.setTintFill(0xffffff);
               this.time.delayedCall(50, () => victim.refreshAilmentTint?.());
@@ -8502,7 +10301,7 @@
         });
       }
       const rootMs = Math.max(1800, Number(proj.rootMs) || Number(proj.life) || 2800);
-      const now = this.time.now;
+      const now = this.combatNow;
       const dmg = Math.max(4, Number(proj.damage) || moveDamage(move) || 10);
       const hitW = Math.max(56, (feet.w || spr.displayWidth) * scale * 0.55);
       const hitH = Math.max(48, inkH * scale * 0.95);
@@ -8543,7 +10342,7 @@
     applyYearZeroWireRoot(shot, target, dmg) {
       if (!shot || !target || target.ko || shot.bindApplied) return;
       if (!this.feetOnWireGround(target, shot.landY)) return;
-      const now = this.time.now;
+      const now = this.combatNow;
       const rootMs = Math.max(400, (shot.diesAt || now + 2800) - now);
       const pinX = Number.isFinite(shot.lockX) ? shot.lockX : target.sprite.x;
       const pinY = Number.isFinite(shot.landY) ? shot.landY : target.sprite.y;
@@ -8599,7 +10398,7 @@
         facing: 1,
         repeat: -1,
       });
-      const now = this.time.now;
+      const now = this.combatNow;
       const life = Math.max(1600, Number(proj.life) || 1900);
       this.projectiles.push(
         this.shotPayload(attacker, move, moveFull, {
@@ -8666,7 +10465,7 @@
       const wantH = bodyDisp * 0.78;
       spr.setDisplaySize(Math.max(wantW, spr.displayWidth * 1.05), Math.max(wantH, spr.displayHeight * 0.9));
       this.pinProjFeetToGround(spr, groundY, proj);
-      const now = this.time.now;
+      const now = this.combatNow;
       const life = Math.max(900, Number(proj.life) || 1100);
       this.projectiles.push(
         this.shotPayload(attacker, move, moveFull, {
@@ -8763,7 +10562,7 @@
           });
           spr.setScrollFactor(1);
           this.pinProjFeetToGround(spr, startY, proj);
-          const now = this.time.now;
+          const now = this.combatNow;
           this.projectiles.push(
             this.shotPayload(attacker, move, moveFull, {
               sprite: spr,
@@ -8799,7 +10598,7 @@
 
     /** 荆棘禁锢：已缠住时钉死在落点 */
     tickYearZeroWireBinds() {
-      const now = this.time.now;
+      const now = this.combatNow;
       for (const shot of this.projectiles || []) {
         if (!shot?.yearZeroBind || !shot.sprite?.active || !shot.bindApplied) continue;
         const foe = shot.lockTarget;
@@ -8830,7 +10629,7 @@
       const facing = attacker.facing || 1;
       const n = 4;
       const scale = Phaser.Math.Clamp((this.scale.height * 0.16) / Math.max(24, ink.h), 0.12, 0.55);
-      const now = this.time.now;
+      const now = this.combatNow;
       const feetY = this.surfaceUnder(attacker.sprite.x, attacker.sprite.y) ?? attacker.sprite.y;
       for (let i = 0; i < n; i++) {
         this.time.delayedCall(i * 55, () => {
@@ -8908,7 +10707,7 @@
         depth: 9,
         facing,
       });
-      const now = this.time.now;
+      const now = this.combatNow;
       const life = Math.max(1400, Number(proj.life) || 1600);
       const speed = Math.max(280, Number(proj.speed) || 320);
       this.projectiles.push(
@@ -8956,7 +10755,7 @@
         originX: 0.5,
         originY: 0.55,
       });
-      const now = this.time.now;
+      const now = this.combatNow;
       this.projectiles.push(
         this.shotPayload(attacker, move, moveFull, {
           sprite: spr,
@@ -8995,7 +10794,7 @@
       const colW = camW * 0.25;
       const colH = camH;
       const startX = attacker.sprite.x + facing * (colW * 0.52 + 48);
-      const now = this.time.now;
+      const now = this.combatNow;
       const life = Math.max(1300, Number(proj.life) || 1400);
       const layers = 3;
       for (let i = 0; i < layers; i++) {
@@ -9102,7 +10901,7 @@
               homing: 0,
               ticksLeft: 5,
               pulseMs: 180,
-              diesAt: this.time.now + 1600,
+              diesAt: this.combatNow + 1600,
               hitW: Math.max(70, spr.displayWidth * 0.42),
               hitH: Math.max(70, spr.displayHeight * 0.42),
               hitScale: 1,
@@ -9184,7 +10983,8 @@
         landY = pt.y;
         y = landY;
       } else if (groundFront) {
-        const pt = this.frontGroundPoint(attacker, 240);
+        // 阵地特效仍落在身前，但不要越过对战间距，否则判定从粒子起算会打空近身敌人
+        const pt = this.frontGroundPoint(attacker, this.isJiangHero(attacker.fighter) ? 120 : 240);
         x = pt.x + spreadX;
         landY = pt.y;
         y = landY;
@@ -9278,8 +11078,20 @@
       else spr.setBlendMode(Phaser.BlendModes.NORMAL);
       if (this.anims.exists(key)) {
         // 德川忍者：略慢一档播完即停；寿命对齐动画，避免末帧僵住
+        // 飞行奥义：播完停在爆炸帧，不要 loop 回第一帧火星（墨迹几乎为空）
+        const superTravel =
+          isSuperMove(move) &&
+          !hover &&
+          motion !== "field" &&
+          mec.type !== "zone" &&
+          mec.type !== "trap" &&
+          mec.type !== "beam";
         const ninjaFps = ieyasuNinjas ? Math.min(4.2, visDef.fps || 4) : visDef.fps;
-        spr.anims.play({ key, repeat: hover || ieyasuNinjas ? 0 : -1, frameRate: ninjaFps });
+        spr.anims.play({
+          key,
+          repeat: hover || ieyasuNinjas || superTravel ? 0 : -1,
+          frameRate: ninjaFps,
+        });
       }
       const speed = visDef.speed;
       let vx = 0;
@@ -9379,6 +11191,7 @@
       }
       const lubuSkill = move === "skill" && this.isLuBuHero(attacker.fighter);
       const jiangFrontLine = move === "combo_down" && this.isJiangHero(attacker.fighter);
+      const sourceSpec = moveSpec(attacker.fighter, move);
       this.projectiles.push({
         sprite: spr,
         owner: attacker,
@@ -9416,14 +11229,14 @@
         ticksLeft: lubuSkill ? 99 : ticks,
         pulseMs,
         hitCd: {},
-        diesAt: this.time.now + lifeMs,
+        diesAt: this.combatNow + lifeMs,
         hit: false,
         damage,
-        hitSpec: moveHit(move),
-        effect: newtonPull ? "pull" : isSuperMove(move) ? "launch" : "none",
-        effectStrength: newtonPull ? 1.4 : isSuperMove(move) ? 1 : 0,
+        hitSpec: { ...sourceSpec.hit, ...(proj.hit || {}) },
+        effect: newtonPull ? "pull" : sourceSpec.effect,
+        effectStrength: newtonPull ? 1.4 : sourceSpec.effectStrength,
         pullField: newtonPull,
-        ailment: "none",
+        ailment: sourceSpec.ailment,
         dmgBudget: lubuSkill ? damage * 12 : newtonPull ? 0 : persist ? (isSuperMove(move) ? moveDamage("super") * 1.35 : moveDamage(move) * 2.2) : damage,
         hitW,
         hitH,
@@ -9438,25 +11251,15 @@
         const h = this.scale.height;
         return new Phaser.Geom.Rectangle(spr.x - w / 2, cam.scrollY, w, h);
       }
-      // 奥义：粒子墨迹碰到人才受伤。空白帧不打；不要用工坊 hitW(霍金 44px)把盒子收没。
-      if (isSuperMove(shot.move)) {
-        let box = spriteInkWorldRect(this, spr, 8, 26);
-        if (shot.screenSpace || spr.scrollFactorX === 0) {
-          const cam = this.cameras.main;
-          box = new Phaser.Geom.Rectangle(box.x + cam.scrollX, box.y + cam.scrollY, box.width, box.height);
-        }
-        const cellW = Math.max(8, Math.abs(spr.displayWidth) || box.width);
-        const cellH = Math.max(8, Math.abs(spr.displayHeight) || box.height);
-        // 扫描失败/整格不透明时，收到贴图几何中心，避免再扫到远处空白
-        if (box.width >= cellW * 0.88 && box.height >= cellH * 0.88) {
-          const face = (shot.facing || 1) >= 0 ? 1 : -1;
-          const cx = spr.x + face * (0.5 - (spr.originX ?? 0.5)) * cellW;
-          const cy = spr.y + (0.5 - (spr.originY ?? 0.5)) * cellH;
-          const w = cellW * 0.58;
-          const h = cellH * 0.62;
-          box = new Phaser.Geom.Rectangle(cx - w / 2, cy - h / 2, w, h);
-        }
-        return box;
+      if (shot.fullscreen) {
+        const w = Math.max(shot.hitW || 80, Math.abs(spr.displayWidth) * 0.72);
+        const h = Math.max(shot.hitH || 80, Math.abs(spr.displayHeight) * 0.72);
+        return new Phaser.Geom.Rectangle(spr.x - w / 2, spr.y - h / 2, w, h);
+      }
+      // 向前飞的奥义粒子（德川/甄嬛）：原点对齐的飞行盒 + 墨迹，禁止整格中心收缩。
+      // 全屏电网、吕布骑冲、霍金黑洞、陨石等走后面各自的盒子。
+      if (isSuperMove(shot.move) && !usesSpecialSuperHitBox(shot)) {
+        return superTravelHitBox(this, shot);
       }
       if (shot.screenSpace) {
         const cam = this.cameras.main;
@@ -9499,13 +11302,16 @@
       if (shot.move === "combo_down") {
         if (shot.jiangFrontLine) {
           const face = (shot.facing || 1) >= 0 ? 1 : -1;
+          const ownerX = shot.owner?.sprite?.x ?? spr.x;
           const lineY = shot.landY ?? spr.y;
-          const h = Math.max(64, shot.hitH || 88);
+          const h = Math.max(110, Math.min(168, this.scale.height * 0.22));
+          const startX = face > 0 ? Math.min(ownerX, spr.x) - 28 : Math.max(ownerX, spr.x) + 28;
+          const worldLeft = -80;
           const worldRight = (this.worldW || this.scale.width) + 80;
-          const reach = Math.max(this.scale.width * 0.92, worldRight - spr.x, spr.x + 80);
-          const w = reach;
-          const left = face > 0 ? spr.x : spr.x - w;
-          return new Phaser.Geom.Rectangle(left, lineY - h, w, h + 18);
+          if (face > 0) {
+            return new Phaser.Geom.Rectangle(startX, lineY - h, Math.max(80, worldRight - startX), h + 22);
+          }
+          return new Phaser.Geom.Rectangle(worldLeft, lineY - h, Math.max(80, startX - worldLeft), h + 22);
         }
         if (shot.luBuGroundWave) {
           const extent = Math.max(shot.hitW || 48, spr.displayWidth * 0.92);
@@ -9563,7 +11369,7 @@
         const t = shot.lockTarget;
         if (t.wireBindShot === shot) {
           t.wireBindShot = null;
-          if (this.time.now < (t.rootedUntil || 0)) t.rootedUntil = this.time.now;
+          if (this.combatNow < (t.rootedUntil || 0)) t.rootedUntil = this.combatNow;
         }
       }
       if (shot?.domainField && shot.owner) {
@@ -9603,11 +11409,10 @@
       if (shot) shot.extras = [];
     }
 
-    /** 冲刺穿背躲大招：正对来招时按下冲刺，且下一帧会到施术者背后 */
+    /** 冲刺穿背躲大招：仅全屏电网类。飞行弹（德川羽毛等）不能靠冲刺获得无敌。 */
     canDashBehindSuper(attacker, defender) {
       if (!attacker || !defender || defender.ko) return false;
-      if (this.superStyle(attacker.fighter) === "lockburst") return false;
-      if (this.superStyle(attacker.fighter) === "domain") return false;
+      if (this.superStyle(attacker.fighter) !== "fullscreen") return false;
       if (defender.move !== "dash") return false;
       const ax = attacker.sprite.x;
       const dx = defender.sprite.x;
@@ -9624,7 +11429,7 @@
       if (!target || target.ko || target.invulnerable()) return;
       const owner = shot.owner;
       if (!owner || owner.ko) return;
-      const now = this.time.now;
+      const now = this.combatNow;
       target.pitFalling = false;
       target.willKnockdown = false;
       target.airFalling = false;
@@ -9679,7 +11484,7 @@
         !shot.domainField &&
         this.canDashBehindSuper(shot.owner, target)
       ) {
-        target.invulnUntil = Math.max(target.invulnUntil || 0, this.time.now + 420);
+        target.invulnUntil = Math.max(target.invulnUntil || 0, this.combatNow + 420);
         return;
       }
       if (shot.pullField || (shot.effect === "pull" && !(shot.damage > 0))) {
@@ -9735,8 +11540,8 @@
     }
 
     updateProjectiles() {
-      const now = this.time.now;
-      const dt = this.game.loop.delta / 1000;
+      const now = this.combatNow;
+      const dt = Math.min(0.05, Math.max(0, this.game.loop.delta / 1000));
       const survivors = [];
       for (const shot of this.projectiles || []) {
         if (!shot.sprite || !shot.sprite.active) {
@@ -10000,7 +11805,7 @@
               continue;
             }
             const box = this.projectileHitBox(shot);
-            for (const target of this.fighters()) {
+            for (const target of this.projectileCombatTargets(shot)) {
               if (target === shot.owner || target.ko) continue;
               const hurt = target.worldHurt();
               Phaser.Geom.Rectangle.Inflate(hurt, 10, 8);
@@ -10036,7 +11841,7 @@
           }
           if (!shot.bindApplied) {
             const box = this.projectileHitBox(shot);
-            for (const target of this.fighters()) {
+            for (const target of this.projectileCombatTargets(shot)) {
               if (target === shot.owner || target.ko) continue;
               if (!this.feetOnWireGround(target, shot.landY)) continue;
               const hurt = target.worldHurt();
@@ -10087,13 +11892,13 @@
         const box = this.projectileHitBox(shot);
         let consumed = false;
         let burstHit = false;
-        for (const target of this.fighters()) {
+        for (const target of this.projectileCombatTargets(shot)) {
           if (target === shot.owner || target.ko) continue;
           if (shot.jiangFrontLine) {
             const face = shot.facing || 1;
-            const lineY = shot.landY ?? shot.sprite.y;
-            if ((target.sprite.x - shot.sprite.x) * face <= 8) continue;
-            if (Math.abs((target.sprite.y || 0) - lineY) > 56) continue;
+            const fromX = shot.owner?.sprite?.x ?? shot.sprite.x;
+            // 身后不打；近身站在蒋介石与阵地特效之间的人要算命中
+            if ((target.sprite.x - fromX) * face <= -16) continue;
           }
           if (shot.forwardOnly && shot.owner) {
             const face = shot.facing || shot.owner.facing || 1;
@@ -10220,13 +12025,60 @@
       });
     }
 
+    nextRaidStageId() {
+      const ids = (this.stageIds || []).filter(Boolean);
+      if (!ids.length) return this.pack.stageId;
+      const at = Math.max(0, ids.indexOf(this.pack.stageId));
+      return ids[(at + 1) % ids.length];
+    }
+
+    showRaidNextButton(show) {
+      if (!this.raidNextButton) return;
+      this.raidNextButton.setVisible(!!show);
+      if (!show) return;
+      const nextId = this.nextRaidStageId();
+      const nextName = this.pack.stages?.[nextId]?.displayName || "下一关";
+      this.raidNextLabel?.setText(`下一关 · ${nextName}`);
+    }
+
+    advanceRaidStage() {
+      if (!this.raid || !this.raidCleared || !this.resultShown) return;
+      const nextId = this.nextRaidStageId();
+      if (this.pvp && !this.isHost) {
+        this.net?.send({ type: "rematch_request", next: true, stageId: nextId });
+        this.raidNextButton?.setVisible(false);
+        this.resultHint?.setText("等待主机进入下一关…");
+        return;
+      }
+      this.pack.stageId = nextId;
+      this.registry.set("match", this.pack);
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set("mode", "raid");
+        url.searchParams.set("stage", nextId);
+        history.replaceState({}, "", url);
+      } catch {
+        /* ignore */
+      }
+      if (this.pvp && this.isHost) this.net?.send({ type: "rematch", stageId: nextId, next: true });
+      killStageBgm(this);
+      this.scene.start("loader", this.pack);
+    }
+
     announceResult() {
       if (this.resultShown || !this.result) return;
       this.resultShown = true;
       const mine = this.myActor();
       let winMine = false;
       let loseMine = false;
-      if (this.cricket) {
+      if (this.raid) {
+        const cleared = !!this.raidCleared && this.aliveFighters().length > 0;
+        winMine = cleared;
+        loseMine = !cleared;
+        this.paintResultTitle(cleared ? "闯关成功" : "闯关失败", cleared ? "win" : "lose");
+        playUiSfx(this, cleared ? UI_SFX.resultWin : UI_SFX.resultLose, { volume: 0.72 });
+        this.showRaidNextButton(cleared);
+      } else if (this.cricket) {
         const winner = !this.p1.ko && this.p2.ko ? this.p1 : !this.p2.ko && this.p1.ko ? this.p2 : null;
         this.paintResultTitle(winner ? `${winner.fighter.displayName}\n胜利` : "双倒", winner ? "win" : "draw");
         if (winner) playUiSfx(this, UI_SFX.resultWin, { volume: 0.78 });
@@ -10251,7 +12103,11 @@
         else playUiSfx(this, UI_SFX.resultLose, { volume: 0.45, rate: 0.92 });
       }
       this.resultHint.setText(
-        this.pvp
+        this.raid
+          ? this.raidCleared
+            ? "点击按钮或按 J / Enter 进入下一关　　Esc 返回选人"
+            : "J / Enter 重新挑战　　Esc 返回选人"
+          : this.pvp
           ? "J / Enter 再战（同人同图）　　任一方 Esc 全员回房间"
           : this.cricket
             ? "J / Enter 再看一场　　Esc 重选英灵"
@@ -10325,6 +12181,13 @@
       // 丢掉上一局 inbox 里的 state/lobby_return，否则抽完图进战会立刻被弹回选人
       net.discard?.(["state", "lobby_return", "start", "map_draw"]);
       net.swallow?.(["pick", "start", "map_draw", "ready", "nick", "lobby_state", "roster", "stage_pick"]);
+      net.on("close", () => {
+        if (!this.sys.isActive()) return;
+        this.remotePads = {guest: emptyPad(), guest2: emptyPad()};
+        this.over = true;
+        this.paintResultTitle("连接已断开", "info");
+        this.resultHint.setText("Esc 返回选人后重新加入房间").setAlpha(1);
+      });
       net.on("input", (msg) => {
         if (!this.isHost) return;
         const from = msg._from;
@@ -10344,13 +12207,29 @@
         if (this.isHost) return;
         this.pendingState = msg;
       });
-      net.on("rematch", () => {
+      net.on("raid_dialogue_next", () => {
+        if (!this.isHost || !this.raid || !this.raidDialogueActive) return;
+        this.advanceRaidDialogue();
+      });
+      net.on("raid_dialogue_done", () => {
+        if (this.isHost || !this.raid) return;
+        this.closeRaidDialogue();
+      });
+      net.on("rematch", (msg) => {
         if (this.isHost) return;
+        if (msg?.stageId && this.stageIds.includes(msg.stageId)) {
+          this.pack.stageId = msg.stageId;
+          this.registry.set("match", this.pack);
+        }
         killStageBgm(this);
         this.scene.start("loader", this.pack);
       });
-      net.on("rematch_request", () => {
+      net.on("rematch_request", (msg) => {
         if (!this.isHost || !this.over || !this.resultShown) return;
+        if (this.raid && this.raidCleared && msg?.next) {
+          this.advanceRaidStage();
+          return;
+        }
         this.net?.send({ type: "rematch" });
         killStageBgm(this);
         this.scene.start("loader", this.pack);
@@ -10374,9 +12253,10 @@
     }
 
     packActor(a) {
-      const now = Date.now();
+      const now = this.combatNow;
       const cdLeft = (move) => Math.max(0, (a.moveCdUntil?.[move] || 0) - now);
       return {
+        clock: now,
         x: a.sprite.x,
         y: a.sprite.y,
         vx: a.sprite.body.velocity.x,
@@ -10419,21 +12299,22 @@
       a.syncFacingVisual();
       a.busy = !!data.busy;
       a.ko = !!data.ko;
-      a.stunUntil = data.stunUntil || 0;
-      a.downedUntil = data.downedUntil || 0;
+      const localDeadline = value => value ? this.combatNow + Math.max(0, value - (Number.isFinite(data.clock) ? data.clock : this.combatNow)) : 0;
+      a.stunUntil = localDeadline(data.stunUntil);
+      a.downedUntil = localDeadline(data.downedUntil);
       a.willKnockdown = !!data.willKnockdown;
       a.airFalling = !!data.airFalling;
       a.hitThisMove = !!data.hitThisMove;
-      a.invulnUntil = data.invulnUntil || 0;
-      a.breakoutAt = data.breakoutAt || 0;
+      a.invulnUntil = localDeadline(data.invulnUntil);
+      a.breakoutAt = localDeadline(data.breakoutAt);
       a.pitFalling = !!data.pitFalling;
       if (data.ailment && data.ailment !== a.ailment) {
         if (data.ailment === "none") a.clearAilment();
         else a.applyAilment(data.ailment, 1);
       }
-      if (Number.isFinite(data.ailmentUntil)) a.ailmentUntil = data.ailmentUntil;
+      if (Number.isFinite(data.ailmentUntil)) a.ailmentUntil = localDeadline(data.ailmentUntil);
       if (data.cd && typeof data.cd === "object") {
-        const now = Date.now();
+        const now = this.combatNow;
         a.moveCdUntil = a.moveCdUntil || { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
         CD_SLOT_ORDER.forEach(({ move }) => {
           if (Number.isFinite(data.cd[move])) a.moveCdUntil[move] = now + Math.max(0, data.cd[move]);
@@ -10476,6 +12357,43 @@
         p2: this.packActor(this.p2),
       };
       if (this.p3) payload.p3 = this.packActor(this.p3);
+      if (this.raid) {
+        payload.raid = {
+          wave: this.raidWave,
+          cleared: this.raidCleared,
+          dialogueOpen: !!this.raidDialogueActive,
+          dialogueStep: this.raidDialogueStep || 0,
+          enemies: (this.raidEnemies || []).map((enemy) => ({
+            id: enemy.id,
+            x: enemy.sprite.x,
+            y: enemy.sprite.y,
+            hp: enemy.hp,
+            maxHp: enemy.maxHp,
+            boss: enemy.boss,
+            elite: enemy.elite,
+            ko: enemy.ko,
+            hitstun: Math.max(0, enemy.hitstunUntil - this.combatNow),
+            comboHits: enemy.comboHits,
+            comboLeft: Math.max(0, enemy.comboUntil - this.combatNow),
+            action: enemy.action,
+            heroMove: enemy.heroActionMove || "",
+            attackSeq: enemy.attackSeq || 0,
+            actionLeft: Math.max(0, enemy.actionUntil - this.combatNow),
+            actionDuration: Math.max(0, enemy.actionUntil - enemy.actionStartedAt),
+            actionHitLeft: Math.max(0, enemy.actionHitAt - this.combatNow),
+            actionHit: enemy.actionHit,
+            facing: enemy.facing,
+            rooted: Math.max(0, enemy.rootedUntil - this.combatNow),
+            slowed: Math.max(0, enemy.slowedUntil - this.combatNow),
+            slowMul: enemy.slowMul,
+            ailment: enemy.ailment,
+            ailmentLeft: Math.max(0, enemy.ailmentUntil - this.combatNow),
+            timeLock: Math.max(0, enemy.timeLockUntil - this.combatNow),
+            timeLockBanking: enemy.timeLockBanking,
+            timeLockBank: enemy.timeLockBank,
+          })),
+        };
+      }
       this.net.send(payload);
     }
 
@@ -10498,8 +12416,81 @@
       this.applyActor(this.p1, msg.p1);
       this.applyActor(this.p2, msg.p2);
       if (this.p3 && msg.p3) this.applyActor(this.p3, msg.p3);
+      if (this.raid && msg.raid) this.applyRaidState(msg.raid);
       if (msg.over && !this.over) {
         this.beginEndCine();
+      }
+    }
+
+    applyRaidState(data) {
+      const prevWave = this.raidWave;
+      this.raidWave = Number(data.wave) || this.raidWave;
+      this.raidCleared = !!data.cleared;
+      const current = new Map((this.raidEnemies || []).map((enemy) => [enemy.id, enemy]));
+      const next = [];
+      (data.enemies || []).forEach((state) => {
+        let enemy = current.get(state.id);
+        if (!enemy) enemy = new RaidEnemy(this, state.id, state.x, state.y, !!state.boss, !!state.elite);
+        enemy.sprite.setPosition(state.x, state.y);
+        enemy.constrainToArena();
+        enemy.hp = state.hp;
+        enemy.maxHp = state.maxHp || enemy.maxHp;
+        enemy.ko = !!state.ko;
+        enemy.hitstunUntil = this.combatNow + Math.max(0, Number(state.hitstun) || 0);
+        enemy.comboHits = Math.max(0, Number(state.comboHits) || 0);
+        enemy.comboUntil = this.combatNow + Math.max(0, Number(state.comboLeft) || 0);
+        enemy.action = state.action || "idle";
+        enemy.heroActionMove = state.heroMove || enemy.heroActionMove || "";
+        enemy.move = enemy.action === "hero_move" ? enemy.heroActionMove || "attack" : enemy.action === "hurt" ? "hurt" : "idle";
+        enemy.attackSeq = Math.max(0, Number(state.attackSeq) || 0);
+        enemy.actionUntil = this.combatNow + Math.max(0, Number(state.actionLeft) || 0);
+        enemy.actionStartedAt = enemy.actionUntil - Math.max(0, Number(state.actionDuration) || 0);
+        enemy.actionHitAt = this.combatNow + Math.max(0, Number(state.actionHitLeft) || 0);
+        enemy.actionHit = !!state.actionHit;
+        enemy.facing = Number(state.facing) < 0 ? -1 : 1;
+        enemy.rootedUntil = this.combatNow + Math.max(0, Number(state.rooted) || 0);
+        enemy.slowedUntil = this.combatNow + Math.max(0, Number(state.slowed) || 0);
+        enemy.slowMul = Number.isFinite(state.slowMul) ? state.slowMul : 1;
+        enemy.ailment = state.ailment || "none";
+        enemy.ailmentUntil = this.combatNow + Math.max(0, Number(state.ailmentLeft) || 0);
+        enemy.timeLockUntil = this.combatNow + Math.max(0, Number(state.timeLock) || 0);
+        enemy.timeLockBanking = !!state.timeLockBanking;
+        enemy.timeLockBank = Math.max(0, Number(state.timeLockBank) || 0);
+        const netCastKey = `${enemy.attackSeq}:${enemy.heroActionMove}`;
+        if (
+          enemy.boss &&
+          enemy.action === "hero_move" &&
+          enemy.actionHit &&
+          enemy._netCastKey !== netCastKey
+        ) {
+          enemy._netCastKey = netCastKey;
+          const profile = enemy.attackProfile();
+          if (profile.hasProjectile && profile.exactSpec) {
+            enemy.projSpawned = true;
+            this.spawnProjectile(enemy, profile.move, profile.exactSpec);
+          }
+        }
+        if (enemy.hitstunUntil > this.combatNow) enemy.hitAt = Math.max(enemy.hitAt, this.combatNow + 80);
+        enemy.sprite.setVisible(!enemy.ko);
+        enemy.gfx.setVisible(!enemy.ko);
+        enemy.heroSprite?.setVisible(!enemy.ko);
+        enemy.heroLabel?.setVisible(!enemy.ko);
+        enemy.draw();
+        next.push(enemy);
+        current.delete(state.id);
+      });
+      current.forEach((enemy) => enemy.destroy());
+      this.raidEnemies = next;
+      if (prevWave !== this.raidWave && this.raidWave >= 3) this.showRaidBossDialogue();
+      if (this.raidWave >= 3 && data.dialogueOpen) {
+        if (!this.raidDialogueActive) {
+          this._raidDialogueWave = 0;
+          this.showRaidBossDialogue();
+        }
+        this.raidDialogueStep = Math.max(0, Number(data.dialogueStep) || 0);
+        this.renderRaidDialogueStep();
+      } else if (this.raidDialogueActive && data.dialogueOpen === false) {
+        this.closeRaidDialogue();
       }
     }
 
@@ -10522,7 +12513,7 @@
 
     /** 每帧最先收边沿；hitstop/倒计时提前 return 也不会把 JustDown 吃掉。 */
     harvestFightEdges() {
-      const now = this.time.now;
+      const now = this.combatNow;
       this._edgeUp = Phaser.Input.Keyboard.JustDown(this.keys.W);
       this._edgeDown = Phaser.Input.Keyboard.JustDown(this.keys.S);
       this._edgeJ = Phaser.Input.Keyboard.JustDown(this.keys.J);
@@ -10546,6 +12537,11 @@
     sendLocalInput() {
       if (this.isHost || !this.net?.connected) return;
       const pad = this.readLocalPad();
+      const state = [pad.left,pad.right,pad.up,pad.down,pad.shift,pad.guard].join();
+      const edge = pad.justUp || pad.justDown || pad.justJ || pad.justK || pad.justL || pad.justShift;
+      if (!edge && state === this._lastInputState && this.combatNow - this._lastInputSent < 1000 / 30) return;
+      this._lastInputState = state;
+      this._lastInputSent = this.combatNow;
       this.net.send({ type: "input", ...pad });
     }
 
@@ -10594,7 +12590,7 @@
       const air = !p.grounded();
       if (this.domainDashLocked(p)) shift = false;
       const dashOn = shift && p.sp > 8;
-      if (dashOn) p.sp = Math.max(0, p.sp - (air ? 5 : 9) * (this.game.loop.delta / 1000));
+      if (dashOn) p.sp = Math.max(0, p.sp - (air ? 5 : 9) * (Math.min(0.05, this.game.loop.delta / 1000)));
       const speed = dashOn ? DASH : air ? AIR : WALK;
       if (left) {
         p.facing = -1;
@@ -10669,7 +12665,7 @@
       if (p.ko) return;
       const s = p.sprite;
       const onGround = p.grounded();
-      const now = this.time.now;
+      const now = this.combatNow;
       // 必须在任何 early-return 之前记下边沿，否则硬直中按 K 会被整帧吃掉
       if (pad.justJ) buf.pendingJAt = now;
       if (pad.justK) buf.pendingKAt = now;
@@ -10776,7 +12772,7 @@
     }
 
     stampDirBuffer() {
-      const now = this.time.now;
+      const now = this.combatNow;
       this.pressedUp = this._edgeUp || Phaser.Input.Keyboard.JustDown(this.keys.W);
       this.pressedDown = this._edgeDown || Phaser.Input.Keyboard.JustDown(this.keys.S);
       if (this.pressedUp) {
@@ -10791,7 +12787,7 @@
     }
 
     vertDir() {
-      const now = this.time.now;
+      const now = this.combatNow;
       const upHeld = this.keys.W.isDown;
       const downHeld = this.keys.S.isDown;
       const upTap = now - (this.lastUpAt || 0) <= DIR_WINDOW;
@@ -10812,7 +12808,7 @@
         right: this.keys.D.isDown,
         shift: this.keys.SHIFT.isDown,
       };
-      this.upJumpAt = this.time.now;
+      this.upJumpAt = this.combatNow;
       return this.beginJumpFor(p, pad);
     }
 
@@ -10843,7 +12839,7 @@
       const shift = this.keys.SHIFT.isDown;
       const justShift = this._edgeShift;
       const onGround = p.grounded();
-      const now = this.time.now;
+      const now = this.combatNow;
       this.stampDirBuffer();
       // 硬直提前 return 前先吃边沿，否则 JustDown 当帧作废
       if (justJ) this.pendingJAt = now;
@@ -11026,7 +13022,7 @@
     }
 
     cpuStartJump(d, vx) {
-      const now = this.time.now;
+      const now = this.combatNow;
       const brain = this.cpuBrain(d);
       if ((d.jumpsLeft || 0) <= 0 || now < (brain.jumpAt || 0)) return false;
       const fromGround = d.grounded();
@@ -11197,7 +13193,7 @@
     }
 
     cpuTrySpecial(d, p, dist) {
-      const now = this.time.now;
+      const now = this.combatNow;
       const spec = this.cpuProfile();
       const brain = this.cpuBrain(d);
       if (
@@ -11230,7 +13226,7 @@
     }
 
     cpuSteerAir(d, p) {
-      const now = this.time.now;
+      const now = this.combatNow;
       const brain = this.cpuBrain(d);
       const dist = Math.abs(p.sprite.x - d.sprite.x);
       let aimX = Number.isFinite(brain.landX) ? brain.landX : p.sprite.x;
@@ -11412,7 +13408,7 @@
     }
 
     showCpuSpecial(d, p, brain, dist, opts = {}) {
-      const now = this.time.now;
+      const now = this.combatNow;
       if (now < brain.skillAt) return false;
       const kinds = ["skill", "combo_up", "combo_down", "super"].filter((m) => d.has(m));
       if (!kinds.length) return false;
@@ -11474,7 +13470,7 @@
     controlShowCpu(d, p) {
       if (d.ko) return;
       d.tickGetUp();
-      const now = this.time.now;
+      const now = this.combatNow;
       const brain = this.cpuBrain(d);
       if (this.cpuTryDashEscape(d, p, brain, now)) return;
       if (!d.canAct() || d.busy) return;
@@ -11569,7 +13565,7 @@
       const p = this.p1;
       if (d.ko) return;
       d.tickGetUp();
-      const now = this.time.now;
+      const now = this.combatNow;
       const brain = this.cpuBrain(d);
       if (this.cpuTryDashEscape(d, p, brain, now)) return;
       if (!d.canAct()) return;
@@ -11663,7 +13659,7 @@
       if (
         this.cutinActive &&
         this._cutinStartedAt &&
-        this.time.now - this._cutinStartedAt > 2800
+        this.combatNow - this._cutinStartedAt > 2800
       ) {
         this.endSuperCutin(this._cutinActor);
       }
@@ -11699,6 +13695,7 @@
         return;
       }
       if (this.countText) this.countText.setAlpha(0);
+      if (this.pauseForRaidDialogue()) return;
       if (this.over) {
         this.plantAllFrames();
         this.positionPlayerTags();
@@ -11708,6 +13705,10 @@
           this.resultShown &&
           (this._edgeJ || Phaser.Input.Keyboard.JustDown(this.keys.ENTER))
         ) {
+          if (this.raid && this.raidCleared) {
+            this.advanceRaidStage();
+            return;
+          }
           if (this.pvp && !this.isHost) {
             this.net?.send({ type: "rematch_request" });
             return;
@@ -11722,6 +13723,10 @@
         if (!this.isHost) {
           this.sendLocalInput();
           this.applyPendingState();
+          this.faceFromMovement(this.myActor(), {
+            left: this.keys.A.isDown,
+            right: this.keys.D.isDown,
+          });
           this.tickCountdown();
           this.plantAllFrames();
           // 客人端本地生成特效，必须自己推进/销毁，否则小技能看不见、奥义残留
@@ -11735,9 +13740,12 @@
         this.tickTimeLocks();
         this.tickYearZeroWireBinds();
         this.refreshDomainMpBan();
-        this.driveActor(this.p1, this.padForSeat("host"), this.hostBuf);
-        this.driveActor(this.p2, this.padForSeat("guest"), this.guestBuf);
-        if (this.p3) this.driveActor(this.p3, this.padForSeat("guest2"), this.guest2Buf);
+        const hostPad = this.padForSeat("host");
+        const guestPad = this.padForSeat("guest");
+        const guest2Pad = this.padForSeat("guest2");
+        this.driveActor(this.p1, hostPad, this.hostBuf);
+        this.driveActor(this.p2, guestPad, this.guestBuf);
+        if (this.p3) this.driveActor(this.p3, guest2Pad, this.guest2Buf);
         ["guest", "guest2"].forEach((seat) => {
           const pad = this.remotePads[seat];
           if (!pad) return;
@@ -11748,13 +13756,20 @@
           pad.justL = false;
           pad.justShift = false;
         });
-        this.fighters().forEach((a) => {
-          a.stayOnStage();
-          this.faceNearestThreat(a);
+        [
+          { actor: this.p1, pad: hostPad },
+          { actor: this.p2, pad: guestPad },
+          { actor: this.p3, pad: guest2Pad },
+        ].forEach(({ actor, pad }) => {
+          if (!actor) return;
+          actor.stayOnStage();
+          this.faceNearestThreat(actor, pad);
         });
         this.resolveAllPush();
-        this.tryAllHits();
+        if (!this.raid) this.tryAllHits();
         this.updateProjectiles();
+        this.raidProjectileHits();
+        this.updateRaid();
         this.plantAllFrames();
         this.resolveAllPush();
         this.checkMatchOver();
@@ -11768,6 +13783,21 @@
       this.regenResources();
       this.tickTimeLocks();
       this.tickYearZeroWireBinds();
+      if (this.raid) {
+        this.controlPlayer();
+        const localPad = { left: this.keys.A.isDown, right: this.keys.D.isDown };
+        this.fighters().forEach((p) => {
+          p.stayOnStage();
+          this.faceNearestThreat(p, p === this.p1 ? localPad : null);
+        });
+        this.updateProjectiles();
+        this.raidProjectileHits();
+        this.updateRaid();
+        this.plantAllFrames();
+        this.positionPlayerTags();
+        this.drawHp();
+        return;
+      }
       if (this.cricket) {
         this.controlShowCpu(this.p1, this.p2);
         this.controlShowCpu(this.p2, this.p1);
@@ -11794,7 +13824,7 @@
     }
   }
 
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
     width: 1344,
@@ -11810,6 +13840,8 @@
       default: "arcade",
       arcade: { gravity: { y: 0 }, debug: false },
     },
+    loader: { maxParallelDownloads: 6, timeout: 15000 },
     scene: [Boot, Select, Load, Fight],
   });
+  window.HeroShell?.bind(game);
 })();

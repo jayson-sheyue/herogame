@@ -14,3 +14,18 @@ game/incoming/_done/
 .env
 .env.*
 .cursor/
+
+# Local credentials, browser sessions and generated artifacts
+!.env.example
+*credentials*.json
+client_secret*.json
+*state*.json
+cookies*.json
+.adk/
+*.db
+*.pem
+*.p12
+*.jks
+*.keystore
+build/
+coverage/
