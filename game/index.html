@@ -1,53 +1,120 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#080c13" />
-  <title>英灵大乱斗 · PVE</title>
-  <script>
-    if (window.location.protocol === "file:") window.location.replace(`http://127.0.0.1:8788/${window.location.search}${window.location.hash}`);
-  </script>
-  <link rel="stylesheet" href="/src/ui.css?v=arcade1" />
-</head>
-<body>
-  <header>
-    <span class="edition">英灵大乱斗 <b>PVE</b></span>
-    <nav aria-label="游戏工具">
-      <button id="muteButton" aria-pressed="false">声音：开</button>
-      <button id="fullscreenButton">全屏</button>
-      <button id="helpButton">出招表 <kbd>F1</kbd></button>
-    </nav>
-  </header>
-  <main id="game" aria-label="英灵大乱斗游戏画面"></main>
-  <footer id="commandBar">
-    <span id="phaseLabel">SELECT</span><p id="quickHint" aria-live="polite">读取资源…</p>
-    <div class="command-actions">
-      <button id="backButton" hidden>选人 <kbd>Esc</kbd></button>
-      <button id="pauseButton" hidden>暂停</button>
-      <button id="rematchButton" class="primary" hidden>再战 <kbd>J</kbd></button>
-      <button id="startButton" class="primary" hidden>开战 <kbd>J</kbd></button>
-    </div>
-  </footer>
-  <section id="loading" class="loading" aria-live="polite">
-    <div class="loading-card"><span class="eyebrow">英灵大乱斗 / PVE</span><h2 id="loadingTitle">LOADING</h2><p id="loadingDetail">读取人物与战场…</p><progress id="loadProgress" aria-label="资源加载进度"></progress><button id="retryButton" hidden>重新加载</button></div>
-  </section>
-  <dialog id="helpDialog" aria-labelledby="helpTitle">
-    <div class="dialog-heading"><h2 id="helpTitle">出招表</h2><button id="closeHelp">关闭 <kbd>Esc</kbd></button></div>
-    <p id="helpContext">推荐横屏与实体键盘</p>
-    <dl class="move-list">
-      <div><dt>选人</dt><dd><kbd>A</kbd> <kbd>D</kbd> 换英灵　<kbd>W</kbd> 选 1P　<kbd>S</kbd> 选 CPU<br><kbd>←</kbd> <kbd>→</kbd> 换战场　<kbd>F</kbd> 难度　<kbd>J</kbd> / <kbd>Enter</kbd> 开战</dd></div>
-      <div><dt>移动</dt><dd><kbd>A</kbd> <kbd>D</kbd> 行走　<kbd>W</kbd> 跳跃 / 二段跳　<kbd>Shift</kbd> 冲刺</dd></div>
-      <div><dt>普攻</dt><dd><kbd>J</kbd> 普攻　<kbd>W</kbd> + <kbd>J</kbd> 对空　<kbd>S</kbd> + <kbd>J</kbd> 对地</dd></div>
-      <div><dt>技能</dt><dd><kbd>K</kbd> 技能　<kbd>W</kbd> + <kbd>K</kbd> 对空技能　<kbd>S</kbd> + <kbd>K</kbd> 对地技能<br><kbd>L</kbd> 奥义；倒地 / 被控时按 <kbd>L</kbd> 挣脱</dd></div>
-      <div><dt>防守</dt><dd><kbd>S</kbd> 防守并回复体力；受击时 <kbd>Shift</kbd> 闪避脱战</dd></div>
-      <div><dt>资源</dt><dd><i class="swatch hp"></i>生命　<i class="swatch mp"></i>能量：技能消耗　<i class="swatch sp"></i>体力：普攻、冲刺与挣脱消耗</dd></div>
-      <div><dt>结束</dt><dd>击倒对手获胜。<kbd>J</kbd> / <kbd>Enter</kbd> 同人同图再战　<kbd>Esc</kbd> 返回选人</dd></div>
-    </dl>
-  </dialog>
-  <dialog id="pauseDialog" aria-labelledby="pauseTitle"><span class="eyebrow">PAUSE</span><h2 id="pauseTitle">对战暂停</h2><p>冷却和战斗计时已停止。</p><button id="resumeButton" class="primary">继续对战</button></dialog>
-  <script src="/src/shell.js?v=arcade1"></script>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js" onerror="HeroShell.fail('游戏引擎加载失败', '请检查网络后重试，首次进入需要连接 jsDelivr。')"></script>
-  <script src="/src/game.js?v=arcade1"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080c13" />
+    <title>英灵大乱斗 · PVE</title>
+    <script>
+      if (window.location.protocol === "file:")
+        window.location.replace(`http://127.0.0.1:8788/${window.location.search}${window.location.hash}`);
+    </script>
+    <link rel="stylesheet" href="/src/ui.css?v=arcade2" />
+  </head>
+  <body>
+    <header>
+      <span class="edition"><span data-i18n="英灵大乱斗">英灵大乱斗</span> <b>PVE</b></span>
+      <nav aria-label="游戏工具" data-i18n-aria="游戏工具">
+        <label class="language-control"
+          ><span class="sr-only" data-i18n="系统语言">系统语言</span
+          ><select id="languageSelect" aria-label="系统语言" data-i18n-aria="系统语言">
+            <option value="zh-CN">简体中文</option>
+            <option value="en">English</option>
+          </select></label
+        >
+        <button data-i18n="声音：开" id="muteButton" aria-pressed="false">声音：开</button>
+        <button data-i18n="全屏" id="fullscreenButton">全屏</button>
+        <button id="helpButton"><span data-i18n="出招表">出招表</span> <kbd>F1</kbd></button>
+      </nav>
+    </header>
+    <main id="game" aria-label="英灵大乱斗游戏画面" data-i18n-aria="英灵大乱斗游戏画面"></main>
+    <footer id="commandBar">
+      <span id="phaseLabel">SELECT</span>
+      <p id="quickHint" aria-live="polite" data-i18n="读取资源…">读取资源…</p>
+      <div class="command-actions">
+        <button id="backButton" hidden><span data-i18n="选人">选人</span> <kbd>Esc</kbd></button>
+        <button data-i18n="暂停" id="pauseButton" hidden>暂停</button>
+        <button id="rematchButton" class="primary" hidden>
+          <span data-i18n="再战">再战</span> <kbd>J</kbd>
+        </button>
+        <button id="startButton" class="primary" hidden>
+          <span data-i18n="fight.button">开战</span> <kbd>J</kbd>
+        </button>
+      </div>
+    </footer>
+    <section id="loading" class="loading" aria-live="polite">
+      <div class="loading-card">
+        <span class="eyebrow" data-i18n="英灵大乱斗 / PVE">英灵大乱斗 / PVE</span>
+        <h2 id="loadingTitle">LOADING</h2>
+        <p id="loadingDetail" data-i18n="读取人物与战场…">读取人物与战场…</p>
+        <progress id="loadProgress" aria-label="资源加载进度" data-i18n-aria="资源加载进度"></progress
+        ><button data-i18n="重新加载" id="retryButton" hidden>重新加载</button>
+      </div>
+    </section>
+    <dialog id="helpDialog" aria-labelledby="helpTitle">
+      <div class="dialog-heading">
+        <h2 id="helpTitle" data-i18n="出招表">出招表</h2>
+        <button id="closeHelp"><span data-i18n="关闭">关闭</span> <kbd>Esc</kbd></button>
+      </div>
+      <p id="helpContext" data-i18n="推荐横屏与实体键盘">推荐横屏与实体键盘</p>
+      <dl class="move-list">
+        <div>
+          <dt data-i18n="选人">选人</dt>
+          <dd data-i18n-html="help.select">
+            <kbd>A</kbd> <kbd>D</kbd> 换英灵　<kbd>W</kbd> 选 1P　<kbd>S</kbd> 选 CPU<br /><kbd>←</kbd>
+            <kbd>→</kbd> 换战场　<kbd>F</kbd> 难度　<kbd>J</kbd> / <kbd>Enter</kbd> 开战
+          </dd>
+        </div>
+        <div>
+          <dt data-i18n="移动">移动</dt>
+          <dd data-i18n-html="help.move">
+            <kbd>A</kbd> <kbd>D</kbd> 行走　<kbd>W</kbd> 跳跃 / 二段跳　<kbd>Shift</kbd> 冲刺
+          </dd>
+        </div>
+        <div>
+          <dt data-i18n="普攻">普攻</dt>
+          <dd data-i18n-html="help.attack">
+            <kbd>J</kbd> 普攻　<kbd>W</kbd> + <kbd>J</kbd> 对空　<kbd>S</kbd> + <kbd>J</kbd> 对地
+          </dd>
+        </div>
+        <div>
+          <dt data-i18n="技能">技能</dt>
+          <dd data-i18n-html="help.skill">
+            <kbd>K</kbd> 技能　<kbd>W</kbd> + <kbd>K</kbd> 对空技能　<kbd>S</kbd> +
+            <kbd>K</kbd> 对地技能<br /><kbd>L</kbd> 奥义；倒地 / 被控时按 <kbd>L</kbd> 挣脱
+          </dd>
+        </div>
+        <div>
+          <dt data-i18n="防守">防守</dt>
+          <dd data-i18n-html="help.guard"><kbd>S</kbd> 防守并回复体力；受击时 <kbd>Shift</kbd> 闪避脱战</dd>
+        </div>
+        <div>
+          <dt data-i18n="资源">资源</dt>
+          <dd data-i18n-html="help.meters">
+            <i class="swatch hp"></i>生命　<i class="swatch mp"></i>能量：技能消耗　<i class="swatch sp"></i
+            >体力：普攻、冲刺与挣脱消耗
+          </dd>
+        </div>
+        <div>
+          <dt data-i18n="结束">结束</dt>
+          <dd data-i18n-html="help.result">
+            击倒对手获胜。<kbd>J</kbd> / <kbd>Enter</kbd> 同人同图再战　<kbd>Esc</kbd> 返回选人
+          </dd>
+        </div>
+      </dl>
+    </dialog>
+    <dialog id="pauseDialog" aria-labelledby="pauseTitle">
+      <span class="eyebrow">PAUSE</span>
+      <h2 id="pauseTitle" data-i18n="对战暂停">对战暂停</h2>
+      <p data-i18n="冷却和战斗计时已停止。">冷却和战斗计时已停止。</p>
+      <button data-i18n="继续对战" id="resumeButton" class="primary">继续对战</button>
+    </dialog>
+    <script src="/src/i18n.js?v=1"></script>
+    <script src="/src/shell.js?v=arcade2"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"
+      onerror="HeroShell.fail('游戏引擎加载失败', '请检查网络后重试，首次进入需要连接 jsDelivr。')"
+    ></script>
+    <script src="/src/game.js?v=arcade2"></script>
+  </body>
 </html>

@@ -41,10 +41,12 @@ function setup() {
   };
   const document = new Element();
   document.getElementById = get;
+  document.documentElement = {};
+  document.querySelectorAll = () => [];
   const window = new Element();
   const stored = new Map();
   let reloaded = 0;
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/shell.js'), 'utf8'), {
+  const context = {
     document,
     window,
     localStorage: { getItem: (k) => stored.get(k), setItem: (k, v) => stored.set(k, v) },
@@ -53,7 +55,10 @@ function setup() {
         reloaded++;
       },
     },
-  });
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/i18n.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/shell.js'), 'utf8'), context);
   const scenes = {};
   let soundPaused = 0,
     soundResumed = 0;
@@ -212,21 +217,80 @@ test('keyboard navigation on native controls does not leak Enter into the game',
 });
 
 test('result offers rematch with the same pack and the next fight hides it', () => {
-  const env = setup(), fight = env.scene(false), pack = {p1Id:'a',p2Id:'b',stageId:'city',cpuDiff:'fair'};
+  const env = setup(),
+    fight = env.scene(false),
+    pack = { p1Id: 'a', p2Id: 'b', stageId: 'city', cpuDiff: 'fair' };
   let next;
-  Object.assign(fight,{pack,resultShown:true});fight.scene.start=(key,data)=>{next={key,data};};
-  env.scenes.fight=fight;
-  env.shell.mode('pve');assert.equal(env.get('rematchButton').hidden,true);
-  env.shell.result();assert.equal(env.get('rematchButton').hidden,false);
-  env.get('rematchButton').onclick();assert.equal(next.key,'loader');assert.equal(next.data,pack);
-  env.shell.mode('pve');assert.equal(env.get('rematchButton').hidden,true);
+  Object.assign(fight, { pack, resultShown: true });
+  fight.scene.start = (key, data) => {
+    next = { key, data };
+  };
+  env.scenes.fight = fight;
+  env.shell.mode('pve');
+  assert.equal(env.get('rematchButton').hidden, true);
+  env.shell.result();
+  assert.equal(env.get('rematchButton').hidden, false);
+  env.get('rematchButton').onclick();
+  assert.equal(next.key, 'loader');
+  assert.equal(next.data, pack);
+  env.shell.mode('pve');
+  assert.equal(env.get('rematchButton').hidden, true);
 });
 
 test('help during a fight pauses and Escape closes help without returning to selection', () => {
-  const env=setup(),fight=env.scene(false);env.scenes.fight=fight;
-  env.get('helpButton').onclick();assert.equal(fight.active,false);
-  let stopped=false;
-  env.window.emit('keydown',{code:'Escape',preventDefault(){},stopImmediatePropagation(){stopped=true;}});
-  assert.equal(stopped,true);assert.equal(env.get('helpDialog').open,false);assert.equal(fight.active,true);
-  assert.deepEqual(env.sound(),{paused:1,resumed:1});
+  const env = setup(),
+    fight = env.scene(false);
+  env.scenes.fight = fight;
+  env.get('helpButton').onclick();
+  assert.equal(fight.active, false);
+  let stopped = false;
+  env.window.emit('keydown', {
+    code: 'Escape',
+    preventDefault() {},
+    stopImmediatePropagation() {
+      stopped = true;
+    },
+  });
+  assert.equal(stopped, true);
+  assert.equal(env.get('helpDialog').open, false);
+  assert.equal(fight.active, true);
+  assert.deepEqual(env.sound(), { paused: 1, resumed: 1 });
+});
+
+test('language switch preserves a paused fight and its result actions', () => {
+  const env = setup(),
+    fight = env.scene(false);
+  env.scenes.fight = fight;
+  fight.hp = 97;
+  fight.combatNow = 5000;
+  let localized = 0;
+  fight.localize = () => {
+    localized++;
+  };
+  env.shell.mode('pve');
+  env.get('pauseButton').onclick();
+  env.get('languageSelect').value = 'en';
+  env.get('languageSelect').onchange();
+  assert.equal(fight.active, false);
+  assert.equal(fight.hp, 97);
+  assert.equal(fight.combatNow, 5000);
+  assert.equal(env.get('pauseDialog').open, true);
+  assert.equal(env.get('muteButton').textContent, 'Sound: On');
+  assert.equal(localized, 1);
+  assert.deepEqual(env.sound(), { paused: 1, resumed: 0 });
+  env.get('resumeButton').onclick();
+  assert.equal(fight.active, true);
+});
+
+test('changing language while assets load translates the current error and keeps its recovery', () => {
+  const env = setup();
+  let recovered = 0;
+  env.shell.fail('英灵资源加载失败', '请确认资源包完整。返回选人后可换一名英灵重试。', () => recovered++);
+  env.get('languageSelect').value = 'en';
+  env.get('languageSelect').onchange();
+  assert.equal(env.get('loadingTitle').textContent, 'Fighter assets could not be loaded');
+  assert.equal(env.get('retryButton').textContent, 'Back to Select');
+  env.get('retryButton').onclick();
+  assert.equal(recovered, 1);
+  assert.equal(env.reloaded(), 0);
 });

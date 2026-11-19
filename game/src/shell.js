@@ -1,5 +1,8 @@
 (() => {
   'use strict';
+  const i18n = window.HeroI18n;
+  const t = i18n.t;
+  let loadingCopy = null;
   const $ = (id) => document.getElementById(id);
   let game,
     pausedScene,
@@ -52,7 +55,7 @@
   function openHelp() {
     if (help.open || pause.open) return;
     suspend();
-    $('helpContext').textContent = pausedScene ? '对战已暂停，关闭后继续。' : '推荐横屏与实体键盘';
+    $('helpContext').textContent = t(pausedScene ? '对战已暂停，关闭后继续。' : '推荐横屏与实体键盘');
     const select = active('select');
     if (select) {
       releaseKeys();
@@ -105,7 +108,7 @@
     if (!game) return;
     muted = !muted;
     game.sound.mute = muted;
-    $('muteButton').textContent = muted ? '声音：关' : '声音：开';
+    $('muteButton').textContent = t(muted ? '声音：关' : '声音：开');
     $('muteButton').setAttribute('aria-pressed', String(muted));
     try {
       localStorage.setItem('herogame-muted', String(muted));
@@ -119,12 +122,12 @@
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch {
-      $('quickHint').textContent = '浏览器未允许全屏，可使用浏览器的全屏菜单。';
+      $('quickHint').textContent = t('浏览器未允许全屏，可使用浏览器的全屏菜单。');
     }
     $('fullscreenButton').blur();
   };
   document.addEventListener('fullscreenchange', () => {
-    $('fullscreenButton').textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+    $('fullscreenButton').textContent = t(document.fullscreenElement ? '退出全屏' : '全屏');
   });
   $('startButton').onclick = () => {
     const select = active('select');
@@ -154,19 +157,43 @@
       if (!help.open && !pause.open && suspend()) pause.showModal();
     }
   });
+  function refreshLocale() {
+    $('muteButton').textContent = t(muted ? '声音：关' : '声音：开');
+    $('fullscreenButton').textContent = t(document.fullscreenElement ? '退出全屏' : '全屏');
+    $('helpContext').textContent = t(pausedScene ? '对战已暂停，关闭后继续。' : '推荐横屏与实体键盘');
+    $('retryButton').textContent = t(retryAction ? '返回英灵选择' : '重新加载');
+    game?.canvas?.setAttribute('aria-label', t('游戏画面。操作方法见出招表。'));
+    if (loadingCopy) {
+      $('loadingTitle').textContent = t(loadingCopy.title);
+      $('loadingDetail').textContent = t(loadingCopy.detail);
+    }
+    for (const key of ['select', 'fight']) {
+      const scene = getScene(key);
+      if (scene && (active(key) || scene === pausedScene)) scene.localize?.();
+    }
+  }
+  $('languageSelect').addEventListener('focus', releaseKeys);
+  $('languageSelect').onchange = () => {
+    releaseKeys();
+    i18n.setLanguage($('languageSelect').value);
+    $('languageSelect').blur();
+    if (!help.open && !pause.open) game?.canvas?.focus({ preventScroll: true });
+  };
+  i18n.onChange(refreshLocale);
+  refreshLocale();
   window.HeroShell = {
     bind(instance) {
       game = instance;
       game.events.once('ready', () => {
         game.canvas.tabIndex = -1;
-        game.canvas.setAttribute('aria-label', '游戏画面。操作方法见出招表。');
+        game.canvas.setAttribute('aria-label', t('游戏画面。操作方法见出招表。'));
         try {
           muted = localStorage.getItem('herogame-muted') === 'true';
         } catch {
           /* defaults */
         }
         game.sound.mute = muted;
-        $('muteButton').textContent = muted ? '声音：关' : '声音：开';
+        $('muteButton').textContent = t(muted ? '声音：关' : '声音：开');
         $('muteButton').setAttribute('aria-pressed', String(muted));
       });
     },
@@ -177,9 +204,9 @@
       $('startButton').hidden = fight;
       $('rematchButton').hidden = true;
       $('phaseLabel').textContent = fight ? '1P VS CPU' : 'SELECT';
-      $('quickHint').textContent = fight
-        ? 'A D 移动 · W 跳跃 · S 防守 · J 普攻 · K 技能 · L 奥义'
-        : '选择英灵与对手';
+      $('quickHint').textContent = t(
+        fight ? 'A D 移动 · W 跳跃 · S 防守 · J 普攻 · K 技能 · L 奥义' : '选择英灵与对手',
+      );
     },
     selection(scene) {
       if (mode !== 'select') return;
@@ -194,8 +221,9 @@
     },
     loading(title, detail) {
       $('loading').hidden = false;
-      $('loadingTitle').textContent = title;
-      $('loadingDetail').textContent = detail || '正在读取资源，请稍候…';
+      loadingCopy = { title, detail: detail || '正在读取资源，请稍候…' };
+      $('loadingTitle').textContent = t(loadingCopy.title);
+      $('loadingDetail').textContent = t(loadingCopy.detail);
       $('loadProgress').hidden = false;
       $('loadProgress').removeAttribute('value');
       $('retryButton').hidden = true;
@@ -207,17 +235,18 @@
       $('loadProgress').value = value;
     },
     ready() {
+      loadingCopy = null;
       $('loading').hidden = true;
     },
     fail(title, detail, onReturn) {
       this.loading(title, detail);
       $('loadProgress').hidden = true;
       retryAction = onReturn || null;
-      $('retryButton').textContent = onReturn ? '返回英灵选择' : '重新加载';
+      $('retryButton').textContent = t(onReturn ? '返回英灵选择' : '重新加载');
       $('retryButton').hidden = false;
     },
     hint(text) {
-      if (text) $('quickHint').textContent = text;
+      if (text) $('quickHint').textContent = t(text);
     },
   };
 })();

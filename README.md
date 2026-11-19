@@ -1,5 +1,7 @@
 # 英灵大乱斗 · PVE 街机版
 
+**简体中文** | [English](README.en.md)
+
 基于 Phaser 3 的本地像素格斗游戏。本分支 `codex/pve-arcade` **只保留玩家对 CPU 的 PVE 对战**，沿用现有英灵、地图和招式素材，重做经典街机风格的选人界面与战斗 HUD。
 
 多模式版本保留在 [main](https://github.com/jayson-sheyue/herogame/tree/main)。本分支没有木桩、双 AI 观战、合作闯关或局域网 PVP，也不启动 WebSocket 房间服务。
@@ -15,6 +17,12 @@ python3 game/serve.py
 ```
 
 打开 <http://127.0.0.1:8788>，按 `Ctrl+C` 停服。默认仅监听本机；自定义端口使用 `--port 8790`。首次启动需要联网从 jsDelivr 加载 Phaser 3.80.1。推荐实体键盘与横屏，当前没有触屏战斗按键。
+
+## 系统语言
+
+顶部语言框可以选择 **简体中文 / English**。首次默认中文，不跟随系统或浏览器自动切换；手动选择后会在本机浏览器保存，下次优先恢复。切换立即更新菜单、出招表、加载 / 错误提示、内置英灵、地图与奥义名称，保留当前选人、地图、难度和对局。
+
+原有语音及画面素材内的文字不变。自定义资源包可在 `fighter.json` / `stage.json` 提供 `displayNameEn` 或 `i18n.en.displayName`；没有英文名称时保留作者原名，切换不会修改资源文件。浏览器不允许存储时，语言选择仅在当前页面会话生效。
 
 ## 选人和开战
 
@@ -56,6 +64,7 @@ python3 game/import_pack.py /path/to/hero.hgpk.zip
 ## 目录与开发检查
 
 - `game/src/game.js`：选人、加载与 PVE 战斗。
+- `game/src/i18n.js`：中英译文、显示名称与语言偏好。
 - `game/src/shell.js`、`game/src/ui.css`：街机外框、出招表、暂停与恢复。
 - `game/serve.py`：标准库 HTTP 静态服务。
 - `assets/game/`：人物、地图与音效；`game/fonts/`：字体。

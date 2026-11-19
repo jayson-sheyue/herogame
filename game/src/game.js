@@ -17,6 +17,9 @@
   const PUSH_H = 158;
   const PUSH_PRONE_W = 152;
   const PUSH_PRONE_H = 36;
+  const t = key => window.HeroI18n?.t(key) ?? key;
+  const heroName = (id, data, short = false) => window.HeroI18n?.heroName(id, data, short) ?? data?.displayName ?? id;
+  const stageName = (id, data) => window.HeroI18n?.stageName(id, data) ?? data?.displayName ?? id;
   const GAME_NAME = "英灵大乱斗";
   const UI_FONT = "GameUI, monospace";
   const BODY_FONT = UI_FONT;
@@ -1188,13 +1191,11 @@
   }
 
   function uiText(scene, x, y, str, style) {
-    return crispUi(
-      scene.add.text(x, y, str || "", {
-        fontFamily: UI_FONT,
-        color: "#f4ead0",
-        ...style,
-      })
-    );
+    const text = crispUi(scene.add.text(x, y, t(str || ""), {
+      fontFamily: UI_FONT, color: "#f4ead0", ...style,
+    }));
+    window.HeroI18n?.bindText(text, str);
+    return text;
   }
 
   function bakeDomainSoftMask(scene) {
@@ -1255,7 +1256,29 @@
   let _fierceKanjiSeq = 0;
 
   /** 奥义字：刀刻感——字距拉开、红黑对半、硬边斜切，避免一团饱和红 */
-  function makeSekiroBrushKanji(scene, text, fontSize, opts = {}) {
+  function makeSekiroBrushKanji(scene, source, fontSize, opts = {}) {
+    const root = scene.add.container(0, 0).setScrollFactor(0);
+    const paint = () => {
+      root.removeAll(true);
+      let child;
+      if (window.HeroI18n?.language === "en") {
+        child = crispUi(scene.add.text(0, 0, t(source), {
+          fontFamily: UI_FONT, fontSize: Math.min(72, fontSize), color: "#efc05d",
+          stroke: "#180e14", strokeThickness: 6,
+        })).setOrigin(0.5).setRotation(opts.rot || 0);
+        while (child.width > scene.scale.width * 0.34 && parseInt(child.style.fontSize, 10) > 18) {
+          child.setFontSize(parseInt(child.style.fontSize, 10) - 2);
+        }
+      } else child = paintSuperTitleGlyph(scene, source, fontSize, opts);
+      root.add(child);
+    };
+    paint();
+    const off = window.HeroI18n?.onChange(paint);
+    if (off) root.once("destroy", off);
+    return root;
+  }
+
+  function paintSuperTitleGlyph(scene, text, fontSize, opts = {}) {
     const rot = opts.rot ?? -0.07;
     const fill = opts.fill || "#8a1414";
     const hot = opts.hot || "#c42828";
@@ -1407,6 +1430,7 @@
     scene.textures.addCanvas(uid, canvas);
     const spr = scene.add.image(0, 0, uid).setOrigin(0.5).setScrollFactor(0);
     if (spr.texture?.setFilter) spr.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    spr.once("destroy", () => { if (scene.textures.exists(uid)) scene.textures.remove(uid); });
     return spr;
   }
 
@@ -2994,7 +3018,7 @@
         const g = this.add.graphics();
         const key = bakeRosterCardPortrait(this, id, this.fighters[id], 96, 80);
         const face = this.add.image(x + 52, y + 42, key).setDisplaySize(96, 80);
-        const name = uiText(this, x + 52, y + 86, this.heroName(index), {
+        const name = uiText(this, x + 52, y + 86, this.heroName(index, true), {
           fontSize: 15,
           color: "#d6dce3",
           wordWrap: { width: 106 },
@@ -3011,7 +3035,7 @@
         zone.on("pointerover", () => face.setAlpha(0.7));
         zone.on("pointerout", () => face.setAlpha(1));
         this.cardsRoot.add([g, face, name, badge, zone]);
-        this.cards.push({ index, x, y, g, badge });
+        this.cards.push({ index, x, y, g, badge, name });
       });
     }
 
@@ -3059,11 +3083,13 @@
       this.cpuDiff = saveCpuDiff(id);
       this.refresh();
     }
-    heroName(index) {
-      return this.fighters[this.playable[index]]?.displayName || "—";
+    heroName(index, short = false) {
+      const id = this.playable[index];
+      return heroName(id, this.fighters[id], short) || "—";
     }
     stageNameAt(index) {
-      return this.stages[this.stageIds[index]]?.displayName || "—";
+      const id = this.stageIds[index];
+      return stageName(id, this.stages[id]) || "—";
     }
     rememberSelection() {
       const selection = {
@@ -3107,6 +3133,7 @@
       });
       this.slotButtons.forEach((b, i) => b.paint(this.slot === (i ? "p2" : "p1")));
       this.cards.forEach((c) => {
+        c.name?.setText(this.heroName(c.index, true));
         const p1 = c.index === this.p1Index,
           p2 = c.index === this.p2Index;
         paintArcadePanel(c.g.clear(), c.x - 2, c.y - 2, 108, 112, {
@@ -3134,6 +3161,8 @@
       this.rememberSelection();
       window.HeroShell?.selection(this);
     }
+    localize() { this.refresh(); }
+
     confirm() {
       if (this.locked || !this.playable.length || !this.stageIds.length) return;
       this.locked = true;
@@ -3426,9 +3455,18 @@
       this.openCurtains(1200);
     }
 
+    localize() {
+      this.fighters().forEach((actor, i) => {
+        this.hudNames?.[i]?.setText(`${i ? "CPU" : "1P"}  ${heroName(i ? this.pack.p2Id : this.pack.p1Id, actor.fighter)}`);
+      });
+      if (this.countText?.alpha > 0) this.countText.setText(t(this._countLabelPrev));
+      if (this.resultShown) this.resultHint.setText(t("J / ENTER  再战     ESC  选人"));
+      this.syncTitle();
+    }
+
     stageName() {
       const id = this.pack.stageId;
-      return this.pack.stages?.[id]?.displayName || id;
+      return stageName(id, this.pack.stages?.[id]);
     }
 
     applyArenaBounds() {
@@ -4202,14 +4240,14 @@
           ease: "Back.easeOut",
         });
       }
-      this.countText.setText(label).setAlpha(1);
+      this.countText.setText(t(label)).setAlpha(1);
     }
 
     plantAllFrames() {
       this.fighters().forEach((a) => a.plantFrame());
     }
 
-    syncTitle() { window.HeroShell?.hint(`${this.p1.fighter.displayName} VS ${this.p2.fighter.displayName} · ${this.stageName()}`); }
+    syncTitle() { window.HeroShell?.hint(`${heroName(this.pack.p1Id, this.p1.fighter)} VS ${heroName(this.pack.p2Id, this.p2.fighter)} · ${this.stageName()}`); }
 
     actionCost(move) {
       if (move === "super") return COST.super;
@@ -4297,7 +4335,7 @@
 
     buildHudChrome() {
       this.hudNames = this.fighters().map((p, i) =>
-        uiText(this, i ? 1312 : 32, 22, `${i ? "CPU" : "1P"}  ${p.fighter.displayName}`, {
+        uiText(this, i ? 1312 : 32, 22, `${i ? "CPU" : "1P"}  ${heroName(i ? this.pack.p2Id : this.pack.p1Id, p.fighter)}`, {
           fontSize: 24,
           color: i ? "#ff9980" : "#8dd4f1",
           stroke: "#080b13",
@@ -4786,13 +4824,13 @@
       };
       winners.forEach((actor) => {
         const text = crispUi(
-          this.add.text(actor.sprite.x, actor.sprite.y - 236, "胜者", { ...style, fontSize: 26, color: "#f2d36b" }).setOrigin(0.5, 1).setDepth(28)
+          uiText(this, actor.sprite.x, actor.sprite.y - 236, "胜者", { ...style, fontSize: 26, color: "#f2d36b" }).setOrigin(0.5, 1).setDepth(28)
         );
         this.outcomeTags.push({ text, actor });
       });
       losers.forEach((actor) => {
         const text = crispUi(
-          this.add.text(actor.sprite.x, actor.sprite.y - 236, "败者", { ...style, fontSize: 26, color: "#d8d8d8" }).setOrigin(0.5, 1).setDepth(28)
+          uiText(this, actor.sprite.x, actor.sprite.y - 236, "败者", { ...style, fontSize: 26, color: "#d8d8d8" }).setOrigin(0.5, 1).setDepth(28)
         );
         this.outcomeTags.push({ text, actor });
       });
@@ -7817,7 +7855,7 @@
         win ? "win" : lose ? "lose" : "draw",
       );
       playUiSfx(this, win ? UI_SFX.resultWin : UI_SFX.resultLose, { volume: 0.7 });
-      this.resultHint.setText("J / ENTER  再战     ESC  选人").setAlpha(1);
+      this.resultHint.setText(t("J / ENTER  再战     ESC  选人")).setAlpha(1);
       window.HeroShell?.result();
     }
 

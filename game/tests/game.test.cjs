@@ -216,3 +216,45 @@ test('stage preview caps texture dimensions preserving aspect ratio', () => {
   assert.equal(draws, 1);
   assert.equal(removed, renamed);
 });
+
+test('localizing the real fight updates names, countdown and result hint without changing combat state', () => {
+  context.document.documentElement = {};
+  context.document.querySelectorAll = () => [];
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/i18n.js'), 'utf8'), context);
+  context.window.HeroI18n.setLanguage('en');
+  const scene = new Fight();
+  const label = () => ({
+    setText(value) {
+      this.text = value;
+      return this;
+    },
+  });
+  Object.assign(scene, {
+    pack: {
+      p1Id: 'id_1786886794',
+      p2Id: 'id_1786874191',
+      stageId: 'alps_tenshukaku',
+      stages: { alps_tenshukaku: { displayName: '雪境天守阁' } },
+    },
+    p1: { fighter: { displayName: '蒋介石' }, hp: 97 },
+    p2: { fighter: { displayName: '甄嬛' }, hp: 202 },
+    combatNow: 5000,
+    hudNames: [label(), label()],
+    countText: { ...label(), alpha: 1 },
+    _countLabelPrev: '开战',
+    resultShown: true,
+    resultHint: label(),
+  });
+  scene.localize();
+  assert.equal(scene.hudNames[0].text, '1P  Chiang Kai-shek');
+  assert.equal(scene.countText.text, 'FIGHT!');
+  assert.equal(scene.stageName(), 'Snow Castle');
+  assert.equal(scene.resultHint.text, 'J / ENTER  REMATCH     ESC  SELECT');
+  assert.equal(scene.p1.hp, 97);
+  assert.equal(scene.p2.hp, 202);
+  assert.equal(scene.combatNow, 5000);
+  context.window.HeroI18n.setLanguage('zh-CN');
+  scene.localize();
+  assert.equal(scene.hudNames[0].text, '1P  蒋介石');
+  assert.equal(scene.p1.fighter.displayName, '蒋介石');
+});
