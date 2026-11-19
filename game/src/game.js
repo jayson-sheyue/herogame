@@ -12,18 +12,17 @@
   // 与作图工坊一致：visualScale = bodyGuideH / 560，夹在 0.5～1.5（无高矮角色特例）
   const VISUAL_SCALE_MIN = 0.5;
   const VISUAL_SCALE_MAX = 1.5;
-  /** 选人页英灵卡池：单行一屏显示数量（多出来的用左右箭头翻页） */
-  const HERO_RAIL_PAGE = 6;
+
   const PUSH_W = 82;
   const PUSH_H = 158;
   const PUSH_PRONE_W = 152;
   const PUSH_PRONE_H = 36;
   const GAME_NAME = "英灵大乱斗";
-  const UI_FONT = "BodyUI, PingFang SC, sans-serif";
-  const BODY_FONT = "BodyUI, PingFang SC, Hiragino Sans GB, sans-serif";
+  const UI_FONT = "GameUI, monospace";
+  const BODY_FONT = UI_FONT;
   const BRUSH_FONT = "BrushUI, STKaiti, KaiTi, serif";
   const P1_DEFAULT = "id_1786892372";
-  const DUMMY_ID = "id_1786874191";
+  const P2_DEFAULT = "id_1786874191";
   const JIANG_ID = "id_1786886794";
   const HITLER_ID = "id_1786892372";
   const ZHU_ID = "id_1786960452";
@@ -37,25 +36,20 @@
     [HITLER_ID]: "铁十字之辉",
     [ZHU_ID]: "天威难测",
     [JIANG_ID]: "优势在我",
-    [DUMMY_ID]: "逆风解意",
+    [P2_DEFAULT]: "逆风解意",
     [IEYASU_ID]: "三河魂",
     [YEAR_ZERO_ID]: "去城市化",
     [HAWKING_ID]: "奇点演说",
     [LUBU_ID]: "赤兔战争践踏",
   };
   const CPU_DIFFS = [
-    { id: "kind", label: "仁慈的敌人" },
-    { id: "fair", label: "认真的敌人" },
-    { id: "cruel", label: "残忍的敌人" },
+    { id: "kind", label: "初级" },
+    { id: "fair", label: "标准" },
+    { id: "cruel", label: "高手" },
   ];
 
   function cpuDiffId(v) {
     return v === "kind" || v === "cruel" ? v : "fair";
-  }
-
-  function cpuDiffLabel(v) {
-    const id = cpuDiffId(v);
-    return CPU_DIFFS.find((d) => d.id === id)?.label || "认真的敌人";
   }
 
   function loadCpuDiff() {
@@ -480,32 +474,6 @@
     return cache.get(cacheKey);
   }
 
-  function clearNetLobbyPings(net) {
-    if (!net) return;
-    (net._lobbyPingIds || []).forEach((id) => {
-      try {
-        clearTimeout(id);
-      } catch {
-        /* ignore */
-      }
-    });
-    net._lobbyPingIds = [];
-  }
-
-  function queueNetLobbyPings(net, delays) {
-    clearNetLobbyPings(net);
-    if (!net?.connected) return;
-    const gen = net._fightGen || 0;
-    const ping = () => {
-      try {
-        if (net.connected) net.send({ type: "lobby_return", gen });
-      } catch {
-        /* ignore */
-      }
-    };
-    net._lobbyPingIds = (delays || []).map((ms) => setTimeout(ping, ms));
-  }
-
   /** 贴图可见墨迹的世界矩形（忽略青底空白）。奥义/弹道判定必须用这个，不能用整帧 displaySize。 */
   function spriteInkWorldRect(scene, spr, pad = 0, minAlpha = 24) {
     if (!spr) return new Phaser.Geom.Rectangle(0, 0, 8, 8);
@@ -624,8 +592,7 @@
 
   /** Fit stage to viewport height; world width follows the source image aspect ratio. */
   function buildStageLayout(scene, stageId, stages, viewH) {
-    // Raid reuses the loaded map card instead of blocking entry on the
-    // full-resolution stage background. Normal matches retain full artwork.
+    // Battle uses the full stage image; the small preview is a loading fallback.
     const fullKey = `stage-${stageId}`;
     const key = scene.textures.exists(fullKey) ? fullKey : `stage-thumb-${stageId}`;
     const meta = stages?.[stageId] || {};
@@ -695,38 +662,13 @@
   }
 
   function sortRoster(ids, fighters) {
-    const prefer = [P1_DEFAULT, JIANG_ID, DUMMY_ID];
+    const prefer = [P1_DEFAULT, JIANG_ID, P2_DEFAULT];
     return [...ids].sort((a, b) => {
       const ia = prefer.indexOf(a);
       const ib = prefer.indexOf(b);
       if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
       return (fighters[a]?.displayName || a).localeCompare(fighters[b]?.displayName || b, "zh");
     });
-  }
-
-  function rosterStamp(roster) {
-    const heroes = (roster?.playable || []).join(",");
-    const stages = (roster?.stageIds || [])
-      .map((id) => {
-        const s = roster?.stages?.[id] || {};
-        return `${id}:${s.committedAt || ""}:${s.width || 0}x${s.height || 0}`;
-      })
-      .join(",");
-    return `${heroes}|${stages}`;
-  }
-
-  function raidBossFor(roster, pack) {
-    const picked = new Set([pack?.p1Id, pack?.p2Id, pack?.p3Id].filter(Boolean));
-    const candidates = (roster?.playable || []).filter((id) => !picked.has(id) && roster?.fighters?.[id]);
-    if (!candidates.length) return null;
-    const seed = String(pack?.stageId || "raid");
-    let hash = 2166136261;
-    for (let i = 0; i < seed.length; i++) {
-      hash ^= seed.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    const bossId = candidates[Math.abs(hash >>> 0) % candidates.length];
-    return { id: bossId, fighter: roster.fighters[bossId] };
   }
 
   async function fetchJson(url) {
@@ -812,120 +754,8 @@
   }
 
   /** Clamp text to at most `maxLines` after Phaser advanced wrap (needed for CJK). */
-  function clampWrappedLines(scene, raw, style, maxWidth, maxLines = 2) {
-    const s = String(raw || "").trim();
-    if (!s || maxWidth <= 0) return "";
-    const wrapStyle = {
-      ...style,
-      wordWrap: { width: maxWidth, useAdvancedWrap: true },
-    };
-    const probe = scene.make.text({ x: -9999, y: -9999, text: s, style: wrapStyle });
-    let lines = probe.getWrappedText();
-    if (lines.length <= maxLines) {
-      probe.destroy();
-      return s;
-    }
-    let lo = 0;
-    let hi = s.length;
-    let best = "…";
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const candidate = `${s.slice(0, mid).replace(/[\s，、。；：！？,.!?;:]+$/u, "")}…`;
-      probe.setText(candidate);
-      lines = probe.getWrappedText();
-      if (lines.length <= maxLines) {
-        best = candidate;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    probe.destroy();
-    return best;
-  }
 
-  function setChrome(mode, text) {
-    window.HeroShell?.mode(mode);
-    const selectKeys = document.getElementById("selectKeys");
-    const dummyKeys = document.getElementById("dummyKeys") || document.getElementById("fightKeys");
-    const pveKeys = document.getElementById("pveKeys");
-    const pvpKeys = document.getElementById("pvpKeys");
-    const raidKeys = document.getElementById("raidKeys");
-    const title = document.querySelector("header p");
-    if (selectKeys) selectKeys.hidden = mode !== "select";
-    if (dummyKeys) dummyKeys.hidden = mode !== "dummy";
-    if (pveKeys) pveKeys.hidden = mode !== "pve";
-    const cricketKeys = document.getElementById("cricketKeys");
-    if (cricketKeys) cricketKeys.hidden = mode !== "cricket";
-    if (pvpKeys) pvpKeys.hidden = mode !== "pvp";
-    if (raidKeys) raidKeys.hidden = mode !== "raid";
-    if (title && text) title.textContent = text;
-  }
-
-  function setSelectFooter(share, hint, warn) {
-    const shareEl = document.getElementById("selectShare");
-    const hintEl = document.getElementById("selectHint");
-    if (shareEl && share != null) shareEl.textContent = share;
-    if (hintEl && hint != null) {
-      hintEl.textContent = hint;
-      hintEl.classList.toggle("warn", Boolean(warn));
-      if (warn) window.HeroShell?.hint(hint);
-    }
-  }
-
-  function emptyPad() {
-    return {
-      left: false,
-      right: false,
-      up: false,
-      down: false,
-      shift: false,
-      guard: false,
-      justUp: false,
-      justDown: false,
-      justJ: false,
-      justK: false,
-      justL: false,
-      justShift: false,
-    };
-  }
-
-  function padFromMsg(msg) {
-    return {
-      left: !!msg.left,
-      right: !!msg.right,
-      up: !!msg.up,
-      down: !!msg.down,
-      shift: !!msg.shift,
-      guard: !!msg.guard,
-      justUp: !!msg.justUp,
-      justDown: !!msg.justDown,
-      justJ: !!msg.justJ,
-      justK: !!msg.justK,
-      justL: !!msg.justL,
-      justShift: !!msg.justShift,
-    };
-  }
-
-  function emptyPvpPicks() {
-    return { host: "", guest: "", guest2: "" };
-  }
-
-  function rosterCount(seats) {
-    return ["host", "guest", "guest2"].reduce((n, s) => n + (seats?.[s] ? 1 : 0), 0);
-  }
-
-  function seatLabel(seat) {
-    if (seat === "host") return "主机";
-    if (seat === "guest2") return "客人2";
-    if (seat === "guest") return "客人1";
-    return "未连线";
-  }
-
-  function sheetInkTop(scene, key) {
-    const box = sheetInkBox(scene, key);
-    return box ? box.top : 0.12;
-  }
+  function setChrome(mode) { window.HeroShell?.mode(mode); }
 
   /** Ink AABB inside frame 0, normalized 0–1 (ignores cyan / empty pad). */
   function sheetInkBox(scene, key, frameIndex = 0) {
@@ -968,22 +798,7 @@
     };
   }
 
-  function fitScaleToBox(inkW, inkH, boxW, boxH) {
-    const w = Math.max(8, Number(inkW) || 8);
-    const h = Math.max(8, Number(inkH) || 8);
-    return Math.min(boxW / w, boxH / h);
-  }
-
   const ROSTER_STD_IDLE_H = 560;
-
-  function fighterVisualScale(fighter) {
-    let vs = Number(fighter?.visualScale);
-    if (!Number.isFinite(vs) || vs <= 0) {
-      const guide = Number(fighter?.bodyGuideH);
-      vs = guide > 0 ? guide / ROSTER_STD_IDLE_H : 1;
-    }
-    return Phaser.Math.Clamp(vs, VISUAL_SCALE_MIN, VISUAL_SCALE_MAX);
-  }
 
   function fighterIdleBodyH(fighter, scene, key) {
     const metaH = Number(fighter?.sprites?.idle?.bodyH);
@@ -1026,34 +841,10 @@
   }
 
   /** 展台转盘：缩放按整套三视图取中位，避免正/侧切帧时忽大忽小。 */
-  function rosterShowcaseScale(scene, fighter, key, boxW, boxH) {
-    const n = Math.max(1, Number(fighter?.sprites?.turnaround?.frames) || 4);
-    if (!scene.textures.exists(key) || n < 2) {
-      return rosterHeroLayout(scene, fighter, key, boxW, boxH, 0).scale;
-    }
-    const bodies = [];
-    let maxTorso = 8;
-    for (let i = 0; i < n; i++) {
-      const pivot = scanFrameCached(scene, key, i);
-      bodies.push(Math.max(8, pivot?.bodyH || pivot?.h || 8));
-      const fw = scene.textures.get(key)?.get(i)?.width || 280;
-      const inkW = Math.max(8, pivot?.w || fw * 0.42);
-      maxTorso = Math.max(maxTorso, Math.min(inkW, fw * 0.52));
-    }
-    const padX = 0.04;
-    const innerW = Math.max(16, boxW * (1 - padX * 2));
-    const innerH = Math.max(16, boxH * (1 - 0.02 - 0.02));
-    let scale = (innerH * 0.98) / Math.max(8, median(bodies));
-    return Math.min(scale, innerW / maxTorso);
-  }
 
   /**
    * 工坊三视图播放：正、3/4、侧、背，8fps 循环，不镜像后半圈。
    */
-  function showcaseTurnaroundSteps(fighter) {
-    const n = Math.max(1, Number(fighter?.sprites?.turnaround?.frames) || 4);
-    return [...Array(n).keys()].map((frame) => ({ frame, flip: false }));
-  }
 
   function rosterCardFrontKey(id) {
     return `roster-ta-${id}`;
@@ -1061,16 +852,6 @@
 
   function rosterCardPortraitKey(id) {
     return `roster-card-${id}`;
-  }
-
-  function rosterCardTexKey(scene, id, fighter) {
-    void scene;
-    void fighter;
-    return rosterCardPortraitKey(id);
-  }
-
-  function rosterCardFrontFrame() {
-    return 0;
   }
 
   /** 从 idle/turnaround 第 0 帧算正方形脸框（像素坐标，相对帧左上）。 */
@@ -1126,10 +907,6 @@
     return { cropX, cropY, cropSize };
   }
 
-  function rosterIdleFaceCrop(scene, key, frameIndex = 0) {
-    return rosterPortraitCrop(scene, key, frameIndex, false);
-  }
-
   /**
    * 把 idle 脸框烘焙成与卡槽等大的 Canvas 纹理（等比、不拉伸）。
    * 若已有工坊导出的 select.png（roster-card-{id}）则直接用。
@@ -1174,14 +951,6 @@
     scene.textures.addCanvas(outKey, canvas);
     scene.registry.set(`cardBake:${id}`, stamp);
     return outKey;
-  }
-
-  function invalidateRosterCardPortraits(scene, ids) {
-    (ids || []).forEach((id) => {
-      scene.registry.remove(`cardBake:${id}`);
-      const key = rosterCardPortraitKey(id);
-      if (scene.textures.exists(key)) scene.textures.remove(key);
-    });
   }
 
   function loadRosterHeroTextures(scene, loader, id, fighter, bust = "") {
@@ -1396,88 +1165,18 @@
     }
   }
 
-  function rosterHeroHeadLayout(scene, fighter, key, boxW, boxH, frameIndex = 0) {
-    void fighter;
-    const crop = rosterIdleFaceCrop(scene, key, frameIndex);
-    const scale = boxW / crop.cropSize;
-    return {
-      cropX: crop.cropX,
-      cropY: crop.cropY,
-      cropW: crop.cropSize,
-      cropH: crop.cropSize,
-      scale,
-      frameIndex,
-    };
-  }
-
-  function ensureRosterAnim(scene, id, fighter) {
-    const key = `roster-${id}`;
-    if (!scene.textures.exists(key)) return key;
-    if (scene.anims.exists(key)) return key;
-    const frames = Math.max(1, fighter?.sprites?.idle?.frames || 6);
-    scene.anims.create({
-      key,
-      frames: scene.anims.generateFrameNumbers(key, { start: 0, end: frames - 1 }),
-      frameRate: 5,
-      repeat: -1,
-    });
-    return key;
-  }
-
   function setLinearFilter(scene, key) {
     const tex = scene.textures.exists(key) ? scene.textures.get(key) : null;
     if (tex?.setFilter) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
-  function fillFlatTab(g, x, y, w, h, on) {
-    paintValleyPanel(g, x, y, w, h, { selected: on, radius: 10, inset: 4 });
-  }
-
-  function paintValleyPanel(g, x, y, w, h, opts = {}) {
-    const selected = !!opts.selected;
-    const accent = opts.accent != null ? opts.accent : 0xd4b06a;
-    const r = opts.radius != null ? opts.radius : 12;
-    const inset = opts.inset != null ? opts.inset : Math.max(5, Math.round(Math.min(w, h) * 0.055));
-    const rawFill = opts.fill;
-    const fill =
-      rawFill == null || rawFill === 0x1c222c
-        ? selected
-          ? 0xe5d3a8
-          : 0x28251e
-        : rawFill;
-    g.fillStyle(0x120a06, 0.38);
-    if (!opts.hollow) g.fillRoundedRect(x + 3, y + 5, w, h, r);
-    if (opts.hollow) {
-      g.lineStyle(5, selected ? 0x947447 : 0x514530, 1);
-      g.strokeRoundedRect(x + 5, y + 5, w - 10, h - 10, Math.max(6, r - 2));
-      g.lineStyle(3, 0xf2d090, selected ? 0.9 : 0.45);
-      g.strokeRoundedRect(x + 8, y + 8, w - 16, h - 16, Math.max(4, r - 4));
-      g.lineStyle(2, 0x1c1008, 0.55);
-      g.strokeRoundedRect(x + 2, y + 2, w - 4, h - 4, r);
-      g.lineStyle(2, accent, selected ? 0.95 : 0.5);
-      g.strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, r);
-      return;
-    }
-    g.fillStyle(selected ? 0x8b7049 : 0x4c422f, 1);
-    g.fillRoundedRect(x, y, w, h, r);
-    g.fillStyle(fill, 1);
-    g.fillRoundedRect(x + inset, y + inset, w - inset * 2, h - inset * 2, Math.max(3, r - 4));
-    g.lineStyle(2, 0xf2d090, selected ? 0.92 : 0.42);
-    g.beginPath();
-    g.moveTo(x + 5, y + h - r);
-    g.lineTo(x + 5, y + r);
-    g.lineTo(x + r, y + 4);
-    g.lineTo(x + w - r, y + 4);
-    g.strokePath();
-    g.lineStyle(2, 0x1c1008, 0.5);
-    g.beginPath();
-    g.moveTo(x + r, y + h - 4);
-    g.lineTo(x + w - r, y + h - 4);
-    g.lineTo(x + w - 4, y + h - r);
-    g.lineTo(x + w - 4, y + r);
-    g.strokePath();
-    g.lineStyle(2, accent, selected ? 0.95 : 0.38);
-    g.strokeRoundedRect(x + 2, y + 2, w - 4, h - 4, Math.max(4, r - 2));
+  function paintArcadePanel(g, x, y, w, h, opts = {}) {
+    const color = opts.accent ?? 0x566272;
+    g.fillStyle(0x05080e); g.fillRect(x + 4, y + 4, w, h);
+    g.fillStyle(opts.selected ? color : 0x465366); g.fillRect(x, y, w, h);
+    g.fillStyle(opts.selected ? 0x223246 : 0x151e2b); g.fillRect(x + 3, y + 3, w - 6, h - 6);
+    g.fillStyle(0xaebdca, opts.selected ? 0.65 : 0.25); g.fillRect(x + 3, y + 3, w - 6, 2);
+    g.fillStyle(0x080d15); g.fillRect(x + 3, y + h - 5, w - 6, 2);
   }
 
   function crispUi(text) {
@@ -1496,49 +1195,6 @@
         ...style,
       })
     );
-  }
-
-  function bakeMysteryHero(scene) {
-    const key = "ui-mystery-hero";
-    if (scene.textures.exists(key)) return key;
-    const w = 128;
-    const h = 160;
-    const tex = scene.textures.createCanvas(key, w, h);
-    const ctx = tex.context || (typeof tex.getContext === "function" ? tex.getContext() : null);
-    if (!ctx) return key;
-    ctx.fillStyle = "#100c0c";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#1a1418";
-    ctx.beginPath();
-    ctx.ellipse(w / 2, 46, 26, 30, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(w / 2 - 38, h);
-    ctx.quadraticCurveTo(w / 2 - 42, 78, w / 2, 74);
-    ctx.quadraticCurveTo(w / 2 + 42, 78, w / 2 + 38, h);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#d4b06a";
-    ctx.font = "700 58px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("?", w / 2, 78);
-    tex.refresh();
-    if (tex.setFilter) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
-    return key;
-  }
-
-  function strokePlaque(g, x, y, w, h, stroke, fill, thick, radius, gloss) {
-    paintValleyPanel(g, x, y, w, h, {
-      selected: !!(gloss || (thick || 0) >= 2),
-      accent: stroke,
-      radius: Math.min(14, radius != null ? radius : 12),
-      fill,
-      hollow: fill == null,
-      inset: Math.max(4, Math.round(Math.min(w, h) * 0.045)),
-    });
   }
 
   function bakeDomainSoftMask(scene) {
@@ -1754,18 +1410,6 @@
     return spr;
   }
 
-  function defaultNick(seat) {
-    if (seat === "host") return "主机";
-    if (seat === "guest") return "客人1";
-    if (seat === "guest2") return "客人2";
-    return "玩家";
-  }
-
-  function wsUrlHint(ips, port) {
-    const list = (ips || []).length ? ips : ["<局域网IP>"];
-    return list.map((ip) => `http://${ip}:${port || location.port || 8788}`).join(" 或 ");
-  }
-
   function ensureStatusFx(scene) {
     const bake = (key, w, h, paint) => {
       if (scene.textures.exists(key)) scene.textures.remove(key);
@@ -1828,7 +1472,7 @@
   }
 
   function wipeFightAssets(scene) {
-    const prefixes = ["p1-", "p2-", "p3-", "boss-", "hero-voice-"];
+    const prefixes = ["p1-", "p2-", "hero-voice-"];
     try {
       [...scene.textures.getTextureKeys()].forEach((k) => {
         if (prefixes.some((p) => k.startsWith(p)) || (k.startsWith("stage-") && !k.startsWith("stage-thumb-"))) scene.textures.remove(k);
@@ -1924,45 +1568,8 @@
     });
   }
 
-  // The raid prototype needs combat feedback, not cinematics, voice packs, or
   // select portraits. This avoids a slow optional resource trapping the player
   // on the transition screen.
-  const RAID_MOVE_SPRITES = new Set([
-    "idle", "walk", "dash", "jump", "guard", "hurt", "air_hurt", "knockdown",
-    "attack", "air_attack", "attack_up", "attack_down", "skill", "combo_up",
-    "combo_down", "super",
-  ]);
-
-  function loadRaidFighterSprites(scene, prefix, heroId, fighter) {
-    if (!fighter) return;
-    const heroRoot = `/assets/game/heroes/${heroId}`;
-    Object.entries(fighter.sprites || {}).forEach(([id, spec]) => {
-      if (!RAID_MOVE_SPRITES.has(id) || !spec?.file) return;
-      const frames = Math.max(1, spec.frames || 6);
-      const bust = encodeURIComponent(spec.committedAt || "1");
-      scene.load.spritesheet(`${prefix}-${id}`, `${heroRoot}/${spec.file}?t=${bust}`, {
-        frameWidth: spec.frameWidth || 280,
-        frameHeight: spec.frameHeight || 672,
-        startFrame: 0,
-        endFrame: frames - 1,
-      });
-    });
-    // Projectile art is small and keeps Q/K/L moves readable; voice and CG
-    // resources are deliberately non-blocking in this prototype.
-    Object.entries(fighter.moves || {}).forEach(([move, spec]) => {
-      const proj = spec?.projectile;
-      if (!proj?.file) return;
-      const frames = Math.max(1, proj.frames || 4);
-      const fw = proj.frameWidth || 64;
-      const fh = proj.frameHeight || 64;
-      scene.load.spritesheet(`${prefix}-proj-${move}`, `${heroRoot}/${proj.file}?fw=${fw}&fh=${fh}&n=${frames}`, {
-        frameWidth: fw,
-        frameHeight: fh,
-        startFrame: 0,
-        endFrame: frames - 1,
-      });
-    });
-  }
 
   function stageBgmKey(stageId) {
     return `stage-bgm-${stageId}`;
@@ -2035,17 +1642,6 @@
         }
       });
     }
-  }
-
-  function stopStageBgm(scene, fadeOut = 350) {
-    const cur = scene._stageBgm;
-    if (!cur) return;
-    scene._stageBgmKey = "";
-    fadeBgmVolume(scene, cur, 0, fadeOut, () => {
-      cur.stop();
-      cur.destroy();
-      if (scene._stageBgm === cur) scene._stageBgm = null;
-    });
   }
 
   const UI_SFX = {
@@ -2200,7 +1796,7 @@
       this.heroId = fighter?.id || fighter?.heroId || "";
       this.tint = 0xffffff;
       this.anchor = false;
-      this.infinite = false;
+
       this.mpBanned = false;
       this.moveCdUntil = { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
       this.domainNoDashUntil = 0;
@@ -2919,8 +2515,8 @@
       if ((this.ailment === "burn" || this.ailment === "poison") && now >= this.ailmentDotAt) {
         this.ailmentDotAt = now + dotEvery;
         const dmg = this.ailment === "burn" ? 2 : 1;
-        if (!this.infinite) this.hp = Math.max(0, this.hp - dmg);
-        if (!this.infinite && this.hp <= 0 && !this.ko) {
+        this.hp = Math.max(0, this.hp - dmg);
+        if (this.hp <= 0 && !this.ko) {
           this.ko = true;
           this.busy = true;
           this.clearAilment();
@@ -3121,10 +2717,10 @@
       }
       // 趴地可被追打但减伤，避免完全无敌；起身瞬间才有短暂无敌
       if (this.downed() || this.move === "knockdown") {
-        if (!this.infinite && dmg > 0) {
+        if (dmg > 0) {
           this.hp = Math.max(0, this.hp - Math.max(1, Math.floor(dmg * 0.35)));
         }
-        if (!this.infinite && this.hp <= 0) {
+        if (this.hp <= 0) {
           this.hp = 0;
           this.ko = true;
           this.busy = true;
@@ -3153,7 +2749,7 @@
       const forceLaunch = specFull.timeLockBurst
         ? Boolean(specFull.forceLaunch)
         : isSuperMove(move) || (dmg > 0 && this.comboDmg >= COMBO_LAUNCH_DMG);
-      if (!this.infinite && dmg > 0) this.hp = Math.max(0, this.hp - dmg);
+      if (dmg > 0) this.hp = Math.max(0, this.hp - dmg);
       this.willKnockdown = forceLaunch;
       this.stunUntil = forceLaunch ? 0 : now + Math.max(spec.stun || 360, dmg > 0 ? 460 : 200);
       this.airFalling = forceLaunch;
@@ -3172,7 +2768,7 @@
       this.sprite.body.setDragX(this.willKnockdown ? 540 : 980);
       this.sprite.setVelocity(dir * knock, lift);
       this.scene.ejectFromTerrain?.(this);
-      if (!this.infinite && this.hp <= 0) {
+      if (this.hp <= 0) {
         this.ko = true;
         this.busy = true;
         this.stunUntil = 0;
@@ -3214,1115 +2810,6 @@
     }
   }
 
-  function raidEnemyTheme(stageId) {
-    const id = String(stageId || "");
-    if (/alps|snow|tenshukaku/.test(id)) return { id: "frost", name: "霜境", colors: [0x75c9e8, 0xb8e7f5, 0x285b78] };
-    if (/cyber|lunar|station/.test(id)) return { id: "mech", name: "机巧", colors: [0x55e0ce, 0xf06adf, 0x203f56] };
-    if (/atlantis|ilios/.test(id)) return { id: "tide", name: "潮汐", colors: [0x3eb7b0, 0x91e1cb, 0x185c68] };
-    if (/giants|pyramid|pantheon|terracotta/.test(id)) return { id: "stone", name: "岩甲", colors: [0xb38a55, 0xe0bd78, 0x55402f] };
-    if (/abandoned|estate/.test(id)) return { id: "blight", name: "荒宅", colors: [0x8cb34f, 0xd0dc75, 0x3e512d] };
-    if (/peak|liberty|cologne/.test(id)) return { id: "storm", name: "风暴", colors: [0x718bd3, 0xb6c8f1, 0x303d6e] };
-    return { id: "imperial", name: "禁军", colors: [0xd76755, 0xeab06d, 0x672b28] };
-  }
-
-  function raidEnemyBlueprint(stageId, enemyId, elite) {
-    const theme = raidEnemyTheme(stageId);
-    const forms = [
-      { variant: "skitter", name: "矮脚兽", bodyX: 1.28, bodyY: 0.72, scale: 0.88, pace: 2.45, hp: 0.78, attack: "charge" },
-      { variant: "fang", name: "尖牙兽", bodyX: 1.05, bodyY: 0.96, scale: 1, pace: 2.05, hp: 1, attack: "bite" },
-      { variant: "wisp", name: "长颈妖", bodyX: 0.72, bodyY: 1.34, scale: 0.96, pace: 1.7, hp: 0.88, attack: "spit" },
-      { variant: "claw", name: "裂爪兽", bodyX: 0.94, bodyY: 1.12, scale: 1.03, pace: 1.9, hp: 1.08, attack: "claw" },
-      { variant: "brute", name: "重甲兽", bodyX: 1.42, bodyY: 1.05, scale: 1.12, pace: 1.38, hp: 1.45, attack: "slam" },
-    ];
-    const stageSeed = [...String(stageId || "")].reduce((sum, ch) => (sum * 33 + ch.charCodeAt(0)) >>> 0, 17);
-    const form = forms[(stageSeed + Number(enemyId || 0)) % forms.length];
-    if (elite) {
-      const eliteForms = {
-        frost: { variant: "mammoth", name: "冰冠猛犸", bodyX: 1.62, bodyY: 1.08, scale: 1.2, pace: 1.34, attack: "charge" },
-        mech: { variant: "sentinel", name: "过载哨兵", bodyX: 1.08, bodyY: 1.45, scale: 1.18, pace: 1.58, attack: "slam" },
-        tide: { variant: "kraken", name: "潮渊多腕兽", bodyX: 1.48, bodyY: 1.18, scale: 1.2, pace: 1.42, attack: "claw" },
-        stone: { variant: "golem", name: "断碑巨像", bodyX: 1.5, bodyY: 1.32, scale: 1.22, pace: 1.2, attack: "slam" },
-        blight: { variant: "treant", name: "腐根树妖", bodyX: 1.28, bodyY: 1.5, scale: 1.17, pace: 1.26, attack: "claw" },
-        storm: { variant: "wyvern", name: "裂空翼兽", bodyX: 1.5, bodyY: 1.02, scale: 1.18, pace: 1.72, attack: "charge" },
-        imperial: { variant: "guardian", name: "赤甲门神", bodyX: 1.32, bodyY: 1.38, scale: 1.2, pace: 1.38, attack: "slam" },
-      };
-      const eliteForm = eliteForms[theme.id] || eliteForms.imperial;
-      return {
-        ...eliteForm,
-        theme,
-        hp: 1,
-        color: theme.colors[1],
-      };
-    }
-    return { ...form, theme, name: `${theme.name}${form.name}`, color: theme.colors[0] };
-  }
-
-  function raidStoryLines(stageId, stageName, bossName, heroName) {
-    const chapters = {
-      giants_pyramid_causeway: [
-        ["旁白", "巨像踏碎商道，流沙正吞没逃难车队；金字塔顶的「太阳金印」是止住沙暴的第一枚宝鉴残片。"],
-        ["boss", "沙海只认强者。那些连巨像脚步都躲不开的人，不配等来救援。"],
-        ["hero", "他们不是你的试金石。我要让商道重新升起炊烟。"],
-        ["boss", "那就穿过我身后的死亡长廊——每一块石砖都埋着失败者。"],
-        ["hero", "我听见的不是亡魂，是他们催我继续向前。"],
-        ["boss", "太阳金印会把你的豪言烧成灰。"],
-        ["hero", "火能毁灭，也能为迷路的人点灯。来吧。"],
-        ["旁白", "烈日垂落，金印苏醒；沙海救援战在巨像残骸间打响。"],
-      ],
-      ilios_sky_tower: [
-        ["旁白", "天空塔失去浮力，整座海港正缓缓坠向云底；唯有「曙光羽核」能重启升空机关。"],
-        ["boss", "让它坠落吧。旧城粉碎后，我会在云端建一座只属于胜者的新国。"],
-        ["hero", "你的新国若以万家灯火为地基，只会是一座坟墓。"],
-        ["boss", "你救得下一座塔，救得下所有被魔潮撕开的天空吗？"],
-        ["hero", "先救眼前这一座，再救下一座——苍生从来不是一句空话。"],
-        ["boss", "很好，我会让狂风替你回答。"],
-        ["hero", "风越高，我手中的旗就会让更多人看见。"],
-        ["旁白", "警钟穿过云海，羽核争夺战在倾斜的天空塔顶爆发。"],
-      ],
-      baimen_bronze_sparrow: [
-        ["旁白", "铜雀台下万民被困，白门封印正抽走城中生气；「王侯玉简」记着解除封门之法。"],
-        ["boss", "乱世只需一个声音。城门一闭，百姓自然会学会服从。"],
-        ["hero", "安静不是太平。被夺走选择的人，也绝不会称你为王。"],
-        ["boss", "你带着一群乌合之众，也敢来谈天下？"],
-        ["hero", "天下本就属于他们，而不是高台上的一把座椅。"],
-        ["boss", "想取玉简，先证明你的刀比我的号令更快。"],
-        ["hero", "这一刀不为王位，只为劈开白门。"],
-        ["旁白", "铜雀无声，城门震动；万千目光投向最后的决斗。"],
-      ],
-      cyberpunk_shibuya_eiffel: [
-        ["旁白", "魔潮侵入城市主脑，霓虹街区的避难门全部反锁；「天网密钥」是唯一的管理员权限。"],
-        ["boss", "我删掉了恐惧、争吵与自由。看，多么完美的秩序。"],
-        ["hero", "你也删掉了人的意志。没有选择的安全，只是漂亮的牢笼。"],
-        ["boss", "系统推演了十亿次，你的胜率连小数点都不配拥有。"],
-        ["hero", "人之所以值得被救，就因为我们总能做出推演之外的选择。"],
-        ["boss", "那就让我格式化你最后的侥幸。"],
-        ["hero", "先问问这座城里还亮着的每一扇窗。"],
-        ["旁白", "倒计时归零前，数据洪流与英雄绝技在霓虹雨中正面相撞。"],
-      ],
-      lunar_station_earth_view: [
-        ["旁白", "月面站偏离轨道，三千冬眠舱正在断氧；「月核星图」记录着返回地球的唯一航线。"],
-        ["boss", "地球已经无药可救。留下燃料，只够我带少数精英去往新世界。"],
-        ["hero", "舱里的人把未来托付给我们，不是让你替他们决定谁该活。"],
-        ["boss", "带上所有人，只会一起坠入黑暗。你所谓仁慈不过是算术不及格。"],
-        ["hero", "那我就去找到你漏算的答案：一个也不放弃。"],
-        ["boss", "真空不会被感动，星图也不会选择你。"],
-        ["hero", "但握住星图的人可以选择回家。"],
-        ["旁白", "地球悬在舷窗之外，返航航线将在这场月面决战后决定。"],
-      ],
-      alps_tenshukaku: [
-        ["旁白", "雪崩封死山村，天守阁却还在吸取地脉取暖；「霜心玉」能让冰河恢复平静。"],
-        ["boss", "山下的人用最后一车木炭，换来了我这一夜的温暖。很公平。"],
-        ["hero", "你把掠夺叫交易，只因从未听过雪地里的哭声。"],
-        ["boss", "同情会让手变慢。暴雪来时，慢一步便是死人。"],
-        ["hero", "所以我会更快——快到在下一场雪崩前把霜心玉送下山。"],
-        ["boss", "先试试你的血，能不能融开我的冰刃。"],
-        ["hero", "不需要。山民点起的灯火足够融化这座冷宫。"],
-        ["旁白", "风雪骤停一瞬，霜心玉在阁顶发光，山村的命运系于此战。"],
-      ],
-      forbidden_city_101: [
-        ["旁白", "紫禁城地脉倒转，护城结界反而困住全城；「社稷龙纹」是修正阵眼的宝鉴残片。"],
-        ["boss", "城中每个人都在我的棋盘上。牺牲几枚卒，江山才坐得稳。"],
-        ["hero", "你忘了，没有那些所谓的卒，棋盘本身就毫无意义。"],
-        ["boss", "一个闯宫之人，也配替天下开口？"],
-        ["hero", "我身后每一声求救，都是比圣旨更重的托付。"],
-        ["boss", "龙纹认主，不认你的匹夫之勇。"],
-        ["hero", "那就让它看清，谁在守社稷，谁只在守宝座。"],
-        ["旁白", "宫门层层洞开，龙纹盘旋升空，阵眼之战就此开始。"],
-      ],
-      broken_pantheon_terracotta: [
-        ["旁白", "破碎神殿唤醒万具兵俑，它们正向附近城镇进军；「镇魂古玺」能令亡军归土。"],
-        ["boss", "活人反复背叛，泥塑的军队却永远忠诚。我为何要停下？"],
-        ["hero", "因为忠诚若没有良知，只是一场不会醒来的灾难。"],
-        ["boss", "古玺在我手中，千军万马也在我手中。你拿什么救城？"],
-        ["hero", "我不需要统治他们，只需要让被惊扰的灵魂安息。"],
-        ["boss", "那就先从兵俑长戈下活下来。"],
-        ["hero", "我会穿过军阵，把古玺送回它该在的地方。"],
-        ["旁白", "陶甲齐鸣，残柱震落；镇魂之战在古老军阵中央展开。"],
-      ],
-      peak_of_liberty: [
-        ["旁白", "自由峰的烽火被魔云熄灭，山下联军失去方向；「破晓火种」能重新点亮万里信标。"],
-        ["boss", "他们嘴上呼喊自由，却总要等别人先点火。这样的众生不值得救。"],
-        ["hero", "正因为有人害怕，才更需要第一个举起火把的人。"],
-        ["boss", "你以为自己是火把？在我眼里不过是一点将熄的火星。"],
-        ["hero", "一颗火星足以越过群山，落进千万人手里。"],
-        ["boss", "那我就用风暴掐灭你。"],
-        ["hero", "风只会让真正的火烧得更旺。"],
-        ["旁白", "魔云压顶，峰巅无路可退；破晓火种等待新的守护者。"],
-      ],
-      atlantis_capitol_ruins: [
-        ["旁白", "海底王都护罩破裂，海水正灌入平民舱；「深海王冠」可以号令潮汐、封住裂口。"],
-        ["boss", "王都沉没，秘密才会永远留在海沟。几座平民舱算什么代价？"],
-        ["hero", "对你是数字，对舱里的人却是全部人生。"],
-        ["boss", "王冠选择统治者，不选择救生员。"],
-        ["hero", "真正的王冠，首先该为最弱小的人挡住海水。"],
-        ["boss", "那就看看你的肺，能否撑到潮汐听命。"],
-        ["hero", "我不需要海低头，只需要你放开王冠。"],
-        ["旁白", "护罩裂纹继续蔓延，深海王冠的蓝光照亮了决战场。"],
-      ],
-      great_wall_cologne: [
-        ["旁白", "长城烽燧与古城钟楼同时失声，兽潮从两界裂缝涌出；「万里铜钟」能让防线重新共鸣。"],
-        ["boss", "高墙早晚会倒。与其守护弱者，不如让兽潮筛出能活的人。"],
-        ["hero", "城墙的意义从来不是挑选谁活，而是让所有人有机会活。"],
-        ["boss", "钟声传不到裂缝另一端，你的援军也不会来。"],
-        ["hero", "那我就亲手敲响它，让两端的人都知道防线还在。"],
-        ["boss", "你会成为钟下第一具尸体。"],
-        ["hero", "只要钟声响起，站起来的人就不会只有我。"],
-        ["旁白", "残墙迎风，铜钟待鸣；两座古城的生死将在同一击中揭晓。"],
-      ],
-      abandoned_estate_site: [
-        ["旁白", "荒宅下埋着被抹去姓名的村落，怨气化作魔兽；「地脉契书」记录着归还土地的誓约。"],
-        ["boss", "名字、家园、承诺，不过是活人安慰自己的纸片。烧掉契书，一切都会安静。"],
-        ["hero", "安静的是你，不是那些至今无处归去的魂魄。"],
-        ["boss", "你愿为一群连脸都看不清的死人拼命？"],
-        ["hero", "正因无人记得他们，我才更不能让最后的证据消失。"],
-        ["boss", "宅门一关，你也会成为没有名字的影子。"],
-        ["hero", "我会带着契书走出去，让每个名字重新被人念起。"],
-        ["旁白", "旧门自行合拢，地底传来低语；为亡者讨回故土的一战开始了。"],
-      ],
-    };
-    const fallback = [
-      ["旁白", `${stageName}被魔潮包围，最后一枚「苍生宝鉴残卷」正在关底守卫手中。`],
-      ["boss", "走到这里又如何？宝鉴只能证明众生从来不值得拯救。"],
-      ["hero", "值不值得，不由站在灾难之外的人裁定。"],
-      ["boss", "你每救一人，魔潮便会吞掉十人。放弃才是慈悲。"],
-      ["hero", "救一人便是一人。希望从来不是算完胜率才出手。"],
-      ["boss", "那就用你的命，为这套天真写下结局。"],
-      ["hero", "结局会由活下来的人共同写，而不是由你封口。"],
-      ["旁白", `${stageName}的最后防线前，苍生宝鉴发出回应。`],
-    ];
-    return (chapters[String(stageId || "")] || fallback).map(([speaker, text]) => ({
-      speaker: speaker === "boss" ? bossName : speaker === "hero" ? heroName : speaker,
-      color: speaker === "boss" ? "#ffcb75" : speaker === "hero" ? "#8fd8ff" : "#e9d5a4",
-      text,
-    }));
-  }
-
-  /** Temporary no-asset enemy used by the cooperative raid demo. */
-  class RaidEnemy {
-    constructor(scene, id, x, y, boss = false, elite = false) {
-      this.scene = scene;
-      this.id = id;
-      this.boss = boss;
-      this.elite = !boss && elite;
-      this.prefix = boss ? "boss" : `raid-${id}`;
-      this.fighter = boss ? scene.pack?.boss : null;
-      this.move = "idle";
-      this.busy = false;
-      this.projSpawned = false;
-      this.domainNoDashUntil = 0;
-      this.luBuSuperHidden = false;
-      this.luBuChargePending = 0;
-      this.blueprint = raidEnemyBlueprint(scene.pack?.stageId, id, this.elite);
-      this.maxHp = boss ? 420 : this.elite ? 185 : Math.round(78 * this.blueprint.hp);
-      this.hp = this.maxHp;
-      this.mp = this.maxMp = BASE_MP;
-      this.sp = this.maxSp = BASE_SP;
-      this.infinite = false;
-      this.mpBanned = false;
-      this.ko = false;
-      this.hitAt = 0;
-      this.hitstunUntil = 0;
-      this.comboUntil = 0;
-      this.comboHits = 0;
-      this.knockVx = 0;
-      this.lastHitDir = 1;
-      this.attackAt = (scene.combatNow ?? scene.time.now) + 420 + (id % 4) * 170;
-      this.skillAt = (scene.combatNow ?? scene.time.now) + 1800 + (id % 3) * 520;
-      this.superAt = (scene.combatNow ?? scene.time.now) + 4800 + (id % 2) * 900;
-      this.moveCdUntil = { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
-      this.attackSeq = 0;
-      this.action = "idle";
-      this.actionStartedAt = 0;
-      this.actionUntil = 0;
-      this.actionHitAt = 0;
-      this.actionHit = false;
-      this.facing = -1;
-      this.rootedUntil = 0;
-      this.slowedUntil = 0;
-      this.slowMul = 1;
-      this.ailment = "none";
-      this.ailmentUntil = 0;
-      this.ailmentDotAt = 0;
-      this.timeLockUntil = 0;
-      this.timeLockBanking = false;
-      this.timeLockBank = 0;
-      this.variant = boss ? "hero" : this.blueprint.variant;
-      this.enemyName = boss ? scene.pack?.boss?.displayName || "关底英灵" : this.blueprint.name;
-      this.color = boss ? 0xa94b9b : this.blueprint.color;
-      this.darkColor = boss ? 0x5a2459 : this.blueprint.theme.colors[2];
-      this.bellyColor = boss ? 0xd38bc9 : this.blueprint.theme.colors[1];
-      this.bodyX = boss ? 1 : this.blueprint.bodyX;
-      this.bodyY = boss ? 1 : this.blueprint.bodyY;
-      this.movePace = boss ? 1.72 : this.blueprint.pace;
-      this.attackKind = boss ? "hero" : this.blueprint.attack;
-      this.visualScale = boss ? 1.1 : this.blueprint.scale;
-      this.halfW = 24 * this.visualScale * this.bodyX;
-      this.footOffset = 48 * this.visualScale * this.bodyY;
-      const visualHalfUnits = {
-        skitter: 61, fang: 52, wisp: 38, claw: 54, brute: 66,
-        mammoth: 70, sentinel: 56, kraken: 56, golem: 66,
-        treant: 58, wyvern: 76, guardian: 66, hero: 30,
-      };
-      const visualTopUnits = {
-        skitter: 34, fang: 58, wisp: 88, claw: 62, brute: 60,
-        mammoth: 62, sentinel: 68, kraken: 66, golem: 64,
-        treant: 72, wyvern: 68, guardian: 66, hero: 62,
-      };
-      this.boundHalfW = (visualHalfUnits[this.variant] || 56) * this.visualScale * this.bodyX;
-      this.visualTopExtent = (visualTopUnits[this.variant] || 62) * this.visualScale * this.bodyY;
-      this.heroBoss = Boolean(boss && scene.pack?.boss && scene.textures.exists("boss-idle"));
-      // y is a floor coordinate. Keep the entire hurt/body volume above it;
-      // the old center-at-floor placement put roughly half the enemy outside
-      // the arena even while its center still looked valid.
-      this.sprite = scene.add
-        .rectangle(x, y - this.footOffset, this.halfW * 2, this.footOffset * 2, this.color, 0)
-        .setDepth(3);
-      scene.physics.add.existing(this.sprite);
-      this.sprite.body.setAllowGravity(false);
-      this.sprite.body.setVelocity(0, 0);
-      this.sprite.body.setCollideWorldBounds(true);
-      // Rectangle + Arcade Body 没有 Sprite 的速度快捷方法；英雄机制技
-      // （时停、铁丝网、引力）会按 Actor 接口调用，给几何怪补齐兼容层。
-      this.sprite.setVelocity = (vx = 0, vy = vx) => {
-        this.sprite.body?.setVelocity(vx, vy);
-        return this.sprite;
-      };
-      this.sprite.setVelocityX = (vx = 0) => {
-        this.sprite.body?.setVelocityX(vx);
-        return this.sprite;
-      };
-      this.sprite.setVelocityY = (vy = 0) => {
-        this.sprite.body?.setVelocityY(vy);
-        return this.sprite;
-      };
-      this.gfx = scene.add.graphics().setDepth(4);
-      this.heroSprite = null;
-      this.heroLabel = null;
-      this.heroAnim = "";
-      if (this.heroBoss) {
-        const fighter = scene.pack.boss;
-        const pivots = scene.pack.bossPivots || {};
-        const metaH = Number(fighter?.sprites?.idle?.bodyH);
-        const idleH = Math.max(8, metaH > 8 ? metaH : sheetBodyH(pivots.idle || []));
-        let vs = Number(fighter?.visualScale);
-        if (!Number.isFinite(vs) || vs <= 0) {
-          const guide = Number(fighter?.bodyGuideH);
-          vs = guide > 0 ? guide / 560 : 1;
-        }
-        this.heroBaseScale =
-          (scene.scale.height * CHAR_SCREEN * CHAR_DISPLAY_SHRINK * Phaser.Math.Clamp(vs, VISUAL_SCALE_MIN, VISUAL_SCALE_MAX)) /
-          idleH;
-        // 让完整英雄技能系统把 Boss 当作一个标准施法者。弹道缩放、发射点和
-        // 英雄专属机制都读取这些与 Actor 同名的字段。
-        this.idleH = idleH;
-        this.baseScale = this.heroBaseScale;
-        this.displayScale = this.heroBaseScale;
-        this.heroSprite = scene.add.sprite(x, y, "boss-idle", 0).setDepth(4).setScale(this.heroBaseScale * 1.08);
-        this.heroLabel = scene.add
-          .text(x, y - 112, fighter.displayName || "关底英灵", {
-            fontFamily: UI_FONT,
-            fontSize: 16,
-            color: "#ffe2a2",
-            stroke: "#2a0d0d",
-            strokeThickness: 4,
-          })
-          .setOrigin(0.5, 1)
-          .setDepth(6);
-      }
-      this.constrainToArena();
-      this.draw();
-    }
-
-    grounded() {
-      return !this.ko;
-    }
-
-    airborne() {
-      return false;
-    }
-
-    strikeFacing() {
-      return this.facing < 0 ? -1 : 1;
-    }
-
-    invulnerable() {
-      return false;
-    }
-
-    syncFacingVisual() {
-      if (this.heroSprite) this.heroSprite.setFlipX(this.facing < 0);
-    }
-
-    has(move) {
-      return this.heroBoss && this.scene.anims.exists(`boss-${move}`);
-    }
-
-    startMove(move, opts = {}) {
-      if (!this.heroBoss || !this.has(move)) return false;
-      this.move = move;
-      this.heroActionMove = move;
-      this.busy = opts.busy ?? ATTACKS.has(move);
-      this.projSpawned = false;
-      return true;
-    }
-
-    clearGhost() {}
-
-    emitPoint(origin, aimX) {
-      const vis = this.worldHurt();
-      const facing = this.strikeFacing();
-      const aheadX = this.sprite.x + facing * 210;
-      const floorY = this.scene.groundYAt?.(this.sprite.x) ?? this.scene.groundY;
-      if (origin === "front_up") return { x: this.sprite.x + facing * 92, y: vis.top + vis.height * 0.12 };
-      if (origin === "front_down") return { x: this.sprite.x + facing * 82, y: Math.min(vis.bottom - 6, floorY - 16) };
-      if (origin === "sky") return { x: Number.isFinite(aimX) ? aimX : aheadX, y: 8 };
-      if (origin === "air") return { x: Number.isFinite(aimX) ? aimX : aheadX, y: floorY - this.scene.scale.height * 0.4 };
-      if (origin === "feet") return { x: this.sprite.x + facing * 70, y: floorY };
-      if (origin === "ahead") return { x: this.sprite.x + facing * 150, y: floorY };
-      return { x: facing > 0 ? vis.right + 1 : vis.left - 1, y: vis.top + vis.height * 0.34 };
-    }
-
-    constrainToArena() {
-      if (!this.sprite?.active) return;
-      const world = this.scene.physics.world.bounds;
-      const visualHalfW = this.boundHalfW || this.halfW;
-      const left = world.x + visualHalfW;
-      const right = world.right - visualHalfW;
-      this.sprite.x = Phaser.Math.Clamp(this.sprite.x, left, Math.max(left, right));
-      // Enemies do not jump in this prototype. Following the stage floor keeps
-      // their feet planted while their full collision volume stays in bounds.
-      const floorY = this.scene.spawnFloorY(this.sprite.x);
-      const topExtent = this.visualTopExtent || 56 * this.visualScale * this.bodyY;
-      this.sprite.y = Math.max(world.y + topExtent, floorY - this.footOffset);
-      this.sprite.body.setVelocity(0, 0);
-      this.sprite.body.updateFromGameObject?.();
-    }
-
-    syncHeroBossVisual() {
-      const spr = this.heroSprite;
-      if (!spr?.active) return;
-      const actionMove =
-        this.action === "walk"
-          ? "walk"
-          : this.action === "hurt"
-            ? "hurt"
-            : this.action === "hero_move" && this.heroActionMove && this.has(this.heroActionMove)
-              ? this.heroActionMove
-            : this.action === "super" || this.action === "roar" || this.action === "slam"
-              ? "super"
-              : this.action === "skill"
-                ? this.heroActionMove && this.has(this.heroActionMove)
-                  ? this.heroActionMove
-                  : this.has("skill")
-                    ? "skill"
-                    : "attack"
-                : this.action === "spit"
-                  ? "skill"
-                : this.action === "claw" || this.action === "bite" || this.action === "charge"
-                  ? "attack"
-                : "idle";
-      const move = this.has(actionMove) ? actionMove : "idle";
-      const key = `boss-${move}`;
-      if (this.heroAnim !== move) {
-        this.heroAnim = move;
-        if (this.scene.anims.exists(key)) spr.anims.play(key, true);
-        else spr.setTexture("boss-idle", 0);
-      }
-      const frameNo = Number(spr.frame?.name);
-      const frames = this.scene.pack?.bossPivots?.[move] || this.scene.pack?.bossPivots?.idle || [];
-      const pivot = frames[Number.isFinite(frameNo) ? Phaser.Math.Clamp(frameNo, 0, Math.max(0, frames.length - 1)) : 0];
-      if (pivot) spr.setOrigin(pivot.originX, pivot.originY);
-      spr.setPosition(this.sprite.x, this.sprite.y + this.footOffset);
-      spr.setScale(this.heroBaseScale * 1.08);
-      spr.setFlipX(this.facing < 0);
-      spr.setVisible(!this.ko && !this.luBuSuperHidden);
-      if ((this.scene.combatNow ?? this.scene.time.now) < this.hitAt) spr.setTintFill(0xffffff);
-      else if (this.ailment === "freeze" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xc8e8ff);
-      else if (this.ailment === "burn" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xffd0ae);
-      else if (this.ailment === "poison" && (this.scene.combatNow ?? this.scene.time.now) < this.ailmentUntil) spr.setTint(0xc8e888);
-      else spr.clearTint();
-      if (this.heroLabel) {
-        this.heroLabel.setPosition(this.sprite.x, this.sprite.y - 88 * this.visualScale).setVisible(!this.ko);
-      }
-    }
-
-    drawHeroBossHud(x, y, s, stunned, now) {
-      const w = 128;
-      this.gfx.fillStyle(0x160e0d, 0.92).fillRect(x - w / 2, y - 82 * s, w, 10);
-      this.gfx.fillStyle(0xe65362, 1).fillRect(x - w / 2, y - 82 * s, w * Math.max(0, this.hp / this.maxHp), 10);
-      this.gfx.lineStyle(2, 0xffdf9a, 1).strokeRect(x - w / 2, y - 82 * s, w, 10);
-      if (stunned && this.comboHits >= 2) {
-        const spin = now * 0.012;
-        this.gfx.fillStyle(0xffe28a, 0.95);
-        for (let i = 0; i < 3; i++) {
-          const a = spin + (Math.PI * 2 * i) / 3;
-          this.gfx.fillCircle(x + Math.cos(a) * 24, y - 94 * s + Math.sin(a) * 7, 3);
-        }
-      }
-      const status = this.ailment !== "none" && now < this.ailmentUntil ? this.ailment : now < this.rootedUntil ? "root" : "";
-      if (status) {
-        const color = status === "freeze" ? 0xa9dcff : status === "burn" ? 0xff853e : status === "poison" ? 0xa8df5a : 0xd6c5ff;
-        this.gfx.lineStyle(3, color, 0.9).strokeEllipse(x, y + 45 * s, 74 * s, 15 * s);
-      }
-    }
-
-    draw() {
-      if (!this.gfx?.active) return;
-      const x = this.sprite.x;
-      const y = this.sprite.y;
-      const s = this.visualScale;
-      const now = (this.scene.combatNow ?? this.scene.time.now);
-      const stunned = now < this.hitstunUntil;
-      const flash = now < this.hitAt;
-      const c = this.ko ? 0x55515d : flash ? 0xfff1b8 : this.color;
-      const dark = this.darkColor;
-      const belly = this.bellyColor;
-      const f = this.facing < 0 ? -1 : 1;
-      const actionSpan = Math.max(1, this.actionUntil - this.actionStartedAt);
-      const actionT = Phaser.Math.Clamp((now - this.actionStartedAt) / actionSpan, 0, 1);
-      const strikePulse = Math.sin(actionT * Math.PI);
-      const walkBob = this.action === "walk" ? Math.sin(now * 0.018 + this.id) * 3 : 0;
-      const hurtLean = stunned ? -this.lastHitDir * 5 : 0;
-      const biteReach = this.action === "bite" || this.action === "charge" ? strikePulse * 17 : 0;
-      const clawReach = this.action === "claw" || this.action === "skill" ? strikePulse * 24 : 0;
-      const slamLift = this.action === "slam" || this.action === "super" || this.action === "roar" ? (actionT < 0.48 ? -actionT * 34 : Math.max(0, (1 - actionT) * 18)) : 0;
-      const ox = hurtLean + (this.action === "charge" ? strikePulse * 9 * f : 0);
-      const oy = walkBob;
-      const pt = (px, py) => ({ x: x + ox + px * s * this.bodyX * f, y: y + oy + py * s * this.bodyY });
-      const poly = (coords, fill, stroke = 0x241619, alpha = 1) => {
-        const points = [];
-        for (let i = 0; i < coords.length; i += 2) points.push(pt(coords[i], coords[i + 1]));
-        this.gfx.fillStyle(fill, alpha).fillPoints(points, true);
-        this.gfx.lineStyle(Math.max(1.5, 2 * s), stroke, Math.min(1, alpha + 0.1)).strokePoints(points, true);
-      };
-      this.gfx.clear();
-      if (this.heroBoss) {
-        this.syncHeroBossVisual();
-        this.drawHeroBossHud(x, y, s, stunned, now);
-        return;
-      }
-      // 每个品种使用独立骨架轮廓，而不只是把同一只四足兽拉高或压扁。
-      // 这让矮脚虫、长颈妖、裂爪兽和各地图精英在远处也能一眼认出。
-      const variant = this.variant;
-      let headX = 27 + biteReach;
-      let headY = -26 + (this.action === "bite" ? strikePulse * 4 : 0);
-      if (variant === "skitter") {
-        // 六足低伏虫：扁甲壳、剪刀颚、三对方向不同的腿。
-        poly([-33, -8, -16, -25, 18, -22, 34, -5, 17, 12, -23, 13], c, 0x1d2026);
-        poly([-20, -18, 8, -17, 19, -6, -10, 1], belly, 0x30414a, 0.9);
-        [-25, -4, 17].forEach((lx, i) => {
-          poly([lx - 4, 5, lx + 4, 5, lx + (i - 1) * 9 + 4, 36, lx + (i - 1) * 9 - 5, 36], dark, 0x171b20);
-        });
-        headX = 31 + biteReach;
-        headY = -8;
-        poly([22, -17, headX + 13, -13, headX + 18, 2, 25, 9], c, 0x1d2026);
-        poly([headX + 7, -2, headX + 28, -12, headX + 18, 4], 0xe9c66c, 0x4d3820);
-        poly([headX + 6, 2, headX + 27, 13, headX + 16, 5], 0xe9c66c, 0x4d3820);
-      } else if (variant === "wisp") {
-        // 长颈漂浮妖：没有兽腿，靠烟尾悬空并从面具口吐弹。
-        poly([-11, 8, 7, 5, 19, 34, 2, 43, -16, 29], dark, 0x20202f, 0.78);
-        poly([-17, -28, 7, -37, 18, -15, 13, 8, -9, 14, -22, -6], c, 0x29213d);
-        poly([-7, -26, 4, -70, 14, -68, 13, -22], belly, 0x4e3b61, 0.9);
-        headX = 11 + biteReach * 0.35;
-        headY = -73;
-        poly([headX - 13, headY - 10, headX + 10, headY - 13, headX + 19, headY, headX + 8, headY + 14, headX - 14, headY + 9], 0xe8dfc7, 0x393243);
-        poly([headX + 8, headY + 1, headX + 25, headY + 7, headX + 9, headY + 10], dark, 0x1b1725);
-      } else if (variant === "claw" || variant === "treant") {
-        // 佝偻双足猎手：手臂长过膝盖，攻击时整只前爪甩出。
-        poly([-17, 2, -2, 4, -8, 43, -23, 43], dark, 0x20151a);
-        poly([5, 4, 19, 1, 25, 43, 10, 43], dark, 0x20151a);
-        poly([-24, -38, 8, -48, 27, -23, 18, 8, -15, 12, -32, -8], c, 0x25151d);
-        poly([-16, -27, 5, -35, 16, -13, 4, 2, -17, -1], belly, 0x56313c, 0.9);
-        poly([-18, -25, -39, -5, -35, 27, -25, 31, -20, 0], dark, 0x25151d);
-        headX = 19 + biteReach * 0.45;
-        headY = -43;
-        poly([headX - 13, headY - 11, headX + 11, headY - 7, headX + 15, headY + 9, headX - 9, headY + 12], c, 0x25151d);
-        for (let i = 0; i < 3; i++) {
-          const a = pt(-34 + i * 3, 27 + i * 2);
-          const b = pt(-49 + i * 4, 39 + i * 3);
-          this.gfx.lineStyle(2.5 * s, 0xffe7ae, 1).lineBetween(a.x, a.y, b.x, b.y);
-        }
-      } else if (variant === "brute" || variant === "golem" || variant === "guardian") {
-        // 重装巨兽：宽肩、短腿、独立盾臂，移动慢但砸地覆盖大。
-        poly([-28, 9, -8, 10, -12, 43, -31, 43], dark, 0x2a2523);
-        poly([8, 10, 28, 8, 33, 43, 13, 43], dark, 0x2a2523);
-        poly([-39, -32, -8, -48, 27, -39, 41, -8, 24, 19, -27, 20, -45, -5], c, 0x30251f);
-        poly([-20, -28, 13, -33, 28, -5, 12, 11, -21, 7], belly, 0x5b4638, 0.95);
-        poly([-38, -25, -57, -13, -55, 20, -33, 27, -25, -5], dark, 0x241e1d);
-        headX = 27 + biteReach * 0.35;
-        headY = -38;
-        poly([headX - 15, headY - 12, headX + 12, headY - 10, headX + 19, headY + 8, headX - 10, headY + 14], c, 0x30251f);
-        poly([-61, -22, -45, -31, -35, -4, -49, 25, -65, 15], belly, 0x49382f, 0.95);
-      } else if (variant === "mammoth") {
-        // 雪原精英：四柱腿、弧形长牙和下垂象鼻。
-        poly([-34, -30, 13, -40, 38, -20, 31, 17, -24, 19, -44, -5], c, 0x334c58);
-        [-26, -8, 17, 31].forEach((lx) => poly([lx - 5, 10, lx + 5, 10, lx + 4, 43, lx - 7, 43], dark, 0x26363e));
-        headX = 36 + biteReach * 0.4;
-        headY = -26;
-        poly([20, -36, headX + 13, -34, headX + 18, -3, 28, 10], c, 0x334c58);
-        poly([headX + 10, -10, headX + 20, 12, headX + 10, 34, headX + 4, 7], dark, 0x243842);
-        poly([headX + 5, -8, headX + 30, 8, headX + 19, 19], 0xf3ead1, 0x665c4e);
-      } else if (variant === "sentinel") {
-        // 机械精英：悬浮核心、分离式肩甲与针脚。
-        poly([-28, -37, 24, -37, 35, -5, 17, 24, -20, 23, -38, -8], c, 0x193c46);
-        poly([-13, -22, 12, -24, 21, -1, 4, 12, -17, 4], 0x17262e, 0xff68da);
-        poly([-31, -14, -49, 2, -35, 9, -20, -4], dark, 0x10242b);
-        poly([27, -14, 49, 1, 36, 10, 20, -3], dark, 0x10242b);
-        poly([-14, 18, -3, 20, -10, 43, -19, 43], belly, 0x19313b);
-        poly([8, 18, 18, 18, 23, 43, 13, 43], belly, 0x19313b);
-        headX = 2;
-        headY = -48;
-        poly([-16, -57, 15, -57, 22, -43, 9, -33, -14, -36], c, 0x14252c);
-      } else if (variant === "kraken") {
-        // 深海精英：钟形头和四条不对称触腕。
-        poly([-35, -38, -8, -57, 24, -47, 38, -17, 23, 7, -23, 9, -42, -15], c, 0x164b55);
-        poly([-19, -35, 10, -43, 24, -18, 10, -2, -18, -8], belly, 0x225f68, 0.9);
-        [-26, -8, 10, 27].forEach((lx, i) => {
-          const bend = i % 2 ? 12 : -13;
-          poly([lx - 6, 2, lx + 5, 1, lx + bend, 27, lx + bend * 0.5, 43, lx - bend * 0.15, 29], dark, 0x123942);
-        });
-        headX = 22;
-        headY = -35;
-      } else if (variant === "wyvern") {
-        // 风暴精英：细躯、双翼、鸟喙与长尾。
-        poly([-10, -20, -58, -50, -39, -3, -17, 8], belly, 0x29365f, 0.88);
-        poly([3, -24, 49, -58, 38, -6, 18, 9], belly, 0x29365f, 0.88);
-        poly([-27, -10, 8, -35, 31, -8, 15, 18, -17, 15], c, 0x263154);
-        poly([-22, 8, -5, 12, -14, 43, -29, 43], dark, 0x1f2948);
-        poly([7, 11, 20, 8, 28, 43, 13, 43], dark, 0x1f2948);
-        poly([-22, -5, -58, 9, -74, 1, -38, -17], dark, 0x1f2948);
-        headX = 31 + biteReach;
-        headY = -24;
-        poly([18, -35, headX + 11, -31, headX + 25, -20, headX + 6, -11, 14, -18], c, 0x263154);
-      } else {
-        // 尖牙兽：保留经典四足轮廓，作为最容易读懂的基础近战单位。
-        poly([-27, -18, -47, -30, -39, -5, -29, 2], dark, 0x20151a);
-        poly([-21, 8, -8, 9, -10, 43, -24, 43], dark, 0x20151a);
-        poly([9, 8, 22, 6, 25, 43, 11, 43], dark, 0x20151a);
-        poly([-31, -27, 2, -35, 29, -19, 25, 13, -13, 20, -34, 3], c, 0x25151d);
-        poly([-12, -24, 7, -29, 18, -13, 9, 7, -14, 11, -23, -5], belly, 0x56313c, 0.9);
-        poly([headX - 10, headY - 15, headX + 12, headY - 11, headX + 20, headY + 2, headX + 8, headY + 14, headX - 12, headY + 9, headX - 17, headY - 3], c, 0x25151d);
-        poly([headX - 8, headY - 13, headX - 2, headY - 28, headX + 5, headY - 12], 0xe9c66c, 0x4d3820);
-        poly([headX + 5, headY - 12, headX + 14, headY - 25, headX + 15, headY - 7], 0xe9c66c, 0x4d3820);
-        const jaw = this.action === "bite" ? 8 * strikePulse : 2;
-        poly([headX + 2, headY + 4, headX + 22, headY + 3 + jaw, headX + 8, headY + 13 + jaw], dark, 0x241619);
-      }
-      const eye = pt(headX + 7, headY - 3);
-      this.gfx.fillStyle(0xffed86, 1).fillCircle(eye.x, eye.y, 2.8 * s);
-      // 地图主题饰件会叠加在独立骨架上，形成同品种在不同生态中的亚种。
-      const theme = this.blueprint?.theme?.id;
-      if (theme === "frost") {
-        poly([-20, -34, -13, -52, -5, -35], 0xc7f1ff, 0x4d7890, 0.9);
-        poly([-4, -37, 3, -58, 11, -35], 0x9fe2fa, 0x4d7890, 0.9);
-      } else if (theme === "mech") {
-        const antenna = pt(2, -42);
-        const tip = pt(7, -58);
-        this.gfx.lineStyle(2.4 * s, 0x7ef9e5, 1).lineBetween(antenna.x, antenna.y, tip.x, tip.y);
-        this.gfx.fillStyle(0xff75e6, 1).fillCircle(tip.x, tip.y, 3 * s);
-      } else if (theme === "tide") {
-        poly([-24, -23, -41, -39, -34, -12], 0x80e1d4, 0x194c58, 0.85);
-        poly([5, -35, 15, -53, 22, -28], 0x80e1d4, 0x194c58, 0.85);
-      } else if (theme === "stone") {
-        poly([-25, -27, -8, -42, 8, -36, 18, -20, -7, -22], 0xd1ad74, 0x4a3728, 0.75);
-      } else if (theme === "blight") {
-        this.gfx.lineStyle(3 * s, 0xaedb62, 0.65).strokeEllipse(x, y + 42 * s * this.bodyY, 68 * s * this.bodyX, 14 * s);
-      } else if (theme === "storm") {
-        const a = pt(-18, -30);
-        const b = pt(12, -43);
-        const c2 = pt(3, -24);
-        this.gfx.lineStyle(3 * s, 0xb7ceff, 0.85).lineBetween(a.x, a.y, b.x, b.y).lineBetween(b.x, b.y, c2.x, c2.y);
-      }
-      // Claw beast swings an oversized forelimb; the titan alternates this
-      // with a two-arm ground slam.
-      if (this.action === "claw" || this.action === "skill") {
-        const armX = 18 + clawReach;
-        poly([10, -9, armX, -18, armX + 10, -8, 16, 5], belly, 0x3b2025);
-        for (let i = -1; i <= 1; i++) {
-          const tip = pt(armX + 15, -9 + i * 7);
-          this.gfx.lineStyle(2.5 * s, 0xffe7ae, 1).lineBetween(pt(armX + 6, -7 + i * 5).x, pt(armX + 6, -7 + i * 5).y, tip.x, tip.y);
-        }
-      }
-      if (this.action === "slam" || this.action === "super" || this.action === "roar") {
-        const armY = -8 + slamLift;
-        poly([-19, -12, -35, armY, -26, armY + 12, -8, 2], belly, 0x3b2025);
-        poly([17, -13, 34, armY, 28, armY + 13, 8, 2], belly, 0x3b2025);
-        if (actionT > 0.48 && actionT < 0.78) {
-          this.gfx.lineStyle(4 * s, 0xffcf78, 0.8).strokeEllipse(x + f * 18 * s, y + 43 * s, (80 + actionT * 90) * s, 18 * s);
-        }
-      }
-      if (this.action === "spit" || this.action === "skill") {
-        const orb = pt(headX + 29 + strikePulse * 18, headY + 1);
-        this.gfx.fillStyle(theme === "mech" ? 0xff6fe8 : theme === "frost" ? 0xb8edff : 0xb5ff77, 0.82).fillCircle(orb.x, orb.y, (4 + strikePulse * 7) * s);
-      }
-      if ((this.action === "super" || this.action === "roar") && actionT > 0.35) {
-        this.gfx.lineStyle(4 * s, 0xffcf78, 0.78).strokeEllipse(x, y + 43 * s * this.bodyY, (90 + actionT * 220) * s, (16 + actionT * 24) * s);
-      }
-      if (this.boss || this.elite) {
-        poly([-25, -34, -17, -49, -8, -35], 0xd9b25f, 0x54331d);
-        poly([-3, -37, 4, -55, 12, -35], 0xd9b25f, 0x54331d);
-        poly([15, -31, 27, -44, 29, -24], 0xd9b25f, 0x54331d);
-      }
-      const w = this.boss ? 100 : this.elite ? 82 : 58;
-      const barY = y - 70 * s * this.bodyY;
-      this.gfx.fillStyle(0x1c140c, 0.9).fillRect(x - w / 2, barY, w, 7);
-      this.gfx.fillStyle(this.boss || this.elite ? 0xe8a3e0 : 0xffd48a, 1).fillRect(x - w / 2, barY, w * Math.max(0, this.hp / this.maxHp), 7);
-      if (this.boss || this.elite) {
-        this.gfx.lineStyle(2, 0xffe4a8, 0.9).strokeRect(x - w / 2, barY, w, 7);
-      }
-      const status = this.ailment !== "none" && now < this.ailmentUntil ? this.ailment : now < this.rootedUntil ? "root" : "";
-      if (status) {
-        const color = status === "freeze" ? 0xa9dcff : status === "burn" ? 0xff853e : status === "poison" ? 0xa8df5a : 0xd6c5ff;
-        this.gfx.lineStyle(3 * s, color, 0.9).strokeEllipse(x, y + 43 * s, 62 * s, 13 * s);
-      }
-      if (stunned && this.comboHits >= 2) {
-        const spin = now * 0.012;
-        this.gfx.fillStyle(0xffe28a, 0.95);
-        for (let i = 0; i < 3; i++) {
-          const a = spin + (Math.PI * 2 * i) / 3;
-          this.gfx.fillCircle(x + Math.cos(a) * 20 * s, y - 58 * s + Math.sin(a) * 6 * s, 2.6 * s);
-        }
-      }
-    }
-
-    worldHurt() {
-      const s = this.visualScale;
-      const hurtHalf = Math.max(this.halfW, Math.min(this.boundHalfW || this.halfW, 36 * s * this.bodyX));
-      const hurtTop = Math.max(56 * s * this.bodyY, Math.min(this.visualTopExtent || 0, 82 * s * this.bodyY));
-      return new Phaser.Geom.Rectangle(
-        this.sprite.x - hurtHalf,
-        this.sprite.y - hurtTop,
-        hurtHalf * 2,
-        hurtTop + this.footOffset
-      );
-    }
-
-    applyAilment(kind, strength = 1) {
-      if (!kind || kind === "none" || this.ko) return;
-      const now = (this.scene.combatNow ?? this.scene.time.now);
-      const s = Math.max(0.4, Number(strength) || 1);
-      const resist = this.boss ? 0.72 : this.elite ? 0.85 : 1;
-      const duration =
-        kind === "freeze" ? (900 + 400 * s) * resist : kind === "poison" ? (3200 + 900 * s) * resist : (2800 + 900 * s) * resist;
-      this.ailment = kind;
-      this.ailmentUntil = Math.max(this.ailmentUntil, now + Math.round(duration));
-      this.ailmentDotAt = Math.min(this.ailmentDotAt || now + 220, now + 220);
-      if (kind === "freeze") {
-        this.rootedUntil = Math.max(this.rootedUntil, this.ailmentUntil);
-        this.action = "hurt";
-        this.actionUntil = this.rootedUntil;
-      }
-    }
-
-    applyMechanic(attacker, move, spec, shot = null) {
-      if (this.ko) return;
-      const now = (this.scene.combatNow ?? this.scene.time.now);
-      const effect = shot?.effect || spec?.effect || "none";
-      const strength = Number(shot?.effectStrength ?? spec?.effectStrength) || 1;
-      const ailment = shot?.ailment || spec?.ailment || "none";
-      const kind = shot?.kind || spec?.mechanic?.type || mechanicSpec(spec).type;
-      if (ailment !== "none") this.applyAilment(ailment, strength);
-      if (this.timeLockBanking && now < this.timeLockUntil) {
-        this.rootedUntil = Math.max(this.rootedUntil, this.timeLockUntil);
-        return;
-      }
-      if (effect === "root" || kind === "trap" || shot?.yearZeroBind) {
-        const duration = (this.boss ? 900 : this.elite ? 1250 : 1700) * Math.max(0.75, strength);
-        this.rootedUntil = Math.max(this.rootedUntil, now + duration);
-        this.hitstunUntil = Math.max(this.hitstunUntil, now + Math.min(760, duration));
-      }
-      if (kind === "zone" || kind === "beam") {
-        this.slowedUntil = Math.max(this.slowedUntil, now + (this.boss ? 650 : 1050));
-        this.slowMul = Math.min(this.slowMul, kind === "zone" ? 0.38 : 0.62);
-      }
-      if (effect === "pull" || shot?.pullField) {
-        const tx = attacker?.sprite?.x ?? this.sprite.x;
-        const dx = tx - this.sprite.x;
-        const step = Math.min(Math.abs(dx), shot?.pullField ? 54 : 34) * Math.sign(dx || 1);
-        this.sprite.x += step;
-        this.rootedUntil = Math.max(this.rootedUntil, now + 260);
-        this.hitstunUntil = Math.max(this.hitstunUntil, now + 320);
-        this.constrainToArena();
-      }
-      if (effect === "launch") {
-        this.knockVx += (attacker?.strikeFacing?.() || attacker?.facing || this.lastHitDir || 1) * (this.boss ? 75 : 135);
-        this.hitstunUntil = Math.max(this.hitstunUntil, now + (this.boss ? 620 : 860));
-      }
-    }
-
-    tickStatus(now) {
-      if (this.ailment !== "none" && now >= this.ailmentUntil) {
-        this.ailment = "none";
-        this.ailmentUntil = 0;
-      }
-      if ((this.ailment === "burn" || this.ailment === "poison") && now < this.ailmentUntil && now >= this.ailmentDotAt) {
-        this.ailmentDotAt = now + (this.ailment === "burn" ? 360 : 480);
-        this.hp = Math.max(0, this.hp - (this.ailment === "burn" ? 3 : 2));
-        this.hitAt = now + 90;
-        if (this.hp <= 0) {
-          this.ko = true;
-          this.sprite.setVisible(false);
-          this.heroSprite?.setVisible(false);
-          this.heroLabel?.setVisible(false);
-          this.gfx.setVisible(false);
-        }
-      }
-      if (now >= this.slowedUntil) this.slowMul = 1;
-    }
-
-    takeHit(move, dir, spec) {
-      if (this.ko) return;
-      const now = (this.scene.combatNow ?? this.scene.time.now);
-      const damage = Math.max(0, Number.isFinite(Number(spec?.damage)) ? Number(spec.damage) : moveDamage(move));
-      if (this.timeLockBanking && now < this.timeLockUntil && !spec?.timeLockBurst) {
-        this.timeLockBank = (this.timeLockBank || 0) + damage;
-        this.hitAt = now + 100;
-        this.draw();
-        return;
-      }
-      this.hp = Math.max(0, this.hp - damage);
-      this.hitAt = now + 145;
-      this.lastHitDir = dir || 1;
-      this.comboHits = now <= this.comboUntil ? Math.min(99, this.comboHits + 1) : 1;
-      this.comboUntil = now + 950;
-      const moveStun = Math.max(0, Number(spec?.hit?.stun) || 0);
-      const baseStun = move === "super" ? 920 : move === "skill" || move === "combo_up" || move === "combo_down" ? 700 : 520;
-      let stunMs = Math.max(baseStun, moveStun + 90) + Math.min(260, (this.comboHits - 1) * 42);
-      if (this.boss) stunMs = Math.max(430, Math.round(stunMs * 0.82));
-      else if (this.elite) stunMs = Math.max(470, Math.round(stunMs * 0.9));
-      // A new hit refreshes and slightly extends an active stagger, leaving a
-      // real cancel window for the next attack instead of letting AI act back.
-      this.hitstunUntil = Math.min(now + 1200, Math.max(now + stunMs, this.hitstunUntil + 70));
-      this.attackAt = Math.max(this.attackAt, this.hitstunUntil + 180);
-      this.action = "hurt";
-      this.actionStartedAt = now;
-      this.actionUntil = this.hitstunUntil;
-      this.actionHit = true;
-      const knock = (this.boss ? 72 : 112) + Math.min(90, damage * 2.2);
-      this.knockVx = this.lastHitDir * knock;
-      this.sprite.x += this.lastHitDir * (this.boss ? 3 : 6);
-      this.constrainToArena();
-      if (this.hp <= 0) {
-        this.ko = true;
-        this.hitstunUntil = 0;
-        this.knockVx = 0;
-        this.sprite.setVisible(false);
-        this.heroSprite?.setVisible(false);
-        this.heroLabel?.setVisible(false);
-        this.gfx.setVisible(false);
-      }
-      this.draw();
-    }
-
-    beginAttack(now, distance = 0, target = null) {
-      this.attackSeq += 1;
-      if (this.boss) {
-        let move = null;
-        const cdReady = (kind) => now >= (this.moveCdUntil?.[kind] || 0);
-        if (this.has("super") && cdReady("super") && now >= this.superAt && (this.hp <= this.maxHp * 0.9 || this.attackSeq >= 3)) {
-          move = "super";
-          this.superAt = now + MOVE_CD_MS.super;
-        }
-        if (!move && now >= this.skillAt) {
-          const specials = ["skill", "combo_up", "combo_down"].filter((kind) => this.has(kind) && cdReady(kind));
-          if (specials.length) {
-            // 循环而不是随机：一场 Boss 战一定有机会看到该英雄的三种小技能。
-            this.bossSkillCursor = (this.bossSkillCursor || 0) % specials.length;
-            move = specials[this.bossSkillCursor];
-            this.bossSkillCursor += 1;
-            this.skillAt = now + 880;
-          }
-        }
-        if (!move) {
-          const targetAir = Boolean(target?.airborne?.());
-          if (targetAir && this.has("attack_up")) move = "attack_up";
-          else {
-            const basics = ["attack", "attack_down", "attack_up"].filter((kind) => this.has(kind));
-            move = basics.length ? basics[this.attackSeq % basics.length] : "attack";
-          }
-        }
-        this.action = "hero_move";
-        this.heroActionMove = move;
-        this.move = move;
-        this.busy = true;
-        this.projSpawned = false;
-        const moveCd = MOVE_CD_MS[move] || 0;
-        if (moveCd > 0) this.moveCdUntil[move] = now + moveCd;
-      } else if (this.elite) {
-        if (now >= this.superAt) {
-          this.action = "roar";
-          this.superAt = now + 6200;
-        } else if (now >= this.skillAt && distance > 90) {
-          this.action = "charge";
-          this.skillAt = now + 2800;
-        } else {
-          this.action = this.attackSeq % 2 ? "slam" : "claw";
-        }
-      } else {
-        this.action = this.attackKind === "spit" && distance < 90 ? "claw" : this.attackKind;
-      }
-      const profile = this.attackProfile();
-      this.actionStartedAt = now;
-      this.actionHitAt = now + profile.windup;
-      this.actionUntil = now + profile.duration;
-      this.actionHit = false;
-      this.attackAt = this.actionUntil + profile.cooldown;
-    }
-
-    attackProfile() {
-      if (this.boss && this.heroActionMove) {
-        const move = this.heroActionMove;
-        const spec = moveSpec(this.fighter, move);
-        const spriteSpec = this.fighter?.sprites?.[move] || {};
-        const frames = Math.max(1, Number(spriteSpec.frames) || 6);
-        const duration = Phaser.Math.Clamp(Math.round((frames / Math.max(1, moveFps(move, frames))) * 1000), 440, 1500);
-        const hasProjectile = Boolean(
-          spec.projectile?.file &&
-          this.scene.textures.exists(`${this.prefix}-proj-${move}`)
-        );
-        const projectileOnly = hasProjectile && (mechanicSpec(spec).type !== "melee" || isSuperMove(move));
-        const hitGate = hasProjectile ? Number(spec.projectile?.spawnFrame ?? 0.35) : 0.3;
-        return {
-          windup: Math.round(duration * Phaser.Math.Clamp(hitGate, 0.12, 0.78)),
-          duration,
-          cooldown: isLightAttack(move) ? 180 : 260,
-          reach: spec.reach,
-          damage: spec.damage,
-          knock: spec.hit?.knock,
-          lift: spec.hit?.lift,
-          stun: spec.hit?.stun,
-          move,
-          lunge: spec.lunge,
-          hasProjectile,
-          projectile: projectileOnly,
-          exactSpec: spec,
-          effect: spec.effect,
-          effectStrength: spec.effectStrength,
-          ailment: spec.ailment,
-        };
-      }
-      if (this.action === "super") {
-        const spec = moveSpec(this.scene.pack?.boss, "super");
-        return {
-          windup: 720,
-          duration: 1280,
-          cooldown: 760,
-          reach: Math.max(310, spec.reach || 0),
-          damage: Math.max(24, spec.damage || 0),
-          knock: Math.max(460, spec.hit?.knock || 0),
-          lift: Math.min(-180, spec.hit?.lift || 0),
-          stun: Math.max(560, spec.hit?.stun || 0),
-          area: true,
-          move: "super",
-          effect: spec.effect,
-          effectStrength: spec.effectStrength,
-          ailment: spec.ailment,
-        };
-      }
-      if (this.action === "roar") {
-        return { windup: 580, duration: 1040, cooldown: 680, reach: 235, damage: 18, knock: 330, lift: -95, stun: 460, area: true };
-      }
-      if (this.action === "skill") {
-        const move = this.heroActionMove || "skill";
-        const spec = moveSpec(this.scene.pack?.boss, move);
-        return {
-          windup: 430,
-          duration: 830,
-          cooldown: 620,
-          reach: Math.max(420, spec.reach || 0),
-          damage: Math.max(12, spec.damage || 0),
-          knock: Math.max(230, spec.hit?.knock || 0),
-          lift: Math.min(-60, spec.hit?.lift || 0),
-          stun: Math.max(360, spec.hit?.stun || 0),
-          ranged: true,
-          move,
-          effect: spec.effect,
-          effectStrength: spec.effectStrength,
-          ailment: spec.ailment,
-        };
-      }
-      if (this.action === "spit") {
-        return { windup: 360, duration: 720, cooldown: 980, reach: 390, damage: 9, knock: 150, lift: -30, stun: 300, ranged: true };
-      }
-      if (this.action === "charge") {
-        return { windup: 245, duration: 720, cooldown: 720, reach: 145, damage: this.elite || this.boss ? 17 : 10, knock: 315, lift: -70, stun: 390, charge: true };
-      }
-      if (this.action === "slam") {
-        return this.elite
-          ? { windup: 430, duration: 880, cooldown: 620, reach: 150, damage: 20, knock: 350, lift: -105, stun: 430, area: true }
-          : { windup: 390, duration: 790, cooldown: 840, reach: 116, damage: 12, knock: 245, lift: -65, stun: 350, area: true };
-      }
-      if (this.action === "claw") {
-        return this.boss
-          ? { windup: 260, duration: 610, cooldown: 430, reach: 112, damage: 15, knock: 270, lift: -65, stun: 340 }
-          : this.elite
-            ? { windup: 285, duration: 650, cooldown: 520, reach: 105, damage: 13, knock: 235, lift: -55, stun: 330 }
-          : { windup: 220, duration: 540, cooldown: 580, reach: 92, damage: 10, knock: 205, lift: -48, stun: 300 };
-      }
-      return { windup: 155, duration: 420, cooldown: 620, reach: 70, damage: 8, knock: 165, lift: -35, stun: 260 };
-    }
-
-    resolveAttack(players, target) {
-      if (this.actionHit) return;
-      this.actionHit = true;
-      const profile = this.attackProfile();
-      if (this.boss && profile.exactSpec) {
-        const move = profile.move;
-        // 与玩家完全共用 spawnProjectile：英雄专属分支（时停、引力、领域、
-        // 忍者、龙卷、骑战等）不会再被替换成通用光球。
-        if (profile.hasProjectile) {
-          this.projSpawned = true;
-          this.scene.spawnProjectile(this, move, profile.exactSpec);
-          if (profile.projectile) return;
-        }
-        const victims = players.filter((victim) => {
-          if (!victim || victim.ko) return false;
-          const dx = victim.sprite.x - this.sprite.x;
-          if (Math.abs(dx) > Math.max(62, profile.reach + 74)) return false;
-          return Math.abs(dx) <= 18 || Math.sign(dx) === this.facing;
-        });
-        victims.forEach((victim) => {
-          if (victim.invulnerable?.()) return;
-          if (this.scene.isGuarding(victim) && !isSuperMove(move)) {
-            this.scene.applyBlockedHit(victim, this, move, profile.exactSpec.damage);
-            victim.sprite.setVelocity(this.facing * 70, 0);
-            this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, null);
-            return;
-          }
-          const hpBefore = victim.hp;
-          victim.takeHit(move, this.facing, profile.exactSpec);
-          if (isLightAttack(move)) {
-            this.scene.applyDomainLightLifesteal(this, victim, Math.max(0, hpBefore - victim.hp));
-          }
-          this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, isSkillSfxMove(move) ? "skill" : "light");
-        });
-        if (isSuperMove(move)) this.scene.cameras.main.shake(90, 0.004);
-        return;
-      }
-      const victims = profile.area ? players : [target];
-      victims.forEach((victim) => {
-        if (!victim || victim.ko || Math.abs(victim.sprite.x - this.sprite.x) > profile.reach * this.visualScale) return;
-        const vx = victim.sprite.x - this.sprite.x;
-        if (!profile.area && Math.abs(vx) > 18 && Math.sign(vx) !== this.facing) return;
-        if (profile.ranged) {
-          const bolt = this.scene.add
-            .circle(this.sprite.x + this.facing * 24, this.sprite.y - 30 * this.bodyY, this.boss ? 10 : 7, this.bellyColor, 0.92)
-            .setDepth(8);
-          this.scene.tweens.add({
-            targets: bolt,
-            x: victim.sprite.x,
-            y: victim.sprite.y - 46,
-            scale: 0.35,
-            alpha: 0.2,
-            duration: 150,
-            onComplete: () => bolt.destroy(),
-          });
-        }
-        victim.takeHit(profile.move || "attack", this.facing, {
-          damage: profile.damage,
-          hit: { knock: profile.knock, lift: profile.lift, stun: profile.stun, knockdown: profile.area || this.action === "slam", stop: 24 },
-        });
-        if (profile.ailment && profile.ailment !== "none") victim.applyAilment?.(profile.ailment, profile.effectStrength || 1);
-        if (profile.effect === "root") {
-          victim.rootedUntil = Math.max(victim.rootedUntil || 0, (this.scene.combatNow ?? this.scene.time.now) + 1100);
-        }
-        this.scene.impactAt(victim.sprite.x, victim.sprite.y - 40, profile.area || profile.ranged ? "skill" : "light");
-      });
-      if (profile.area) this.scene.cameras.main.shake(this.boss ? 120 : 75, this.boss ? 0.006 : 0.0035);
-    }
-
-    acquireTarget(players) {
-      const alive = players.filter((player) => player && !player.ko);
-      if (!alive.length) return null;
-      let target = alive[0];
-      let best = Math.abs(target.sprite.x - this.sprite.x) + Math.abs(target.sprite.y - this.sprite.y) * 0.35;
-      for (let i = 1; i < alive.length; i++) {
-        const player = alive[i];
-        const score = Math.abs(player.sprite.x - this.sprite.x) + Math.abs(player.sprite.y - this.sprite.y) * 0.35;
-        if (score < best) {
-          best = score;
-          target = player;
-        }
-      }
-      return target;
-    }
-
-    tick(players) {
-      if (this.ko || !players.length) return;
-      const target = this.acquireTarget(players);
-      if (!target) return;
-      const now = (this.scene.combatNow ?? this.scene.time.now);
-      this.tickStatus(now);
-      if (this.ko) return;
-      const dx = target.sprite.x - this.sprite.x;
-      // 索敌和转身放在受控判断之前：即便刚挨打或被绕背，恢复行动的第一帧也已经朝向最近玩家。
-      if (Math.abs(dx) > 2) this.facing = dx < 0 ? -1 : 1;
-      this.syncFacingVisual();
-      if (now > this.comboUntil) this.comboHits = 0;
-      if (now < this.hitstunUntil || now < this.rootedUntil) {
-        const dt = Math.min(50, Math.max(1, this.scene.game.loop.delta));
-        this.sprite.x += this.knockVx * (dt / 1000);
-        this.knockVx *= Math.pow(0.8, dt / 16.67);
-        if (Math.abs(this.knockVx) < 4) this.knockVx = 0;
-        this.constrainToArena();
-        this.draw();
-        return;
-      }
-      this.knockVx = 0;
-      const attacking = this.action === "hero_move" || ["bite", "claw", "slam", "charge", "spit", "skill", "roar", "super"].includes(this.action);
-      if (attacking && now < this.actionUntil) {
-        const profile = this.attackProfile();
-        if (this.boss && profile.lunge && !this.actionHit && now >= this.actionStartedAt + profile.windup * 0.18) {
-          this.sprite.x += this.facing * profile.lunge * Math.min(0.05, this.scene.game.loop.delta / 1000);
-          this.constrainToArena();
-        }
-        if (profile.charge && !this.actionHit && now >= this.actionStartedAt + profile.windup * 0.55) {
-          this.sprite.x += this.facing * (this.boss ? 4.8 : this.elite ? 4.1 : 3.5) * this.scene.game.loop.delta / 16.67;
-          this.constrainToArena();
-        }
-        if (!this.actionHit && now >= this.actionHitAt) this.resolveAttack(players, target);
-        this.draw();
-        return;
-      }
-      if (now >= this.actionUntil) {
-        this.action = "idle";
-        if (this.boss) {
-          this.move = "idle";
-          this.busy = false;
-          this.projSpawned = false;
-        }
-      }
-      const bossRangedReady =
-        this.boss &&
-        now >= this.skillAt &&
-        ["skill", "combo_up", "combo_down", "super"].some(
-          (move) => {
-            const spec = moveSpec(this.fighter, move);
-            return this.has(move) && now >= (this.moveCdUntil?.[move] || 0) && spec.projectile?.file && mechanicSpec(spec).type !== "melee";
-          }
-        );
-      const rangedReady = bossRangedReady || (this.attackKind === "spit" && now >= this.attackAt);
-      const engage = rangedReady ? 390 : this.boss ? 132 : this.elite ? 105 : this.attackKind === "bite" ? 64 : 86;
-      if (Math.abs(dx) > engage) {
-        this.action = "walk";
-        const pace = this.movePace * (now < this.slowedUntil ? this.slowMul : 1);
-        this.sprite.x += Math.sign(dx) * pace * this.scene.game.loop.delta / 16.67;
-        this.constrainToArena();
-      } else if (now >= this.attackAt) {
-        this.beginAttack(now, Math.abs(dx), target);
-      } else {
-        this.action = "idle";
-      }
-      this.draw();
-    }
-
-    destroy() {
-      this.sprite?.destroy();
-      this.gfx?.destroy();
-      this.heroSprite?.destroy();
-      this.heroLabel?.destroy();
-    }
-  }
-
   class Boot extends Phaser.Scene {
     constructor() {
       super("boot");
@@ -4334,7 +2821,6 @@
         if (document.fonts?.load) {
           await Promise.all([
             document.fonts.load("24px GameUI"),
-            document.fonts.load("24px BodyUI"),
             document.fonts.load("64px BrushUI"),
             document.fonts.load("120px BrushUI"),
           ]);
@@ -4365,2302 +2851,324 @@
     }
 
     preload() {
-      window.HeroShell?.loading("准备英灵选择", "载入人物立绘、战场预览与音效…");
-      this.load.on("progress", value => window.HeroShell?.progress(value));
+      window.HeroShell?.loading("CHARACTER SELECT", "读取英灵与战场…");
+      this.load.on("progress", (value) => window.HeroShell?.progress(value));
       loadUiSfx(this);
-      const roster = this.registry.get("roster") || {};
-      const { playable = [], fighters = {}, stageIds = [], stages = {} } = roster;
+      const { playable = [], fighters = {}, stageIds = [], stages = {} } = this.registry.get("roster") || {};
       playable.forEach((id) => {
-        loadRosterHeroTextures(this, this.load, id, fighters[id] || {});
-        const vkey = `select-voice-${id}`;
-        if (!this.cache.audio.exists(vkey)) {
-          const selectFile = fighters[id]?.voice?.lines?.select?.file || "voice/select.mp3";
-          this.load.audio(vkey, `/assets/game/heroes/${id}/${selectFile}`);
-        }
+        loadRosterHeroTextures(this, this.load, id, fighters[id]);
+        const key = `select-voice-${id}`;
+        if (!this.cache.audio.exists(key))
+          this.load.audio(
+            key,
+            `/assets/game/heroes/${id}/${fighters[id]?.voice?.lines?.select?.file || "voice/select.mp3"}`,
+          );
       });
       stageIds.forEach((id) => {
         const key = `stage-thumb-${id}`;
-        if (this.textures.exists(key)) return;
-        const file = stages[id]?.file || "stage.png";
-        const bust = stages[id]?.committedAt || Date.now();
-        this.load.image(key, `/assets/game/stages/${id}/${file}?t=${encodeURIComponent(bust)}`);
+        if (!this.textures.exists(key))
+          this.load.image(key, `/assets/game/stages/${id}/${stages[id]?.file || "stage.png"}`);
       });
     }
 
     create() {
-      window.HeroShell?.ready();
-      this._rosterPulling = false;
-      this._blockAutoStart = false;
-      this._selectGeneration = (this._selectGeneration || 0) + 1;
-      const generation = this._selectGeneration;
       killStageBgm(this);
-      const roster = this.registry.get("roster") || {};
-      this.playable = roster.playable || [];
-      this.fighters = roster.fighters || {};
-      this.stageIds = roster.stageIds || [];
-      this.stages = roster.stages || {};
-      const w = this.scale.width;
-      const h = this.scale.height;
-      const wantP1 = queryParam("p1") || P1_DEFAULT;
-      const wantP2 = queryParam("p2") || DUMMY_ID;
-      this.p1Index = Math.max(0, this.playable.indexOf(wantP1));
-      this.p2Index = Math.max(0, this.playable.indexOf(wantP2));
-      if (this.playable.indexOf(wantP1) < 0) this.p1Index = 0;
-      if (this.playable.indexOf(wantP2) < 0) {
-        const dummyAt = this.playable.indexOf(DUMMY_ID);
-        this.p2Index = dummyAt >= 0 ? dummyAt : Math.min(1, this.playable.length - 1);
-      }
-      this.slot = "p1";
-      this.hoverIndex = -1;
-      this._selectVoiceCool = 0;
-      this.locked = false;
-      this.drawingMap = false;
-      const wantStage = queryParam("stage");
-      this.stageIndex = Math.max(0, this.stageIds.indexOf(wantStage));
-      if (this.stageIds.indexOf(wantStage) < 0) this.stageIndex = 0;
-      this.stageConfirmed = !this.stageIds.length;
-      const wantMode = queryParam("mode");
-      this.mode = wantMode === "pve" || wantMode === "pvp" || wantMode === "cricket" || wantMode === "raid" ? wantMode : "dummy";
+      Object.assign(this, this.registry.get("roster"));
+      const previous = this.registry.get("selection") || {};
+      const pick = (id, fallback) => Math.max(0, this.playable.indexOf(id || fallback));
+      this.p1Index = pick(previous.p1Id || queryParam("p1"), P1_DEFAULT);
+      this.p2Index = pick(previous.p2Id || queryParam("p2"), P2_DEFAULT);
+      this.stageIndex = Math.max(0, this.stageIds.indexOf(previous.stageId || queryParam("stage")));
       this.cpuDiff = loadCpuDiff();
-      this.pvpSeat = "";
-      this.pvpRoom = "";
-      this.pvpPeerHero = "";
-      this.pvpPicks = emptyPvpPicks();
-      this.pvpSeats = { host: false, guest: false, guest2: false };
-      this.pvpProfiles = {
-        host: { nick: "主机", ready: false, heroId: "" },
-        guest: { nick: "客人1", ready: false, heroId: "" },
-        guest2: { nick: "客人2", ready: false, heroId: "" },
-      };
-      this.pvpStatus = "";
-      this.lanIps = [];
-      this.lanPort = Number(location.port) || 8788;
-      fetch("/api/lan")
-        .then((r) => r.json())
-        .then((info) => {
-          if (!this.sys.isActive() || generation !== this._selectGeneration) return;
-          this.lanIps = info.ips || [];
-          this.lanPort = info.port || this.lanPort;
-          this.refresh();
-        })
-        .catch(() => {});
-      const existingNet = this.registry.get("net");
-      const resume = this.registry.get("pvpResume");
-      if (existingNet?.connected) {
-        this.mode = "pvp";
-        this.pvpSeat = existingNet.seat || "";
-        this.pvpRoom = existingNet.room || this.pvpRoom;
-        this.pvpSeats[this.pvpSeat] = true;
-        this.ensureProfile(this.pvpSeat).nick = this.localNick() || defaultNick(this.pvpSeat);
-        const pack = this.registry.get("match");
-        if (pack?.mode === "raid") this.mode = "raid";
-        if (pack?.mode === "pvp" || pack?.mode === "raid") {
-          if (pack.p1Id) this.rememberPick("host", pack.p1Id);
-          if (pack.p2Id) this.rememberPick("guest", pack.p2Id);
-          if (pack.p3Id) this.rememberPick("guest2", pack.p3Id);
-          const mine = this.heroOf(this.pvpSeat);
-          const mineAt = this.playable.indexOf(mine);
-          if (mineAt >= 0) this.p1Index = mineAt;
-          const lastStage = pack.stageId;
-          const lastAt = this.stageIds.indexOf(lastStage);
-          if (lastAt >= 0) this.stageIndex = lastAt;
-          if (pack.profiles) {
-            ["host", "guest", "guest2"].forEach((seat) => {
-              const src = pack.profiles[seat];
-              if (!src) return;
-              const cur = this.ensureProfile(seat);
-              if (src.nick) cur.nick = src.nick;
-              if (src.heroId) cur.heroId = src.heroId;
-            });
-          }
-        }
-        existingNet.discard?.(["start", "map_draw", "ready", "lobby_return", "lobby_state", "state"]);
-        clearNetLobbyPings(existingNet);
-        this._blockAutoStart = true;
-        this.resetLobbyReady();
-        this.bindNet(existingNet);
-        this._resumeStage = !!resume?.refreshStage;
-        this._pullPeers = !!resume?.pullPeers;
-        this.time.delayedCall(600, () => {
-          this._blockAutoStart = false;
-        });
-        this.pvpStatus =
-          this.pvpSeat === "host"
-            ? `房间 ${this.pvpRoom}　可换英灵换图，全员准备后开战`
-            : `已回到房间 ${this.pvpRoom}　可换人，地图由主机选择`;
-        this.broadcastNick();
-        this.scheduleSync();
-        try {
-          const url = new URL(location.href);
-          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
-          history.replaceState({}, "", url);
-        } catch {
-          /* ignore */
-        }
-      }
-      this.registry.remove("pvpResume");
-
-      this.paintSelectBackdrop(w, h);
-      this.modeGfx = this.add.graphics().setDepth(5);
-      const modeStyle = {
-        fontSize: 18,
-        color: "#ead8a8",
-      };
-      this.modeDummy = uiText(this, w / 2 - 384, 36, "木桩练习", modeStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.modePve = uiText(this, w / 2 - 192, 36, "PVE 对战", modeStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.modeCricket = uiText(this, w / 2, 36, "电子斗蛐蛐", modeStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.modeRaid = uiText(this, w / 2 + 192, 36, "合作闯关", modeStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.modePvp = uiText(this, w / 2 + 384, 36, "局域网 PVP", modeStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      [this.modeDummy, this.modePve, this.modeCricket, this.modeRaid, this.modePvp].forEach((tab) => tab.setData("uiClickFirm", true));
-      this.modeDummy.on("pointerdown", () => this.setMode("dummy"));
-      this.modePve.on("pointerdown", () => this.setMode("pve"));
-      this.modeCricket.on("pointerdown", () => this.setMode("cricket"));
-      this.modeRaid.on("pointerdown", () => this.setMode("raid"));
-      this.modePvp.on("pointerdown", () => this.setMode("pvp"));
-      const diffStyle = {
-        fontSize: 16,
-        color: "#ead8a8",
-      };
-      this.diffKind = uiText(this, w / 2 - 186, 82, "仁慈的敌人", diffStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.diffFair = uiText(this, w / 2, 82, "认真的敌人", diffStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      this.diffCruel = uiText(this, w / 2 + 186, 82, "残忍的敌人", diffStyle)
-        .setOrigin(0.5, 0)
-        .setDepth(6)
-        .setInteractive({ useHandCursor: true });
-      [this.diffKind, this.diffFair, this.diffCruel].forEach((tab) => tab.setData("uiClickFirm", true));
-      this.diffKind.on("pointerdown", () => this.setCpuDiff("kind"));
-      this.diffFair.on("pointerdown", () => this.setCpuDiff("fair"));
-      this.diffCruel.on("pointerdown", () => this.setCpuDiff("cruel"));
-      this.title = uiText(this, w / 2, 70, "", {
-        fontSize: 15,
-        color: "#c8b88a",
-        wordWrap: { width: w - 80, useAdvancedWrap: true },
-        align: "center",
-      })
-        .setOrigin(0.5, 0)
-        .setDepth(6);
-      this.buildShowcases(w, h);
-      this.buildPvpLobby(w);
-
+      this.slot = "p1";
+      this.locked = false;
+      this.page = 0;
       this.cards = [];
-      this.heroRailPage = 0;
-      this.buildHeroRail();
-      this.buildStageDeck(w, h);
-      this._rosterStamp = rosterStamp({
-        playable: this.playable,
-        stageIds: this.stageIds,
-        stages: this.stages,
+      this.add.rectangle(672, 384, 1344, 768, 0x10151e);
+      const bg = this.add.graphics();
+      // A quiet tile grid and a stepped horizon, drawn on whole pixels.
+      bg.lineStyle(1, 0x263342, 0.5);
+      for (let x = 0; x < 1344; x += 32) bg.lineBetween(x, 92, x, 704);
+      for (let y = 96; y < 704; y += 32) bg.lineBetween(0, y, 1344, y);
+      bg.fillStyle(0x172230);
+      for (let x = 0; x < 1344; x += 64) bg.fillRect(x, 610 + ((x / 64) % 3) * 24, 64, 140);
+      bg.fillStyle(0x080c13);
+      bg.fillRect(0, 0, 1344, 82);
+      bg.fillRect(0, 706, 1344, 62);
+      bg.fillStyle(0xc5c4ac);
+      bg.fillRect(32, 78, 1280, 2);
+      uiText(this, 38, 22, GAME_NAME, { fontSize: 24, color: "#f0e7cf" });
+      uiText(this, 672, 24, "CHARACTER SELECT", {
+        fontSize: 30,
+        color: "#efc05d",
+        stroke: "#382b25",
+        strokeThickness: 4,
+      }).setOrigin(0.5, 0);
+      uiText(this, 1306, 30, "PVE / SINGLE PLAYER", { fontSize: 15, color: "#b5bfcb" }).setOrigin(1, 0);
+      this.uiGfx = this.add.graphics().setDepth(1);
+      this.large = [this.add.sprite(178, 532, "").setDepth(2), this.add.sprite(1166, 532, "").setDepth(2)];
+      this.names = [178, 1166].map((x) =>
+        uiText(this, x, 558, "", { fontSize: 28, color: "#f0e7cf", wordWrap: { width: 280 }, align: "center" })
+          .setOrigin(0.5, 0)
+          .setDepth(3),
+      );
+      this.roleLabels = [178, 1166].map((x, i) =>
+        uiText(this, x, 104, i ? "CPU" : "1P", { fontSize: 32, color: i ? "#f48173" : "#75c8ed" })
+          .setOrigin(0.5)
+          .setDepth(3),
+      );
+      [178, 1166].forEach((x, i) =>
+        this.add
+          .zone(x, 356, 292, 492)
+          .setInteractive({ useHandCursor: true })
+          .setDepth(4)
+          .on("pointerdown", () => this.chooseSlot(i ? "p2" : "p1")),
+      );
+      this.slotButtons = [
+        this.button(516, 112, 276, 34, "1P  选择英灵", () => this.chooseSlot("p1")),
+        this.button(828, 112, 276, 34, "CPU  选择对手", () => this.chooseSlot("p2")),
+      ];
+      this.cardsRoot = this.add.container(0, 0).setDepth(5);
+      this.pageLabel = uiText(this, 672, 405, "", { fontSize: 14, color: "#b5bfcb" }).setOrigin(0.5);
+      this.prevPage = this.button(406, 405, 50, 30, "◀", () => this.shiftPage(-1));
+      this.nextPage = this.button(938, 405, 50, 30, "▶", () => this.shiftPage(1));
+      uiText(this, 672, 448, "STAGE SELECT", { fontSize: 19, color: "#efc05d" }).setOrigin(0.5);
+      this.stageImage = this.add.image(672, 542, "").setDepth(2);
+      const stageMask = this.add.graphics().fillStyle(0xffffff).fillRect(492, 472, 360, 140).setVisible(false);
+      this.stageImage.setMask(stageMask.createGeometryMask());
+      this.stageLabel = uiText(this, 672, 630, "", { fontSize: 21, color: "#f0e7cf" }).setOrigin(0.5).setDepth(3);
+      this.button(446, 542, 48, 64, "◀", () => this.shiftStage(-1));
+      this.button(898, 542, 48, 64, "▶", () => this.shiftStage(1));
+      this.diffButtons = CPU_DIFFS.map((d, i) =>
+        this.button(500 + i * 172, 678, 156, 36, d.label, () => this.setCpuDiff(d.id)),
+      );
+      uiText(this, 34, 728, "A D 选人   W S 切换 1P / CPU   ← → 战场   F 难度", {
+        fontSize: 16,
+        color: "#b5bfcb",
       });
-      this._stageThumbStamp = {};
-      this.stageIds.forEach((id) => {
-        const s = this.stages[id] || {};
-        this._stageThumbStamp[id] = String(s.committedAt || `${s.width || 0}x${s.height || 0}`);
-      });
-      this.rosterPoll = this.time.addEvent({
-        delay: 10000,
-        loop: true,
-        callback: () => this.pullStudioRoster(),
-      });
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-        this.rememberSelection();
-        ++this._selectGeneration;
-        this.load.off("progress");
-        this._selectVoice?.snd?.stop();
-        this._selectVoice?.snd?.destroy();
-        this._selectVoice = null;
-        this.rosterPoll?.remove(false);
-        this.rosterPoll = null;
-      });
-      this.keys = this.input.keyboard.addKeys("A,D,W,S,R,J,Q,E,F,ENTER,SPACE,LEFT,RIGHT,UP,DOWN,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN");
+      uiText(this, 1310, 728, "J / ENTER  开战", { fontSize: 20, color: "#efc05d" }).setOrigin(1, 0);
+      this.keys = this.input.keyboard.addKeys("A,D,W,S,J,ENTER,F,LEFT,RIGHT");
       this.input.once("pointerdown", () => this.sound.unlock());
       this.input.keyboard.once("keydown", () => this.sound.unlock());
-      this.input.on("pointerdown", (_pointer, objects) => {
-        if (!objects?.length) return;
-        const firm = objects.some((o) => o.getData?.("uiClickFirm"));
-        playUiClick(this, firm);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.rememberSelection();
+        this.load.off("progress");
+        this.selectVoice?.stop();
+        this.selectVoice?.destroy();
+        this.selectVoice = null;
       });
+      window.HeroShell?.ready();
+      setChrome("select");
+      this.buildGrid();
       this.refresh();
-      if (this._resumeStage) {
-        this._resumeStage = false;
-        this.refreshStageForNewRound();
-      }
-      if (this._pullPeers) {
-        this._pullPeers = false;
-        this.pullPeersToLobby();
-      }
     }
 
-    rememberSelection() {
-      try {
-        // A random-map draw already chose the match. Do not overwrite it with
-        // the preview that happened to be showing before the draw.
-        const match = this.locked ? this.registry.get("match") : null;
-        const url = new URL(location.href);
-        url.searchParams.set("p1", match?.p1Id || this.playable[this.p1Index]);
-        url.searchParams.set("p2", match?.p2Id || this.playable[this.p2Index]);
-        url.searchParams.set("mode", this.mode);
-        url.searchParams.set("diff", this.cpuDiff);
-        const stageId = match?.stageId || this.stageIds[this.stageIndex];
-        if (stageId) url.searchParams.set("stage", stageId);
-        history.replaceState({}, "", url);
-      } catch { /* optional deep link */ }
-    }
-
-    paintSelectBackdrop(w, h) {
-      this.add.rectangle(w / 2, h / 2, w + 8, h + 8, 0x191813).setDepth(0);
-      const ink = this.add.graphics().setDepth(0);
-      ink.fillStyle(0x342c1d, 0.4);
-      ink.fillCircle(w / 2, 288, 224);
-      [0, 1, 2].forEach(layer => {
-        ink.fillStyle([0x29271f, 0x23231d, 0x1d201b][layer], 0.7);
-        ink.beginPath(); ink.moveTo(0, h);
-        for (let x = 0; x <= w + 80; x += 80) {
-          const y = 530 + layer * 55 - Math.sin(x * 0.006 + layer * 2) * 64 - Math.cos(x * 0.017) * 22;
-          ink.lineTo(x, y);
-        }
-        ink.lineTo(w, h); ink.closePath(); ink.fillPath();
-      });
-      ink.lineStyle(1, 0xc5a46a, 0.18);
-      ink.strokeCircle(w / 2, 288, 234);
-      ink.lineBetween(32, 680, w - 32, 680);
-      uiText(this, w / 2, 710, "择一英灵  ·  赴一场山河之战", {fontFamily: BODY_FONT, fontSize: 13, color: "#a99b7d"}).setOrigin(0.5);
-    }
-
-    buildShowcases(w) {
-      this.showGfx = this.add.graphics().setDepth(2);
-      const boxW = 312;
-      const boxH = 368;
-      const top = 118;
-      this.showBox = { w: boxW, h: boxH, top, leftX: 22, rightX: w - 22 - boxW };
-      const mkPlate = (cx, color) =>
-        uiText(this, cx, top + boxH - 78, "", {
-          fontFamily: BODY_FONT,
-          fontSize: 24,
-          color,
-          align: "center",
-          wordWrap: { width: boxW - 36, useAdvancedWrap: true },
-        })
-          .setOrigin(0.5, 0)
-          .setDepth(5);
-      const mkLine = (cx) =>
-        uiText(this, cx, top + boxH - 48, "", {
-          fontFamily: BODY_FONT,
-          fontSize: 16,
-          color: "#2a160c",
-          align: "center",
-          wordWrap: { width: boxW - 36, useAdvancedWrap: true },
-        })
-          .setOrigin(0.5, 0)
-          .setDepth(5);
-      const mkTag = (cx, color, label) =>
-        uiText(this, cx, top + 12, label, {
-          fontSize: 16,
-          color,
-          stroke: "#4a3018",
-          strokeThickness: 3,
-        })
-          .setOrigin(0.5, 0)
-          .setDepth(5);
-      const leftCx = this.showBox.leftX + boxW / 2;
-      const rightCx = this.showBox.rightX + boxW / 2;
-      this.showP1 = this.add.sprite(leftCx, top + boxH - 88, "").setDepth(3).setVisible(false);
-      this.showP1Ghost = this.add.sprite(leftCx, top + boxH - 88, "").setDepth(4).setVisible(false).setAlpha(0);
-      this.showP2 = this.add.sprite(rightCx, top + boxH - 88, "").setDepth(3).setVisible(false);
-      this.showP2Ghost = this.add.sprite(rightCx, top + boxH - 88, "").setDepth(4).setVisible(false).setAlpha(0);
-      this.showP1Name = mkPlate(leftCx, "#2a5080");
-      this.showP2Name = mkPlate(rightCx, "#8a3028");
-      this.showP1Line = mkLine(leftCx);
-      this.showP2Line = mkLine(rightCx);
-      this.showP1Tag = mkTag(leftCx, "#1a5a9a", "1P  出战");
-      this.showP2Tag = mkTag(rightCx, "#9a3028", "2P");
-      this.vsMark = uiText(this, w / 2, 136, "VS", {
-        fontSize: 64,
-        color: "#f2d36b",
-        stroke: "#3a2410",
-        strokeThickness: 5,
-      })
-        .setOrigin(0.5)
-        .setDepth(5);
-      this.vsSub = this.add.text(w / 2, 196, "").setVisible(false);
-      [[leftCx, "p1"], [rightCx, "p2"]].forEach(([cx, slot]) => {
-        this.add.zone(cx, top + boxH / 2, boxW, boxH).setDepth(6).setInteractive({useHandCursor: true})
-          .on("pointerdown", () => {
-            if (this.locked || this.drawingMap || this.mode === "pvp" || this.mode === "raid") return;
-            this.slot = slot;
-            this.ensureHeroRailPageFor(slot === "p1" ? this.p1Index : this.p2Index);
-            this.refresh();
-          });
-      });
-    }
-
-    paintShowcasePose(spr, texKey, fighter, step, cx, feetY, fitW, fitH, scale) {
-      const frame = Number(step?.frame ?? 0);
-      const layout = rosterHeroLayout(this, fighter, texKey, fitW, fitH, frame);
-      if (spr.anims?.isPlaying) spr.anims.stop();
-      spr.setTexture(texKey, frame).setVisible(true);
-      spr.setFlipX(!!step?.flip);
-      spr.setOrigin(layout.originX, layout.originY);
-      spr.setScale(scale ?? layout.scale);
-      spr.setPosition(cx, feetY);
-    }
-
-    applyShowcaseSprite(sprite, ghost, id, cx, feetY, fitW, fitH, flip) {
-      const fighter = this.fighters[id] || {};
-      const ta = fighter?.sprites?.turnaround;
-      const taKey = rosterCardFrontKey(id);
-      const hasTa = !!(ta?.file && this.textures.exists(taKey));
-      if (!hasTa && !this.textures.exists(`roster-${id}`)) {
-        sprite._showcaseSpin = null;
-        sprite.setVisible(false);
-        if (ghost) ghost.setVisible(false).setAlpha(0);
-        return;
-      }
-      if (hasTa) {
-        const scale = rosterShowcaseScale(this, fighter, taKey, fitW, fitH);
-        const same = sprite._showcaseSpin?.id === id && sprite._showcaseSpin?.texKey === taKey;
-        sprite._showcaseSpin = {
-          id,
-          texKey: taKey,
-          fighter,
-          seq: showcaseTurnaroundSteps(fighter),
-          cx,
-          feetY,
-          fitW,
-          fitH,
-          scale,
-          ghost,
-          t0: same ? sprite._showcaseSpin.t0 : this.time.now,
-          i0: same ? sprite._showcaseSpin.i0 : -1,
-          i1: same ? sprite._showcaseSpin.i1 : -1,
-        };
-        this.tickShowcaseSpin(sprite);
-        return;
-      }
-      sprite._showcaseSpin = null;
-      if (ghost) ghost.setVisible(false).setAlpha(0);
-      const key = ensureRosterAnim(this, id, fighter);
-      sprite.setTexture(key, 0).setVisible(true);
-      sprite.setFlipX(!!flip);
-      const layout = rosterHeroLayout(this, fighter, key, fitW, fitH, 0);
-      sprite.setOrigin(layout.originX, layout.originY);
-      sprite.setScale(layout.scale);
-      sprite.setPosition(cx, feetY);
-      sprite.setAlpha(1);
-      if (this.anims.exists(key)) sprite.anims.play(key, true);
-    }
-
-    tickShowcaseSpin(sprite) {
-      const spin = sprite?._showcaseSpin;
-      if (!spin?.seq?.length || !this.textures.exists(spin.texKey)) return;
-      const seq = spin.seq;
-      const stepMs = 1000 / 8;
-      const elapsed = Math.max(0, this.time.now - (spin.t0 || 0));
-      const i0 = seq.length < 2 ? 0 : Math.floor(elapsed / stepMs) % seq.length;
-      if (spin.i0 !== i0) {
-        this.paintShowcasePose(sprite, spin.texKey, spin.fighter, seq[i0], spin.cx, spin.feetY, spin.fitW, spin.fitH, spin.scale);
-        spin.i0 = i0;
-      } else {
-        sprite.setPosition(spin.cx, spin.feetY).setScale(spin.scale);
-      }
-      sprite.setAlpha(1).setVisible(true);
-      if (spin.ghost) spin.ghost.setVisible(false).setAlpha(0);
-    }
-
-    tickShowcaseSpins() {
-      this.tickShowcaseSpin(this.showP1);
-      if (this.showP2?.visible || this.showP2?._showcaseSpin) this.tickShowcaseSpin(this.showP2);
-    }
-
-    refreshShowcases() {
-      if (!this.showGfx) return;
-      const { w: boxW, h: boxH, top, leftX, rightX } = this.showBox;
-      const pvp = this.mode === "pvp" || this.mode === "raid";
-      const p1Id = this.playable[this.p1Index];
-      const p2Id = pvp ? this.heroOf("guest") || this.playable[this.p2Index] : this.playable[this.p2Index];
-      const p1 = this.fighters[p1Id] || {};
-      const p2 = this.fighters[p2Id] || {};
-      const leftCx = leftX + boxW / 2;
-      const rightCx = rightX + boxW / 2;
-      const fitW = boxW - 28;
-      const zoneTop = top + 12;
-      const zoneBottom = top + boxH - 78;
-      const feetY = zoneBottom - 2;
-      this.showGfx.clear();
-      paintValleyPanel(this.showGfx, leftX, top, boxW, boxH, {
-        selected: true,
-        accent: 0x4aa3ff,
-        radius: 14,
-        inset: 10,
-      });
-      this.applyShowcaseSprite(this.showP1, this.showP1Ghost, p1Id, leftCx, feetY, fitW, zoneBottom - zoneTop, false);
-      this.showP1Name.setText(p1.displayName || "—");
-      this.showP1Line.setText(p1.oneLiner || "");
-      this.showP1Tag.setText(pvp ? "出战 · 我" : this.slot === "p1" ? "1P  出战" : "1P");
-      this.showP1Tag.setColor(this.slot === "p1" || pvp ? "#1a5a9a" : "#5a6a78");
-      if (pvp) {
-        this.showP2.setVisible(false);
-        if (this.showP2Ghost) {
-          this.showP2Ghost.setVisible(false).setAlpha(0);
-          this.showP2._showcaseSpin = null;
-        }
-        this.showP2Name.setText("");
-        this.showP2Line.setText("");
-        this.showP2Tag.setText("");
-        this.vsMark.setText(this.pvpConnectedCount() >= 3 ? "混战" : "VS").setPosition(this.scale.width / 2 - 40, 136);
-      } else {
-        paintValleyPanel(this.showGfx, rightX, top, boxW, boxH, {
-          selected: true,
-          accent: 0xe86a5a,
-          radius: 14,
-          inset: 10,
-        });
-        this.applyShowcaseSprite(this.showP2, this.showP2Ghost, p2Id, rightCx, feetY, fitW, zoneBottom - zoneTop, true);
-        this.showP2Name.setText(p2.displayName || "—");
-        this.showP2Line.setText(p2.oneLiner || "");
-        const role = this.p2Role();
-        this.showP2Tag.setText(this.slot === "p2" ? `2P  ${role}` : `2P`);
-        this.showP2Tag.setColor(this.slot === "p2" ? "#9a3028" : "#7a5850");
-        this.vsMark.setText("VS").setPosition(this.scale.width / 2, 136);
-      }
-    }
-
-    buildHeroRail() {
-      this.playable.forEach((id, i) => {
-        const fighter = this.fighters[id] || {};
-        ensureRosterAnim(this, id, fighter);
-        const g = this.add.graphics().setDepth(8);
-        const maskG = this.add.graphics().setDepth(7).setVisible(false);
-        const portrait = this.add.image(0, 0, "__MISSING").setDepth(9);
-        portrait.setMask(maskG.createGeometryMask());
-        const name = uiText(this, 0, 0, fighter.displayName || id, {
-          fontFamily: BODY_FONT,
-          fontSize: 15,
-          color: "#f4e6c4",
-          stroke: "#2a180c",
-          strokeThickness: 2,
-          align: "center",
-          wordWrap: { width: 96, useAdvancedWrap: true },
-        })
-          .setOrigin(0.5, 0)
-          .setDepth(10);
-        const line = this.add.text(0, 0, "").setVisible(false);
-        const badge = uiText(this, 0, 0, "", {
-          fontSize: 13,
-          color: "#f2e6c4",
-          stroke: "#3a2410",
-          strokeThickness: 3,
-        })
-          .setOrigin(0.5, 0)
-          .setDepth(11);
-        const zone = this.add.zone(0, 0, 96, 118).setInteractive({ useHandCursor: true }).setDepth(12);
-        zone.on("pointerdown", () => {
-          if (this.drawingMap || this.locked) return;
-          if (this.mode === "pvp" || this.mode === "raid") {
-            this.p1Index = i;
-            this.broadcastPick();
-          } else if (this.slot === "p1") this.p1Index = i;
-          else this.p2Index = i;
-          this.ensureHeroRailPageFor(i);
-          this.refresh();
-          this.playSelectVoice(this.playable[i]);
-        });
-        const cardHover = on => { portrait.setAlpha(on ? 0.8 : 1); };
-        zone.on("pointerover", () => {
-          this.hoverIndex = i;
-          cardHover(true);
-        });
-        zone.on("pointerout", () => {
-          if (this.hoverIndex === i) this.hoverIndex = -1;
-          cardHover(false);
-        });
-        this.cards.push({ id, x: 0, cardW: 96, cardH: 118, top: 0, g, maskG, portrait, name, line, badge, zone });
-      });
-      this.addComingSoonCard();
-      this.buildHeroRailArrows();
-      this.layoutHeroRail();
-    }
-
-    addComingSoonCard() {
-      bakeMysteryHero(this);
-      const g = this.add.graphics().setDepth(8);
-      const maskG = this.add.graphics().setDepth(7).setVisible(false);
-      const portrait = this.add.image(0, 0, "ui-mystery-hero").setDepth(9);
-      portrait.setMask(maskG.createGeometryMask());
-      const name = uiText(this, 0, 0, "即将登场", {
-        fontFamily: BODY_FONT,
-        fontSize: 14,
-        color: "#8a7a60",
-        align: "center",
-        wordWrap: { width: 96, useAdvancedWrap: true },
-      })
-        .setOrigin(0.5, 0)
-        .setDepth(10);
-      const line = this.add.text(0, 0, "").setVisible(false);
-      const badge = uiText(this, 0, 0, "？", {
-        fontSize: 16,
-        color: "#d4b06a",
-      })
-        .setOrigin(0.5, 0)
-        .setDepth(11);
-      const zone = this.add.zone(0, 0, 96, 118).setInteractive({ useHandCursor: false }).setDepth(12);
+    button(x, y, w, h, label, action) {
+      const g = this.add.graphics();
+      const text = uiText(this, 0, 0, label, { fontSize: 17, color: "#d6dce3" }).setOrigin(0.5);
+      const zone = this.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
+      const root = this.add.container(x, y, [g, text, zone]).setDepth(6);
+      const paint = (on) => {
+        g.clear();
+        paintArcadePanel(g, -w / 2, -h / 2, w, h, { selected: on, accent: 0xefc05d });
+      };
+      paint(false);
+      root.paint = paint;
+      zone.on("pointerover", () => paint(true));
+      zone.on("pointerout", () => this.refresh());
       zone.on("pointerdown", () => {
-        if (this.drawingMap || this.locked) return;
-        setSelectFooter(null, "更多英灵正在赶来的路上", false);
-        this.time.delayedCall(1600, () => this.refresh());
+        if (this.locked) return;
+        playUiClick(this, true);
+        action();
       });
-      this.cards.push({
-        id: "__coming_soon__",
-        comingSoon: true,
-        x: 0,
-        cardW: 96,
-        cardH: 118,
-        top: 0,
-        g,
-        maskG,
-        portrait,
-        name,
-        line,
-        badge,
-        zone,
-      });
+      return root;
     }
 
-    heroRailPageCount() {
-      return Math.max(1, Math.ceil((this.cards?.length || 0) / HERO_RAIL_PAGE));
-    }
-
-    ensureHeroRailPageFor(index) {
-      if (!Number.isFinite(index) || index < 0) return;
-      const page = Math.floor(index / HERO_RAIL_PAGE);
-      const maxPage = this.heroRailPageCount() - 1;
-      this.heroRailPage = Phaser.Math.Clamp(page, 0, maxPage);
-    }
-
-    shiftHeroRail(dir) {
-      if (this.drawingMap || this.locked) return;
-      const pages = this.heroRailPageCount();
-      if (pages <= 1) return;
-      this.heroRailPage = (this.heroRailPage + dir + pages * 8) % pages;
-      this.refresh();
-    }
-
-    buildHeroRailArrows() {
-      this.destroyHeroRailArrows();
-      // 位置在 layoutHeroRail 里按卡池区域重算；深度高于地图区，避免点不中
-      this.heroRailPrev = this.makeHeroRailArrow(0, 0, -1);
-      this.heroRailNext = this.makeHeroRailArrow(0, 0, 1);
-    }
-
-    makeHeroRailArrow(x, y, dir) {
-      const arrow = { g: null, zone: null, paint: null, dir, x, y };
-      const g = this.add.graphics().setDepth(60);
-      const zone = this.add
-        .zone(x, y, 52, 80)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(61)
-        .setData("uiClickFirm", true);
-      const paint = (hover) => {
-        const ax = arrow.x;
-        const ay = arrow.y;
-        g.clear();
-        paintValleyPanel(g, ax - 20, ay - 28, 40, 56, {
-          selected: !!hover,
-          accent: 0xf2d090,
-          radius: 10,
-          inset: 5,
-        });
-        g.lineStyle(4, hover ? 0x5a3818 : 0xf4ead0, 1);
-        g.beginPath();
-        if (dir < 0) {
-          g.moveTo(ax + 6, ay - 12);
-          g.lineTo(ax - 8, ay);
-          g.lineTo(ax + 6, ay + 12);
-        } else {
-          g.moveTo(ax - 6, ay - 12);
-          g.lineTo(ax + 8, ay);
-          g.lineTo(ax - 6, ay + 12);
-        }
-        g.strokePath();
-      };
-      paint(false);
-      zone.on("pointerover", () => paint(true));
-      zone.on("pointerout", () => paint(false));
-      zone.on("pointerdown", () => this.shiftHeroRail(dir));
-      arrow.g = g;
-      arrow.zone = zone;
-      arrow.paint = paint;
-      return arrow;
-    }
-
-    setHeroRailArrowsVisible(show) {
-      [this.heroRailPrev, this.heroRailNext].forEach((arrow) => {
-        if (!arrow) return;
-        arrow.g?.setVisible(show);
-        if (show) arrow.zone?.setInteractive({ useHandCursor: true });
-        else arrow.zone?.disableInteractive();
-      });
-    }
-
-    destroyHeroRailArrows() {
-      [this.heroRailPrev, this.heroRailNext].forEach((arrow) => {
-        arrow?.g?.destroy();
-        arrow?.zone?.destroy();
-      });
-      this.heroRailPrev = null;
-      this.heroRailNext = null;
-    }
-
-    layoutHeroRail() {
-      const w = this.scale.width;
-      const n = this.cards.length;
-      if (!n) return;
-      const pvp = this.mode === "pvp" || this.mode === "raid";
-      const reserve = pvp ? 328 : 0;
-      const icon = 96;
-      const gap = 12;
-      const arrowW = 48;
-      const pageSize = HERO_RAIL_PAGE;
-      const pages = this.heroRailPageCount();
-      this.heroRailPage = Phaser.Math.Clamp(this.heroRailPage ?? 0, 0, pages - 1);
-      const start = this.heroRailPage * pageSize;
-      const visible = Math.min(pageSize, n - start);
-      const areaW = w - 32 - reserve;
-      const stripW = visible * icon + Math.max(0, visible - 1) * gap;
-      const left = 16 + Math.max(0, (areaW - stripW) / 2);
-      const top = 532;
-      const midY = top + icon / 2;
-
-      this.cards.forEach((card, i) => {
-        const onPage = i >= start && i < start + pageSize;
-        card.g?.setVisible(onPage);
-        card.maskG?.setVisible(false);
-        card.portrait?.setVisible(onPage);
-        card.name?.setVisible(onPage);
-        card.badge?.setVisible(onPage);
-        if (!onPage) {
-          card.zone?.disableInteractive();
-          // 挪出屏幕，避免残留命中区挡箭头
-          card.zone?.setPosition(-9999, -9999);
-          return;
-        }
-        const col = i - start;
-        const x = left + col * (icon + gap);
-        const y = top;
-        card.x = x;
-        card.top = y;
-        card.cardW = icon;
-        card.cardH = icon + 22;
-        const cx = x + icon / 2;
-        card.zone.setPosition(cx, y + card.cardH / 2).setSize(icon, card.cardH);
-        card.zone.setInteractive({ useHandCursor: !card.comingSoon });
-        if (card.comingSoon) {
-          card.portrait.setOrigin(0.5, 0.5);
-          card.portrait.setDisplaySize(icon - 10, icon - 10);
-          card.portrait.setPosition(cx, y + icon / 2);
-          card.maskG.clear();
-          card.maskG.fillStyle(0xffffff, 1);
-          card.maskG.fillRoundedRect(x + 5, y + 5, icon - 10, icon - 10, 14);
-          card.name.setPosition(cx, y + icon + 2).setWordWrapWidth(icon + 4);
-          card.badge.setOrigin(0.5, 1).setPosition(cx, y - 3);
-          return;
-        }
-        const fighter = this.fighters[card.id] || {};
-        const slotX = x + 3;
-        const slotY = y + 3;
-        const slotW = icon - 6;
-        const slotH = icon - 6;
-        const slotCx = slotX + slotW / 2;
-        const slotCy = slotY + slotH / 2;
-        const cardKey = bakeRosterCardPortrait(this, card.id, fighter, slotW, slotH);
-        if (this.textures.exists(cardKey)) {
-          card.portrait.setTexture(cardKey);
-        }
-        card.portrait.setOrigin(0.5, 0.5);
-        card.portrait.setDisplaySize(slotW, slotH);
-        card.portrait.setPosition(slotCx, slotCy);
-        card.maskG.clear();
-        card.maskG.fillStyle(0xffffff, 1);
-        card.maskG.fillRoundedRect(x + 3, y + 3, icon - 6, icon - 6, 18);
-        card.name.setPosition(cx, y + icon + 2).setWordWrapWidth(icon + 4);
-        card.badge.setOrigin(0.5, 1).setPosition(cx, y - 3);
-      });
-
-      const showArrows = pages > 1;
-      const placeArrow = (arrow, x) => {
-        if (!arrow) return;
-        arrow.x = x;
-        arrow.y = midY;
-        arrow.zone?.setPosition(x, midY);
-        arrow.paint?.(false);
-      };
-      placeArrow(this.heroRailPrev, left - arrowW);
-      placeArrow(this.heroRailNext, left + stripW + arrowW);
-      this.setHeroRailArrowsVisible(showArrows);
-    }
-
-    clearHeroRail() {
-      this.destroyHeroRailArrows();
-      (this.cards || []).forEach((c) => {
-        c.g?.destroy();
-        c.maskG?.destroy();
-        c.portrait?.destroy();
-        c.name?.destroy();
-        c.line?.destroy();
-        c.badge?.destroy();
-        c.zone?.destroy();
-      });
+    buildGrid() {
+      this.cardsRoot.removeAll(true);
       this.cards = [];
-    }
-
-    destroyStageDeck() {
-      (this.stageLayers || []).forEach((layer) => {
-        layer.img?.destroy();
-        layer.frame?.destroy();
-        layer.maskG?.destroy();
-      });
-      this.stageLayers = [];
-      this.stageGlow?.destroy();
-      this.stageLabel?.destroy();
-      this.stageHint?.destroy();
-      this.stageZone?.destroy();
-      this.stagePrev?.g?.destroy();
-      this.stagePrev?.zone?.destroy();
-      this.stageNext?.g?.destroy();
-      this.stageNext?.zone?.destroy();
-      this.stageGlow = null;
-      this.stageLabel = null;
-      this.stageHint = null;
-      this.stageZone = null;
-      this.stagePrev = null;
-      this.stageNext = null;
-    }
-
-    queueRosterHeroThumbs() {
-      let queued = 0;
-      this.playable.forEach((id) => {
-        queued += loadRosterHeroTextures(this, this.load, id, this.fighters[id] || {}, `?t=${Date.now()}`);
-      });
-      return queued;
-    }
-
-    async pullStudioRoster() {
-      if (this._rosterPulling || this.drawingMap || this.locked || document.hidden) return;
-      const generation = this._selectGeneration;
-      this._rosterPulling = true;
-      try {
-        const roster = await fetchRoster(this.registry.get("roster"));
-        if (!this.sys?.isActive?.() || generation !== this._selectGeneration) {
-          if (generation !== this._selectGeneration) return;
-          this._rosterPulling = false;
-          return;
-        }
-        const next = rosterStamp(roster);
-        this.registry.set("roster", roster);
-        if (next === this._rosterStamp) {
-          this._rosterPulling = false;
-          return;
-        }
-        const prevStageIds = this.stageIds || [];
-        const stagesChanged =
-          prevStageIds.join() !== roster.stageIds.join() ||
-          roster.stageIds.some((id) => {
-            const a = this.stages?.[id] || {};
-            const b = roster.stages[id] || {};
-            return (a.committedAt || "") !== (b.committedAt || "") || a.width !== b.width || a.height !== b.height;
-          });
-        const heroesChanged = (this.playable || []).join() !== roster.playable.join();
-        const keepStage = this.stageIds[this.stageIndex];
-        this.playable = roster.playable;
-        this.fighters = roster.fighters;
-        this.stageIds = roster.stageIds;
-        this.stages = roster.stages;
-        this._rosterStamp = next;
-        invalidateRosterCardPortraits(this, roster.playable);
-        if (this.p1Index >= this.playable.length) this.p1Index = 0;
-        if (this.p2Index >= this.playable.length) this.p2Index = Math.min(1, Math.max(0, this.playable.length - 1));
-        const idx = this.stageIds.indexOf(keepStage);
-        this.stageIndex = idx >= 0 ? idx : 0;
-        if (this.stageConfirmed && idx < 0) this.stageConfirmed = false;
-        let queued = this.queueRosterHeroThumbs();
-        if (stagesChanged) {
-          this._stageThumbStamp = this._stageThumbStamp || {};
-          this.stageIds.forEach((id) => {
-            const meta = this.stages[id] || {};
-            const stamp = String(meta.committedAt || `${meta.width || 0}x${meta.height || 0}`);
-            const key = `stage-thumb-${id}`;
-            if (this.textures.exists(key) && this._stageThumbStamp[id] === stamp) return;
-            if (this.textures.exists(key)) this.textures.remove(key);
-            const file = meta.file || "stage.png";
-            this.load.image(key, `/assets/game/stages/${id}/${file}?t=${encodeURIComponent(stamp || Date.now())}`);
-            this._stageThumbStamp[id] = stamp;
-            queued += 1;
-          });
-        }
-        const applyUi = () => {
-          if (!this.sys?.isActive?.() || generation !== this._selectGeneration) return;
-          if (heroesChanged) {
-            this.clearHeroRail();
-            this.buildHeroRail();
-          } else if (queued) {
-            this.layoutHeroRail();
-          }
-          if (stagesChanged) {
-            this.destroyStageDeck();
-            this.buildStageDeck(this.scale.width, this.scale.height);
-          }
-          this.refresh();
-          this._rosterPulling = false;
-        };
-        if (!queued) {
-          applyUi();
-          return;
-        }
-        this.load.once("complete", applyUi);
-        this.load.start();
-        return;
-      } catch {
-        /* keep last roster */
-      }
-      this._rosterPulling = false;
-    }
-
-    buildStageDeck(w, h) {
-      this.stageIds.forEach(id => compactStagePreview(this, `stage-thumb-${id}`));
-      const sw = 456;
-      const sh = 256;
-      const cx = w / 2;
-      const cy = 328;
-      this.stageDeckCx = cx;
-      this.stageDeckCy = cy;
-      this.stageDeckW = sw;
-      this.stageDeckH = sh;
-      this.stageLayers = [];
-      const depthBase = 12;
-      this.stageIds.forEach((id, i) => {
-        const off = Math.min(i, 4) * 5;
-        const img = this.add
-          .image(cx + off, cy - off, `stage-thumb-${id}`)
-          .setDisplaySize(sw, sh)
-          .setDepth(depthBase + i)
-          .setVisible(false);
-        const maskG = this.add.graphics().setVisible(false);
-        img.setMask(maskG.createGeometryMask());
-        const frame = this.add.graphics().setDepth(depthBase + i + 0.5);
-        this.stageLayers.push({ id, img, frame, maskG, off });
-      });
-      this.stageGlow = this.add.graphics().setDepth(depthBase + 40);
-      this.stageLabel = uiText(this, cx, cy + sh / 2 + 12, "", {
-        fontSize: 20,
-        color: "#f4ead0",
-        stroke: "#3a2410",
-        strokeThickness: 3,
-        wordWrap: { width: sw, useAdvancedWrap: true },
-        align: "center",
-      })
-        .setOrigin(0.5, 0)
-        .setDepth(depthBase + 41);
-      this.stageHint = this.add.text(cx, cy + sh / 2 + 34, "").setVisible(false);
-      this.stageZone = this.add
-        .zone(cx, cy, sw + 28, sh + 28)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(depthBase + 42)
-        .setData("uiClickFirm", true);
-      this.stageZone.on("pointerdown", () => {
-        if (this.drawingMap || this.locked) return;
-        if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
-        if (this.stageConfirmed) {
-          this.stageConfirmed = false;
-          this.refreshStageDeck(true);
-          this.refresh();
-          if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
-          return;
-        }
-        this.confirmStage();
-      });
-      this.stagePrev = this.makeStageArrow(cx - sw / 2 - 38, cy, -1);
-      this.stageNext = this.makeStageArrow(cx + sw / 2 + 38, cy, 1);
-      this.refreshStageDeck(true);
-    }
-
-    makeStageArrow(x, y, dir) {
-      const g = this.add.graphics().setDepth(54);
-      const zone = this.add.zone(x, y, 46, 72).setInteractive({ useHandCursor: true }).setDepth(55).setData("uiClickFirm", true);
-        const paint = (hover) => {
-        g.clear();
-        paintValleyPanel(g, x - 20, y - 28, 40, 56, {
-          selected: !!hover,
-          accent: 0xf2d090,
-          radius: 10,
-          inset: 5,
+      this.playable.slice(this.page * 10, this.page * 10 + 10).forEach((id, n) => {
+        const index = this.page * 10 + n,
+          x = 386 + (n % 5) * 118,
+          y = 150 + Math.floor(n / 5) * 118;
+        const g = this.add.graphics();
+        const key = bakeRosterCardPortrait(this, id, this.fighters[id], 96, 80);
+        const face = this.add.image(x + 52, y + 42, key).setDisplaySize(96, 80);
+        const name = uiText(this, x + 52, y + 86, this.heroName(index), {
+          fontSize: 15,
+          color: "#d6dce3",
+          wordWrap: { width: 106 },
+          align: "center",
+        }).setOrigin(0.5, 0);
+        const badge = uiText(this, x + 4, y + 2, "", {
+          fontSize: 14,
+          color: "#ffffff",
+          stroke: "#10151e",
+          strokeThickness: 4,
         });
-        g.lineStyle(4, hover ? 0x5a3818 : 0xf4ead0, 1);
-        g.beginPath();
-        if (dir < 0) {
-          g.moveTo(x + 6, y - 12);
-          g.lineTo(x - 8, y);
-          g.lineTo(x + 6, y + 12);
-        } else {
-          g.moveTo(x - 6, y - 12);
-          g.lineTo(x + 8, y);
-          g.lineTo(x - 6, y + 12);
-        }
-        g.strokePath();
-      };
-      paint(false);
-      zone.on("pointerover", () => paint(true));
-      zone.on("pointerout", () => paint(false));
-      zone.on("pointerdown", () => this.shiftStage(dir));
-      return { g, zone, paint, dir, x, y };
-    }
-
-    setStageArrowsVisible(show) {
-      [this.stagePrev, this.stageNext].forEach((arrow) => {
-        if (!arrow) return;
-        arrow.g?.setVisible(show);
-        if (show) arrow.zone?.setInteractive({ useHandCursor: true });
-        else arrow.zone?.disableInteractive();
+        const zone = this.add.zone(x + 52, y + 54, 108, 112).setInteractive({ useHandCursor: true });
+        zone.on("pointerdown", () => this.chooseHero(index));
+        zone.on("pointerover", () => face.setAlpha(0.7));
+        zone.on("pointerout", () => face.setAlpha(1));
+        this.cardsRoot.add([g, face, name, badge, zone]);
+        this.cards.push({ index, x, y, g, badge });
       });
     }
 
-    stageNameAt(index) {
-      const id = this.stageIds[index];
-      return this.stages[id]?.displayName || id || "—";
+    chooseSlot(slot) {
+      if (this.locked) return;
+      this.slot = slot;
+      this.page = Math.floor((slot === "p1" ? this.p1Index : this.p2Index) / 10);
+      this.buildGrid();
+      this.refresh();
     }
-
-    cycleStagePreview() {
-      this.shiftStage(1);
+    chooseHero(index) {
+      if (this.locked || !this.playable[index]) return;
+      if (this.slot === "p1") this.p1Index = index;
+      else this.p2Index = index;
+      const page = Math.floor(index / 10);
+      if (page !== this.page) {
+        this.page = page;
+        this.buildGrid();
+      }
+      playUiClick(this, false);
+      this.selectVoice?.stop();
+      this.selectVoice?.destroy();
+      this.selectVoice = null;
+      const key = `select-voice-${this.playable[index]}`;
+      if (this.cache.audio.exists(key)) {
+        this.selectVoice = this.sound.add(key, { volume: 0.6 });
+        this.selectVoice.play();
+      }
+      this.refresh();
     }
-
+    shiftPage(dir) {
+      if (this.locked) return;
+      const count = Math.ceil(this.playable.length / 10);
+      this.page = (this.page + dir + count) % count;
+      this.buildGrid();
+      this.refresh();
+    }
     shiftStage(dir) {
-      if (this.locked || this.drawingMap || !this.stageIds.length) return;
-      if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
-      const n = this.stageIds.length;
-      this.stageIndex = (this.stageIndex + dir + n * 8) % n;
-      this.stageConfirmed = false;
-      this.refreshStageDeck(false);
-      this.refresh();
-      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
-    }
-
-    confirmStage() {
-      if (this.drawingMap || this.locked) return;
-      if ((this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) && this.pvpSeat !== "host") return;
-      if (!this.stageIds.length) return;
-      this.stageConfirmed = true;
-      try {
-        const url = new URL(location.href);
-        url.searchParams.set("stage", this.stageIds[this.stageIndex]);
-        history.replaceState({}, "", url);
-      } catch {
-        /* ignore */
-      }
-      this.refreshStageDeck(true);
-      this.refresh();
-      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) this.broadcastStage();
-    }
-
-    refreshStageDeck(snap) {
-      const n = this.stageLayers?.length || 0;
-      if (!n) return;
-      const { stageDeckCx: cx, stageDeckCy: cy, stageDeckW: sw, stageDeckH: sh } = this;
-      this.stageLayers.forEach((layer, i) => {
-        const dist = (i - this.stageIndex + n) % n;
-        const show = dist <= 3;
-        layer.img.setVisible(show);
-        layer.frame.setVisible(show);
-        if (!show) return;
-        const off = dist * 6;
-        const depth = 12 + (3 - dist);
-        this.tweens.killTweensOf(layer.img);
-        const targetX = cx + off;
-        const targetY = cy - off;
-        layer.img.setDepth(depth);
-        layer.frame.setDepth(depth + 0.2);
-        if (snap) {
-          layer.img.setPosition(targetX, targetY).setAlpha(dist === 0 ? 1 : 0.55 - dist * 0.08);
-        } else {
-          this.tweens.add({
-            targets: layer.img,
-            x: targetX,
-            y: targetY,
-            alpha: dist === 0 ? 1 : 0.55 - dist * 0.08,
-            duration: 180,
-            ease: "Sine.easeOut",
-          });
-        }
-        layer.frame.clear();
-        if (layer.maskG) {
-          layer.maskG.clear();
-          layer.maskG.fillStyle(0xffffff, 1);
-          layer.maskG.fillRoundedRect(targetX - sw / 2, targetY - sh / 2, sw, sh, 22);
-        }
-        if (dist === 0) {
-          const col = this.stageConfirmed ? 0xe8c36a : 0xc4b078;
-          strokePlaque(layer.frame, targetX - sw / 2 - 8, targetY - sh / 2 - 8, sw + 16, sh + 16, col, null, this.stageConfirmed ? 2 : 1, 26);
-        }
-      });
-      this.stageGlow.clear();
-      this.stageLabel.setVisible(true);
-      const hostMap = (this.mode !== "pvp" && !(this.mode === "raid" && this.pvpSeat)) || this.pvpSeat === "host";
-      if (hostMap) this.stageZone?.setInteractive({ useHandCursor: true });
-      else this.stageZone?.disableInteractive();
-      this.setStageArrowsVisible(hostMap && this.stageIds.length > 1);
-      {
-        const labelStyle = {
-          fontFamily: UI_FONT,
-          fontSize: 20,
-          color: "#f4ead0",
-          stroke: "#3a2410",
-          strokeThickness: 3,
-        };
-        this.stageLabel.setText(clampWrappedLines(this, this.stageNameAt(this.stageIndex), labelStyle, sw, 2));
-      }
-      if (this.stageConfirmed) {
-        this.stageGlow.lineStyle(6, 0xe8c36a, 0.22);
-        this.stageGlow.strokeRoundedRect(cx - sw / 2 - 14, cy - sh / 2 - 14, sw + 28, sh + 28, 28);
-      }
-    }
-
-    p2Role() {
-      if (this.mode === "pvp" || this.mode === "pve") return "对手";
-      if (this.mode === "cricket") return "人机";
-      return "木桩";
-    }
-
-    setMode(mode) {
-      if (this.locked || this.drawingMap) return;
-      const next = mode === "pve" || mode === "pvp" || mode === "cricket" || mode === "raid" ? mode : "dummy";
-      if (next !== this.mode && (this.mode === "pvp" || this.mode === "raid")) this.teardownNet();
-      this.mode = next;
-      if (this.mode === "pvp" || this.mode === "raid") {
-        this.slot = "p1";
-        this.pvpStatus = "点右侧「创建房间」或「加入房间」";
-      } else {
-        this.pvpStatus = "";
-      }
-      this.refreshStageDeck(true);
+      if (this.locked || !this.stageIds.length) return;
+      this.stageIndex = (this.stageIndex + dir + this.stageIds.length) % this.stageIds.length;
       this.refresh();
     }
-
     setCpuDiff(id) {
+      if (this.locked) return;
       this.cpuDiff = saveCpuDiff(id);
       this.refresh();
     }
-
-    teardownNet() {
-      const net = this.registry.get("net");
-      if (net) {
-        net.close();
-        this.registry.remove("net");
-      }
-      this.pvpSeat = "";
-      this.pvpRoom = "";
-      this.pvpPeerHero = "";
-      this.pvpPicks = emptyPvpPicks();
-      this.pvpSeats = { host: false, guest: false, guest2: false };
-      this.pvpProfiles = {
-        host: { nick: "主机", ready: false, heroId: "" },
-        guest: { nick: "客人1", ready: false, heroId: "" },
-        guest2: { nick: "客人2", ready: false, heroId: "" },
-      };
-      this.locked = false;
-      this.drawingMap = false;
-    }
-
-    applyRoster(msg) {
-      if (msg?.seats) {
-        this.pvpSeats = {
-          host: !!msg.seats.host,
-          guest: !!msg.seats.guest,
-          guest2: !!msg.seats.guest2,
-        };
-      }
-    }
-
-    rememberPick(seat, heroId, ts) {
-      if (!seat || !heroId) return;
-      if (!this.pvpPicks) this.pvpPicks = emptyPvpPicks();
-      this.pvpPicks[seat] = heroId;
-      const profile = this.ensureProfile(seat);
-      profile.heroId = heroId;
-      if (ts) profile.ts = Number(ts) || profile.ts || 0;
-      else if (seat === this.pvpSeat) profile.ts = Date.now();
-      if (seat !== this.pvpSeat) this.pvpSeats[seat] = true;
-      if (seat === "guest") this.pvpPeerHero = heroId;
-      if (seat !== this.pvpSeat) {
-        const idx = this.playable.indexOf(heroId);
-        if (idx >= 0 && seat === "guest") this.p2Index = idx;
-      }
-    }
-
-    pvpConnectedCount() {
-      return this.onlineSeats().length;
-    }
-
-    onlineSeats() {
-      return ["host", "guest", "guest2"].filter((seat) => !!this.pvpSeats?.[seat]);
-    }
-
-    heroOf(seat) {
-      return this.pvpPicks?.[seat] || this.ensureProfile(seat).heroId || "";
-    }
-
-    ensureProfile(seat) {
-      if (!this.pvpProfiles[seat]) {
-        this.pvpProfiles[seat] = { nick: defaultNick(seat), ready: false, heroId: "" };
-      }
-      return this.pvpProfiles[seat];
-    }
-
-    localNick() {
-      try {
-        return String(localStorage.getItem("hg_pvp_nick") || "").trim().slice(0, 12);
-      } catch {
-        return "";
-      }
-    }
-
-    saveLocalNick(nick) {
-      try {
-        localStorage.setItem("hg_pvp_nick", String(nick || "").trim().slice(0, 12));
-      } catch {
-        /* ignore */
-      }
-    }
-
-    promptNick(action) {
-      const saved = this.localNick();
-      const next = String(
-        window.prompt(`给自己取个昵称（最多 12 字）${action ? `，然后${action}` : ""}`, saved) || ""
-      )
-        .trim()
-        .slice(0, 12);
-      if (!next) {
-        this.pvpStatus = "需要昵称才能进房";
-        this.refresh();
-        return "";
-      }
-      this.saveLocalNick(next);
-      return next;
-    }
-
-    setReady(ready) {
-      if (!this.pvpSeat) return;
-      const profile = this.ensureProfile(this.pvpSeat);
-      profile.ready = !!ready;
-      profile.ts = Date.now();
-      const net = this.registry.get("net");
-      if (net?.connected) net.send({ type: "ready", ready: profile.ready, ts: profile.ts });
-      this.broadcastLobby();
-      this.refresh();
-      this.tryAutoStart();
-    }
-
-    allOnlineReady() {
-      const online = this.onlineSeats();
-      if (online.length < 2) return false;
-      return online.every((seat) => {
-        const p = this.ensureProfile(seat);
-        return !!p.ready && !!this.heroOf(seat);
-      });
-    }
-
-    tryAutoStart() {
-      if (this._blockAutoStart) return;
-      if (this.pvpSeat !== "host" || this.drawingMap || this.locked) return;
-      if (!this.allOnlineReady()) return;
-      this.startHostMatch();
-    }
-
-    broadcastNick() {
-      if (!this.pvpSeat) return;
-      const profile = this.ensureProfile(this.pvpSeat);
-      profile.ts = Date.now();
-      const net = this.registry.get("net");
-      if (net?.connected) net.send({ type: "nick", nick: profile.nick || defaultNick(this.pvpSeat), ts: profile.ts });
-    }
-
-    broadcastLobby() {
-      const net = this.registry.get("net");
-      if (!net?.connected || !this.pvpSeat) return;
-      this.ensureProfile(this.pvpSeat).ts = Date.now();
-      net.send({
-        type: "lobby_state",
-        seats: this.pvpSeats,
-        profiles: {
-          host: { ...this.ensureProfile("host") },
-          guest: { ...this.ensureProfile("guest") },
-          guest2: { ...this.ensureProfile("guest2") },
-        },
-        picks: { ...(this.pvpPicks || emptyPvpPicks()) },
-        stageId: this.stageIds[this.stageIndex] || "",
-        stageConfirmed: !!this.stageConfirmed,
-      });
-    }
-
-    broadcastStage() {
-      const net = this.registry.get("net");
-      if (!net?.connected || this.pvpSeat !== "host") return;
-      net.send({
-        type: "stage_pick",
-        stageId: this.stageIds[this.stageIndex] || "",
-        confirmed: !!this.stageConfirmed,
-      });
-      this.broadcastLobby();
-    }
-
-    applyStagePick(msg) {
-      if (!msg?.stageId) return;
-      const idx = this.stageIds.indexOf(msg.stageId);
-      if (idx >= 0) this.stageIndex = idx;
-      if ("confirmed" in msg) this.stageConfirmed = !!msg.confirmed;
-      else if ("stageConfirmed" in msg) this.stageConfirmed = !!msg.stageConfirmed;
-      this.refreshStageDeck(true);
-    }
-
-    resetLobbyReady() {
-      this.locked = false;
-      this.drawingMap = false;
-      ["host", "guest", "guest2"].forEach((seat) => {
-        const p = this.ensureProfile(seat);
-        p.ready = false;
-        p.ts = Date.now();
-      });
-      if (this.pvpSeat) {
-        const net = this.registry.get("net");
-        const profile = this.ensureProfile(this.pvpSeat);
-        if (net?.connected) net.send({ type: "ready", ready: false, ts: profile.ts });
-      }
-    }
-
-    pullPeersToLobby() {
-      const net = this.registry.get("net");
-      if (!net?.connected || !this.pvpSeat) return;
-      const gen = Number(this.registry.get("pvpFightGen")) || 0;
-      net._fightGen = gen;
-      const ping = () => {
-        if (this.scene.isActive() && net.connected) net.send({ type: "lobby_return", gen });
-      };
-      ping();
-      this.time.delayedCall(160, ping);
-      this.time.delayedCall(420, ping);
-    }
-
-    refreshStageForNewRound() {
-      if (!this.stageIds.length) return;
-      if (this.pvpSeat === "host") {
-        let next = Phaser.Math.Between(0, Math.max(0, this.stageIds.length - 1));
-        if (this.stageIds.length > 1 && next === this.stageIndex) {
-          next = (next + 1) % this.stageIds.length;
-        }
-        this.stageIndex = next;
-        this.stageConfirmed = false;
-        this.refreshStageDeck(true);
-        this.broadcastStage();
-      }
-    }
-
-    applyLobbyState(msg) {
-      const from = msg._from;
-      if (!from || from === this.pvpSeat) return;
-      this.pvpSeats[from] = true;
-      if (msg.seats) {
-        ["host", "guest", "guest2"].forEach((seat) => {
-          if (msg.seats[seat]) this.pvpSeats[seat] = true;
-        });
-      }
-      const profiles = msg.profiles || {};
-      ["host", "guest", "guest2"].forEach((seat) => {
-        if (seat === this.pvpSeat) return;
-        const p = profiles[seat];
-        if (!p) return;
-        const cur = this.ensureProfile(seat);
-        const ts = Number(p.ts) || 0;
-        if (cur.ts && ts && ts < cur.ts) return;
-        if (p.heroId) this.rememberPick(seat, p.heroId, ts);
-        if (p.nick) cur.nick = String(p.nick).trim().slice(0, 12);
-        if (typeof p.ready === "boolean") cur.ready = !!p.ready;
-        if (ts) cur.ts = ts;
-      });
-      if (msg.picks) {
-        Object.entries(msg.picks).forEach(([seat, heroId]) => {
-          if (seat !== this.pvpSeat && heroId) this.rememberPick(seat, heroId);
-        });
-      }
-      if (msg.stageId) this.applyStagePick(msg);
-    }
-
-    scheduleSync() {
-      this.syncSelf();
-      this.time.delayedCall(80, () => this.syncSelf());
-      this.time.delayedCall(320, () => this.syncSelf());
-    }
-
-    editNick() {
-      if (!this.pvpSeat) return;
-      const next = this.promptNick();
-      if (!next) return;
-      this.ensureProfile(this.pvpSeat).nick = next;
-      this.broadcastNick();
-      this.broadcastLobby();
-      this.refresh();
-    }
-
-    addLobbyBtn(x, y, bw, bh, fill, label, handler) {
-      const g = this.add.graphics().setDepth(36);
-      const zone = this.add
-        .zone(x + bw / 2, y + bh / 2, bw, bh)
-        .setDepth(36)
-        .setInteractive({ useHandCursor: true })
-        .setData("uiClickFirm", true);
-      const text = uiText(this, x + bw / 2, y + bh / 2, label, {
-        fontSize: 15,
-        color: "#5a3818",
-      })
-        .setOrigin(0.5)
-        .setDepth(37);
-      zone.on("pointerdown", handler);
-      const btn = { g, zone, text, x, y, w: bw, h: bh, fill };
-      this.paintLobbyBtn(btn, true);
-      return btn;
-    }
-
-    paintLobbyBtn(btn, show) {
-      btn.g.clear();
-      btn.g.setVisible(show);
-      btn.text.setVisible(show);
-      if (!show) {
-        btn.zone.disableInteractive();
-        return;
-      }
-      paintValleyPanel(btn.g, btn.x, btn.y, btn.w, btn.h, {
-        selected: true,
-        accent: btn.fill || 0xd4b06a,
-        radius: 10,
-        inset: 4,
-      });
-      btn.text.setColor("#5a3818");
-      btn.zone.setPosition(btn.x + btn.w / 2, btn.y + btn.h / 2).setSize(btn.w, btn.h);
-      btn.zone.setInteractive({ useHandCursor: true });
-      btn.text.setPosition(btn.x + btn.w / 2, btn.y + btn.h / 2);
-    }
-
-    buildPvpLobby(w) {
-      const railW = 300;
-      const startX = w - 16 - railW;
-      const top = 98;
-      this.lobbyX = startX;
-      this.lobbyW = railW;
-      this.lobbyTop = top;
-      this.lobbyPanel = this.add.graphics().setDepth(34);
-      this.lobbyTitle = uiText(this, startX + 18, top + 12, "", {
-        fontFamily: BODY_FONT,
-        fontSize: 20,
-        color: "#3a2410",
-      }).setDepth(36);
-      this.lobbySub = uiText(this, startX + 18, top + 38, "", {
-        fontFamily: BODY_FONT,
-        fontSize: 14,
-        color: "#3a2414",
-        wordWrap: { width: railW - 44, useAdvancedWrap: true },
-        lineSpacing: 4,
-      }).setDepth(36);
-      this.pvpLobby = [];
-      const rowH = 70;
-      const rowsTop = top + 86;
-      ["host", "guest", "guest2"].forEach((seat, i) => {
-        const y = rowsTop + i * (rowH + 8);
-        const g = this.add.graphics().setDepth(35);
-        const avatar = this.add.sprite(startX + 28, y + 58, "roster-" + (this.playable[0] || "")).setDepth(36).setVisible(false);
-        const title = uiText(this, startX + 56, y + 10, "", {
-          fontFamily: BODY_FONT,
-          fontSize: 15,
-          color: "#3a2410",
-        }).setDepth(36);
-        const hero = uiText(this, startX + 56, y + 32, "", {
-          fontFamily: BODY_FONT,
-          fontSize: 14,
-          color: "#1a3a6a",
-        }).setDepth(36);
-        const ready = uiText(this, startX + 56, y + 50, "", {
-          fontFamily: BODY_FONT,
-          fontSize: 14,
-          color: "#3a2414",
-        }).setDepth(36);
-        this.pvpLobby.push({ seat, g, avatar, title, hero, ready, x: startX, y, h: rowH });
-      });
-      const btnY = rowsTop + 3 * (rowH + 8) + 8;
-      this.createBtn = this.addLobbyBtn(startX + 12, btnY, 132, 34, 0x3d5a3d, "创建房间", () => this.hostPvp());
-      this.joinBtn = this.addLobbyBtn(startX + 156, btnY, 132, 34, 0x3a4d66, "加入房间", () => this.joinPvp(""));
-      this.readyBtn = this.addLobbyBtn(startX + 12, btnY, 132, 34, 0x2f393f, "准备", () => {
-        if (!this.pvpSeat) return;
-        this.setReady(!this.ensureProfile(this.pvpSeat).ready);
-      });
-      this.startBtn = this.addLobbyBtn(startX + 156, btnY, 132, 34, 0x6a4a18, "开战", () => this.startHostMatch());
-      this.nickBtn = this.addLobbyBtn(startX + 12, btnY + 42, 132, 30, 0x313131, "改昵称", () => this.editNick());
-      this.leaveBtn = this.addLobbyBtn(startX + 156, btnY + 42, 132, 30, 0x4a3030, "离开房间", () => {
-        this.teardownNet();
-        this.pvpStatus = "已离开房间";
-        this.refresh();
-      });
-      this.refreshPvpLobby();
-    }
-
-    setLobbyBtn(btn, show, label, fill) {
-      if (!btn) return;
-      if (show && label) btn.text.setText(label);
-      if (show && fill != null) btn.fill = fill;
-      this.paintLobbyBtn(btn, show);
-    }
-
-    refreshPvpLobby() {
-      const show = this.mode === "pvp" || this.mode === "raid";
-      const inRoom = show && !!this.pvpSeat;
-      if (this.lobbyPanel) {
-        this.lobbyPanel.clear();
-        this.lobbyPanel.setVisible(show);
-        if (show) {
-          paintValleyPanel(this.lobbyPanel, this.lobbyX, this.lobbyTop ?? 98, this.lobbyW, 412, {
-            selected: true,
-            accent: 0xd4b056,
-            radius: 14,
-            inset: 8,
-          });
-        }
-      }
-      this.lobbyTitle?.setVisible(show);
-      this.lobbySub?.setVisible(show);
-      if (show) {
-        const n = this.pvpConnectedCount();
-        const readyN = this.onlineSeats().filter((s) => this.ensureProfile(s).ready).length;
-        this.lobbyTitle.setText(inRoom ? `房间  ${this.pvpRoom}` : this.mode === "raid" ? "合作闯关" : "局域网对战");
-        let sub = "每人打开同一地址，创建或加入房间，无需带参数";
-        if (inRoom) {
-          if (n < 2) sub = "1 人在场　把房号发给同事即可开战";
-          else if (n === 2) {
-            sub = this.allOnlineReady()
-              ? this.mode === "raid" ? "2 人已准备　即将闯关" : "2 人已准备　即将 1v1"
-              : `2 人在场 · ${this.mode === "raid" ? "合作闯关" : "1v1"}　已准备 ${readyN}/2`;
-          } else {
-            sub = this.allOnlineReady()
-              ? this.mode === "raid" ? "3 人已准备　即将闯关" : "3 人已准备　即将混战"
-              : `3 人在场 · ${this.mode === "raid" ? "合作闯关" : "混战"}　已准备 ${readyN}/3`;
-          }
-        }
-        this.lobbySub.setText(sub);
-      }
-      (this.pvpLobby || []).forEach((row) => {
-        row.g.clear();
-        row.g.setVisible(show);
-        row.avatar.setVisible(false);
-        row.title.setVisible(show);
-        row.hero.setVisible(show);
-        row.ready.setVisible(show);
-        if (!show) return;
-        const online = !!this.pvpSeats?.[row.seat];
-        const profile = this.ensureProfile(row.seat);
-        const mine = row.seat === this.pvpSeat;
-        paintValleyPanel(row.g, row.x + 10, row.y, this.lobbyW - 20, row.h, {
-          selected: mine,
-          accent: mine ? 0xe8c36a : 0xa08050,
-          radius: 10,
-          inset: 4,
-        });
-        const nick = online ? profile.nick || defaultNick(row.seat) : "空位";
-        row.title.setText(`${seatLabel(row.seat)}${mine ? " ·我" : ""}　${nick}`);
-        row.hero.setText(online && profile.heroId ? this.fighters[profile.heroId]?.displayName || profile.heroId : "未选英灵");
-        row.title.setColor(mine ? "#3a2410" : "#ead8a8");
-        row.hero.setColor(online ? (mine ? "#1a3a6a" : "#c8d8f0") : "#8a7a60");
-        row.ready.setText(!online ? "未入场" : profile.ready ? "已准备" : "选人中");
-        row.ready.setColor(!online ? "#8a7a60" : profile.ready ? "#2d6a32" : "#8a5a18");
-        if (online && profile.heroId) {
-          const texKey = `roster-${profile.heroId}`;
-          if (this.textures.exists(texKey)) {
-            const fighter = this.fighters[profile.heroId] || {};
-            const layout = rosterHeroLayout(this, fighter, texKey, 34, 42);
-            row.avatar.setTexture(texKey, 0).setVisible(true);
-            row.avatar
-              .setOrigin(layout.originX, layout.originY)
-              .setPosition(row.x + 32, row.y + row.h - 8)
-              .setScale(layout.scale);
-          }
-        }
-      });
-      this.setLobbyBtn(this.createBtn, show && !inRoom);
-      this.setLobbyBtn(this.joinBtn, show && !inRoom);
-      const mineReady = inRoom && this.ensureProfile(this.pvpSeat).ready;
-      const hostStart = inRoom && this.pvpSeat === "host";
-      if (this.readyBtn) this.readyBtn.w = hostStart ? 132 : 276;
-      this.setLobbyBtn(
-        this.readyBtn,
-        inRoom,
-        mineReady ? "取消准备" : "准备",
-        mineReady ? 0x3f5e3f : 0x2f4a66
-      );
-      const startLabel = this.mode === "raid" ? "开始闯关" : this.pvpConnectedCount() >= 3 ? "开战·混战" : "开战·1v1";
-      this.setLobbyBtn(
-        this.startBtn,
-        hostStart && this.pvpConnectedCount() >= 2,
-        this.allOnlineReady() ? startLabel : "等人齐",
-        this.allOnlineReady() ? 0x6a4a18 : 0x333333
-      );
-      this.setLobbyBtn(this.nickBtn, inRoom);
-      this.setLobbyBtn(this.leaveBtn, inRoom);
-    }
-
-    playSelectVoice(heroId) {
-      if (!heroId || this.drawingMap) return;
-      const key = `select-voice-${heroId}`;
-      const line = this.fighters[heroId]?.voice?.lines?.select;
-      const file = line?.file || "voice/select.mp3";
-      if (this._selectVoice?.heroId === heroId && this._selectVoice?.snd?.isPlaying) return;
-      const play = () => {
-        if (!this.cache.audio.exists(key)) return;
-        if (this._selectVoice?.snd?.isPlaying && this._selectVoice.heroId !== heroId) {
-          /* previous pick no longer selected; new pick must play in full */
-        }
-        const snd = this.sound.add(key, { volume: 0.78 });
-        if (this._selectVoice?.snd) {
-          try {
-            this._selectVoice.snd.stop();
-            this._selectVoice.snd.destroy();
-          } catch {
-            /* ignore */
-          }
-        }
-        this._selectVoice = { heroId, snd };
-        snd.once("complete", () => {
-          try {
-            snd.destroy();
-          } catch {
-            /* ignore */
-          }
-          if (this._selectVoice?.snd === snd) this._selectVoice = null;
-        });
-        snd.play();
-      };
-      if (!this.cache.audio.exists(key)) {
-        this.load.audio(key, `/assets/game/heroes/${heroId}/${file}`);
-        this.load.once(Phaser.Loader.Events.COMPLETE, play);
-        this.load.start();
-        return;
-      }
-      play();
-    }
-
-    broadcastPick() {
-      const net = this.registry.get("net");
-      if (!net?.connected || !this.pvpSeat) return;
-      const id = this.playable[this.p1Index];
-      this.rememberPick(this.pvpSeat, id);
-      const ts = this.ensureProfile(this.pvpSeat).ts || Date.now();
-      net.send({ type: "pick", heroId: id, ts });
-      this.setReady(false);
-    }
-
-    syncSelf() {
-      const net = this.registry.get("net");
-      if (!net?.connected || !this.pvpSeat) return;
-      const id = this.playable[this.p1Index];
-      this.rememberPick(this.pvpSeat, id);
-      const profile = this.ensureProfile(this.pvpSeat);
-      net.send({ type: "pick", heroId: id, ts: profile.ts });
-      this.broadcastNick();
-      net.send({ type: "ready", ready: !!profile.ready, ts: profile.ts });
-      this.broadcastLobby();
-    }
-
-    bindNet(net) {
-      this.registry.set("net", net);
-      net.on("state", () => {});
-      net.on("roster", (msg) => {
-        this.applyRoster(msg);
-        this.refresh();
-        this.tryAutoStart();
-      });
-      net.on("peer", (msg) => {
-        this.applyRoster(msg);
-        if (msg.event === "joined") {
-          const n = this.pvpConnectedCount();
-          this.pvpStatus = n >= 3 ? `房间 ${this.pvpRoom}　三人已齐，选定英灵后点准备` : `房间 ${this.pvpRoom}　已有 ${n} 人`;
-          this.scheduleSync();
-          this.refresh();
-          this.tryAutoStart();
-        } else if (msg.event === "left") {
-          if (msg.seat && this.pvpPicks) this.pvpPicks[msg.seat] = "";
-          if (msg.seat && this.pvpProfiles[msg.seat]) {
-            this.pvpProfiles[msg.seat] = { nick: defaultNick(msg.seat), ready: false, heroId: "" };
-          }
-          if (msg.seat === "guest") this.pvpPeerHero = "";
-          const n = this.pvpConnectedCount();
-          this.pvpStatus =
-            n <= 1
-              ? `房间 ${this.pvpRoom}　有人离线，等待加入`
-              : `房间 ${this.pvpRoom}　有人离线，现 ${n} 人`;
-          this.locked = false;
-          this.drawingMap = false;
-          this.refresh();
-        }
-      });
-      net.on("lobby_state", (msg) => {
-        this.applyLobbyState(msg);
-        this.refresh();
-        this.tryAutoStart();
-      });
-      net.on("pick", (msg) => {
-        if (!msg.heroId) return;
-        const seat = msg._from || "guest";
-        this.pvpSeats[seat] = true;
-        this.rememberPick(seat, msg.heroId, msg.ts);
-        this.refresh();
-        this.tryAutoStart();
-      });
-      net.on("nick", (msg) => {
-        const seat = msg._from;
-        if (!seat) return;
-        this.pvpSeats[seat] = true;
-        const profile = this.ensureProfile(seat);
-        profile.nick = String(msg.nick || "").trim().slice(0, 12) || defaultNick(seat);
-        if (msg.ts) profile.ts = Number(msg.ts) || profile.ts || 0;
-        this.refresh();
-      });
-      net.on("ready", (msg) => {
-        const seat = msg._from;
-        if (!seat) return;
-        this.pvpSeats[seat] = true;
-        const profile = this.ensureProfile(seat);
-        const ts = Number(msg.ts) || 0;
-        if (profile.ts && ts && ts < profile.ts) return;
-        profile.ready = !!msg.ready;
-        if (ts) profile.ts = ts;
-        this.refresh();
-        this.tryAutoStart();
-      });
-      net.on("stage_pick", (msg) => {
-        if (msg._from === this.pvpSeat) return;
-        this.applyStagePick(msg);
-        this.refresh();
-      });
-      net.on("lobby_return", () => {
-        if (this.mode !== "pvp" && this.mode !== "raid") return;
-        // 抽图/进战途中的过期回房包会掐掉本局
-        if (this.drawingMap || this.locked) return;
-        this.resetLobbyReady();
-        this.pvpStatus = `房间 ${this.pvpRoom}　对局结束，可换英灵换图后再次准备`;
-        this.refresh();
-      });
-      net.on("map_draw", (msg) => {
-        if (this._blockAutoStart || this.pvpSeat === "host" || this.drawingMap) return;
-        this.runMapDraw(msg.stageId, () => {
-          this.beginMatch(msg.p1Id, msg.p2Id, msg.stageId, this.pvpSeat, msg.p3Id, msg.profiles);
-        });
-      });
-      net.on("start", (msg) => {
-        if (this._blockAutoStart || this.pvpSeat === "host" || this.drawingMap) return;
-        this.beginMatch(msg.p1Id, msg.p2Id, msg.stageId, this.pvpSeat, msg.p3Id, msg.profiles);
-      });
-      net.on("error", (msg) => {
-        this.pvpStatus = msg.message || "对战连接出错";
-        this.locked = false;
-        this.drawingMap = false;
-        this.refresh();
-      });
-      net.on("close", () => {
-        if (this.mode !== "pvp" && this.mode !== "raid") return;
-        this.pvpSeat = "";
-        this.pvpRoom = "";
-        this.pvpSeats = { host: false, guest: false, guest2: false };
-        this.pvpPicks = emptyPvpPicks();
-        this.pvpStatus = "连接已断开，可重新创建或加入房间";
-        this.locked = false;
-        this.drawingMap = false;
-        this.refresh();
-      });
-    }
-
     heroName(index) {
-      const id = this.playable[index];
-      return this.fighters[id]?.displayName || id || "—";
+      return this.fighters[this.playable[index]]?.displayName || "—";
     }
-
-    refresh() {
-      const modeLabel =
-        this.mode === "pvp" ? "PVP" : this.mode === "raid" ? "合作闯关" : this.mode === "pve" ? "PVE" : this.mode === "cricket" ? "斗蛐蛐" : "木桩";
-      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
-        setChrome("select", this.pvpSeat && this.pvpRoom ? `${GAME_NAME}　房 ${this.pvpRoom}` : `${GAME_NAME}　${modeLabel}`);
-        if (this.title) this.title.setText("").setVisible(false);
-      } else {
-        setChrome("select", `${GAME_NAME}　${modeLabel}`);
-        if (this.title) this.title.setText("").setVisible(false);
-      }
-      this.paintModeTabs();
-      // 翻页与换人解耦：refresh 不改卡池页码；仅点头像 / A·D 换人时 ensureHeroRailPageFor
-      this.layoutHeroRail();
-      this.refreshShowcases();
-      if (this.modeDummy) this.modeDummy.setColor(this.mode === "dummy" ? "#4a3018" : "#ead8a8");
-      if (this.modePve) this.modePve.setColor(this.mode === "pve" ? "#4a3018" : "#ead8a8");
-      if (this.modeCricket) this.modeCricket.setColor(this.mode === "cricket" ? "#4a3018" : "#ead8a8");
-      if (this.modePvp) this.modePvp.setColor(this.mode === "pvp" ? "#4a3018" : "#ead8a8");
-      if (this.modeRaid) this.modeRaid.setColor(this.mode === "raid" ? "#4a3018" : "#ead8a8");
-      const share = this.mode === "pvp" || this.mode === "raid" ? `同网访问：${wsUrlHint(this.lanIps, this.lanPort)}` : "";
-      setSelectFooter(
-        share,
-        this.mode === "cricket"
-          ? "点左右立绘选两名人机　不锁地图则开战抽签　W/S 切 1P/2P　J 开打旁观"
-          : this.mode === "pve"
-            ? "点下方难度　　不锁地图则开战抽签　　F 切换难度"
-            : this.mode === "raid"
-              ? "单人：J 开始当前战场；合作：创建／加入房间，选人准备后开战"
-            : "",
-        false
-      );
-      this.refreshPvpLobby();
-      window.HeroShell?.selection(this);
-      const onlineMode = this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat);
-      this.cards.forEach((card, i) => {
-        if (card.comingSoon) {
-          card.g.clear();
-          paintValleyPanel(card.g, card.x, card.top, card.cardW, card.cardW, {
-            selected: false,
-            accent: 0x5a4a38,
-            radius: 12,
-            inset: 5,
-          });
-          card.portrait.setAlpha(0.92);
-          card.name.setColor("#8a7a60");
-          card.badge.setText("？").setColor("#d4b06a");
-          return;
-        }
-        const asMine = i === this.p1Index;
-        const picks = this.pvpPicks || emptyPvpPicks();
-        const peerSeats = [];
-        if (onlineMode) {
-          ["host", "guest", "guest2"].forEach((seat) => {
-            if (seat === this.pvpSeat) return;
-            if (picks[seat] === card.id) peerSeats.push(seat);
-          });
-        }
-        const asPeer = onlineMode ? peerSeats.length > 0 : this.mode !== "raid" && i === this.p2Index;
-        const on = onlineMode || this.mode === "raid" ? asMine : this.slot === "p1" ? asMine : asPeer;
-        const hover = i === this.hoverIndex;
-        card.g.clear();
-        const stroke =
-          asMine && asPeer ? 0xf2d36b : asMine ? 0x4aa3ff : asPeer ? 0xe86a5a : hover ? 0xd4b056 : 0x4a4333;
-        paintValleyPanel(card.g, card.x, card.top, card.cardW, card.cardW, {
-          selected: on,
-          accent: stroke,
-          radius: 12,
-          inset: 5,
-        });
-        card.portrait.setAlpha(asMine || asPeer || hover ? 1 : 0.72);
-        card.name.setColor(on ? "#f8ecd0" : "#c4b090");
-        if (onlineMode) {
-          const peerLabel = peerSeats.map((s) => seatLabel(s)).join("+");
-          if (asMine && asPeer) card.badge.setText(`我+${peerLabel}`).setColor("#e8c36a");
-          else if (asMine) card.badge.setText("我").setColor("#6ec8ff");
-          else if (asPeer) card.badge.setText(peerLabel).setColor("#ff8a78");
-          else card.badge.setText("");
-        } else if (asMine && asPeer) card.badge.setText("双方").setColor("#e8c36a");
-        else if (asMine) card.badge.setText("1P").setColor("#6ec8ff");
-        else if (asPeer) card.badge.setText("2P").setColor("#ff8a78");
-        else card.badge.setText("");
-      });
+    stageNameAt(index) {
+      return this.stages[this.stageIds[index]]?.displayName || "—";
     }
-
-    paintModeTabs() {
-      if (!this.modeGfx) return;
-      this.modeGfx.clear();
-      const tabs = [
-        { t: this.modeDummy, on: this.mode === "dummy" },
-        { t: this.modePve, on: this.mode === "pve" },
-        { t: this.modeCricket, on: this.mode === "cricket" },
-        { t: this.modeRaid, on: this.mode === "raid" },
-        { t: this.modePvp, on: this.mode === "pvp" },
-      ];
-      tabs.forEach(({ t, on }) => {
-        if (!t) return;
-        const bw = 132;
-        const bh = 34;
-        fillFlatTab(this.modeGfx, t.x - bw / 2, t.y - 6, bw, bh, on);
-      });
-      const pve = this.mode === "pve";
-      const diffs = [
-        { t: this.diffKind, id: "kind" },
-        { t: this.diffFair, id: "fair" },
-        { t: this.diffCruel, id: "cruel" },
-      ];
-      diffs.forEach(({ t, id }) => {
-        if (!t) return;
-        t.setVisible(pve);
-        if (pve) t.setInteractive({ useHandCursor: true });
-        else t.disableInteractive();
-        const on = pve && this.cpuDiff === id;
-        t.setColor(on ? "#4a3018" : "#ead8a8");
-        if (!pve) return;
-        const bw = 156;
-        const bh = 32;
-        fillFlatTab(this.modeGfx, t.x - bw / 2, t.y - 6, bw, bh, on);
-      });
-    }
-
-    runMapDraw(stageId, onDone) {
-      if (this.drawingMap) return;
-      this.drawingMap = true;
-      this.locked = true;
-      window.HeroShell?.selection(this);
-      const w = this.scale.width;
-      const h = this.scale.height;
-      const n = this.stageIds.length;
-      if (!n) {
-        this.drawingMap = false;
-        this.locked = false;
-        this.time.delayedCall(200, () => onDone?.());
-        return;
-      }
-      const pick = this.stageIds.includes(stageId) ? stageId : this.stageIds[0];
-      const pickIndex = Math.max(0, this.stageIds.indexOf(pick));
-      const overlay = this.add.rectangle(w / 2, h / 2, w, h, 0x140e0a, 0.88).setDepth(200);
-      const title = uiText(this, w / 2, 56, "战场抽签", {
-        fontSize: 32,
-        color: "#f6e4b4",
-        stroke: "#3a2410",
-        strokeThickness: 4,
-      })
-        .setOrigin(0.5)
-        .setDepth(201);
-      const nameText = uiText(this, w / 2, h - 72, "", {
-        fontSize: 24,
-        color: "#f4ead0",
-        stroke: "#3a2410",
-        strokeThickness: 4,
-        wordWrap: { width: Math.min(w - 80, 640), useAdvancedWrap: true },
-        align: "center",
-      })
-        .setOrigin(0.5)
-        .setDepth(201);
-      const cardW = Math.min(220, (w - 80) / Math.max(3, Math.min(n, 6)));
-      const cardH = cardW * 0.56;
-      const gap = 14;
-      const total = n * cardW + (n - 1) * gap;
-      const left = (w - total) / 2;
-      const cy = h / 2 - 10;
-      const cards = this.stageIds.map((id, i) => {
-        const x = left + i * (cardW + gap) + cardW / 2;
-        const img = this.add
-          .image(x, cy, `stage-thumb-${id}`)
-          .setDisplaySize(cardW, cardH)
-          .setDepth(202)
-          .setAlpha(0.45);
-        const frame = this.add.graphics().setDepth(203);
-        return { id, x, img, frame };
-      });
-      const glow = this.add.graphics().setDepth(204);
-      const totalSteps = Math.max(n * 2 + pickIndex, pickIndex);
-      const stepMs = 90;
-      let step = 0;
-      let finished = false;
-      const paint = (hi, settled) => {
-        glow.clear();
-        cards.forEach((c, i) => {
-          const on = i === hi;
-          c.img.setAlpha(on ? 1 : settled ? 0.28 : 0.4);
-          c.frame.clear();
-          if (on) {
-            paintValleyPanel(c.frame, c.x - cardW / 2 - 8, cy - cardH / 2 - 8, cardW + 16, cardH + 16, {
-              selected: settled,
-              accent: settled ? 0xe8c36a : 0x7ec8ff,
-              radius: 10,
-              hollow: true,
-            });
-            if (!settled) {
-              glow.lineStyle(2, 0x9ad4ff, 0.55);
-              glow.strokeRoundedRect(c.x - cardW / 2 - 12, cy - cardH / 2 - 12, cardW + 24, cardH + 24, 12);
-            }
-          }
-        });
-        const stageNameStyle = {
-          fontFamily: UI_FONT,
-          fontSize: 24,
-          color: "#f4ead0",
-          stroke: "#3a2410",
-          strokeThickness: 4,
-        };
-        nameText.setText(
-          clampWrappedLines(
-            this,
-            this.stages[this.stageIds[hi]]?.displayName || this.stageIds[hi] || "",
-            stageNameStyle,
-            Math.min(w - 80, 640),
-            2
-          )
-        );
+    rememberSelection() {
+      const selection = {
+        p1Id: this.playable[this.p1Index],
+        p2Id: this.playable[this.p2Index],
+        stageId: this.stageIds[this.stageIndex],
       };
-      paint(0, false);
-      playUiSfx(this, UI_SFX.mapDrawTick, { volume: 0.68 });
-      this.mapDrawTimer = this.time.addEvent({
-        delay: stepMs,
-        repeat: totalSteps,
-        callback: () => {
-          if (finished || !n) return;
-          const hi = step % n;
-          step += 1;
-          const settled = step > totalSteps;
-          paint(settled ? pickIndex : hi, settled);
-          if (!settled) {
-            playUiSfx(this, UI_SFX.mapDrawTick, {
-              volume: 0.58 + (step / totalSteps) * 0.28,
-              detune: hi * 35,
-              rate: 0.95 + (step / totalSteps) * 0.15,
-            });
-            return;
-          }
-          finished = true;
-          playUiSfx(this, UI_SFX.mapDrawPick, { volume: 0.92 });
-          title.setText(`选定：${this.stages[pick]?.displayName || pick}`);
-          this.time.delayedCall(700, () => {
-            overlay.destroy();
-            title.destroy();
-            nameText.destroy();
-            glow.destroy();
-            cards.forEach((c) => {
-              c.img.destroy();
-              c.frame.destroy();
-            });
-            this.drawingMap = false;
-            onDone?.();
-          });
-        },
-      });
+      this.registry.set("selection", selection);
+      try {
+        const url = new URL(location.href);
+        url.searchParams.delete("mode");
+        url.searchParams.delete("room");
+        url.searchParams.set("p1", selection.p1Id);
+        url.searchParams.set("p2", selection.p2Id);
+        url.searchParams.set("stage", selection.stageId);
+        url.searchParams.set("diff", this.cpuDiff);
+        history.replaceState({}, "", url);
+      } catch {
+        /* optional deep link */
+      }
     }
-
-    beginMatch(p1Id, p2Id, stageId, seat, p3Id, profiles) {
+    refresh() {
+      const g = this.uiGfx;
+      g.clear();
+      [32, 1020].forEach((x, i) => {
+        const accent = i ? 0xee7766 : 0x69bce9;
+        paintArcadePanel(g, x, 132, 292, 474, { accent, selected: this.slot === (i ? "p2" : "p1") });
+        g.fillStyle(accent, 0.15);
+        g.fillRect(x + 8, 508, 276, 40);
+        const index = i ? this.p2Index : this.p1Index,
+          id = this.playable[index],
+          fighter = this.fighters[id];
+        const key = this.textures.exists(rosterCardFrontKey(id)) ? rosterCardFrontKey(id) : `roster-${id}`;
+        const pose = rosterHeroLayout(this, fighter, key, 260, 354);
+        this.large[i]
+          .setTexture(key, 0)
+          .setOrigin(pose.originX, pose.originY)
+          .setScale(pose.scale)
+          .setFlipX(i === 1);
+        this.names[i].setText(this.heroName(index));
+      });
+      this.slotButtons.forEach((b, i) => b.paint(this.slot === (i ? "p2" : "p1")));
+      this.cards.forEach((c) => {
+        const p1 = c.index === this.p1Index,
+          p2 = c.index === this.p2Index;
+        paintArcadePanel(c.g.clear(), c.x - 2, c.y - 2, 108, 112, {
+          selected: p1 || p2,
+          accent: p1 ? 0x69bce9 : p2 ? 0xee7766 : 0x465366,
+        });
+        c.badge.setText(p1 && p2 ? "1P / CPU" : p1 ? "1P" : p2 ? "CPU" : "");
+      });
+      const pages = Math.ceil(this.playable.length / 10);
+      this.prevPage.setVisible(pages > 1);
+      this.nextPage.setVisible(pages > 1);
+      this.pageLabel.setText(pages > 1 ? `${this.page + 1} / ${pages}` : "SELECT YOUR FIGHTER");
+      paintArcadePanel(g, 486, 466, 372, 152, { accent: 0x929b9f });
+      const key = `stage-thumb-${this.stageIds[this.stageIndex]}`;
+      compactStagePreview(this, key);
+      if (this.textures.exists(key)) {
+        const img = this.textures.get(key).getSourceImage();
+        const s = Math.max(360 / img.width, 140 / img.height);
+        this.stageImage.setTexture(key).setDisplaySize(img.width * s, img.height * s);
+      }
+      this.stageLabel.setText(
+        `${String(this.stageIndex + 1).padStart(2, "0")}  ${this.stageNameAt(this.stageIndex)}`,
+      );
+      this.diffButtons.forEach((b, i) => b.paint(CPU_DIFFS[i].id === this.cpuDiff));
+      this.rememberSelection();
+      window.HeroShell?.selection(this);
+    }
+    confirm() {
+      if (this.locked || !this.playable.length || !this.stageIds.length) return;
       this.locked = true;
-      this.drawingMap = false;
-      const net = this.registry.get("net");
-      clearNetLobbyPings(net);
-      const fightGen = Number(this.registry.get("pvpFightGen")) || 0;
-      if (net) net._fightGen = fightGen;
-      net?.discard?.(["lobby_return", "state", "start", "map_draw"]);
-      const three = Boolean(p3Id);
+      const p1Id = this.playable[this.p1Index],
+        p2Id = this.playable[this.p2Index];
       const pack = {
         p1Id,
         p2Id,
-        p3Id: three ? p3Id : "",
-        pvpThree: three,
-        mode: this.mode === "raid" ? "raid" : "pvp",
-        raid: this.mode === "raid",
-        seat,
-        room: this.pvpRoom,
-        stageId: stageId || this.stageIds[0],
-        stageIds: this.stageIds,
-        stages: this.stages,
         p1: this.fighters[p1Id],
         p2: this.fighters[p2Id],
-        p3: three ? this.fighters[p3Id] : null,
-        profiles: profiles || this.pvpProfiles || {},
-        fightGen,
+        cpuDiff: this.cpuDiff,
+        stageId: this.stageIds[this.stageIndex],
+        stageIds: this.stageIds,
+        stages: this.stages,
       };
+      this.rememberSelection();
       this.registry.set("match", pack);
       this.scene.start("loader", pack);
     }
-
-    async hostPvp() {
-      if (!window.HeroNet?.NetRoom) {
-        this.pvpStatus = "缺少 net.js";
-        this.refresh();
-        return;
-      }
-      if (this.pvpSeat || this.locked) return;
-      const nick = this.promptNick("创建房间");
-      if (!nick) return;
-      this.locked = true;
-      this.pvpStatus = "正在开房…";
-      this.refresh();
-      try {
-        const net = new window.HeroNet.NetRoom();
-        const msg = await net.create();
-        this.bindNet(net);
-        this.pvpSeat = "host";
-        this.pvpRoom = msg.room;
-        this.ensureProfile(this.pvpSeat).nick = nick;
-        this.lanIps = msg.ips || this.lanIps;
-        this.lanPort = msg.port || this.lanPort;
-        this.applyRoster(msg);
-        this.pvpSeats.host = true;
-        this.pvpStatus = `房间 ${this.pvpRoom}　把房号发给同事`;
-        this.locked = false;
-        try {
-          const url = new URL(location.href);
-          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
-          history.replaceState({}, "", url);
-        } catch {
-          /* ignore */
-        }
-        this.scheduleSync();
-        this.refresh();
-      } catch (err) {
-        this.pvpStatus = err.message || "开房失败";
-        this.locked = false;
-        this.refresh();
-      }
-    }
-
-    async joinPvp(roomCode) {
-      if (!window.HeroNet?.NetRoom) {
-        this.pvpStatus = "缺少 net.js";
-        this.refresh();
-        return;
-      }
-      if (this.pvpSeat || this.locked) return;
-      let code = String(roomCode || "").trim().toUpperCase();
-      if (!code) {
-        code = String(window.prompt("输入房间号（4 位）", "") || "")
-          .trim()
-          .toUpperCase();
-      }
-      if (!code) return;
-      const nick = this.promptNick("加入房间");
-      if (!nick) return;
-      this.locked = true;
-      this.pvpStatus = `正在加入 ${code}…`;
-      this.refresh();
-      try {
-        const net = new window.HeroNet.NetRoom();
-        const msg = await net.join(code);
-        this.bindNet(net);
-        this.pvpSeat = msg.seat || "guest";
-        this.pvpRoom = code;
-        this.ensureProfile(this.pvpSeat).nick = nick;
-        this.applyRoster(msg);
-        this.pvpSeats[this.pvpSeat] = true;
-        this.pvpStatus = `已加入 ${code}　选定英灵后点准备`;
-        this.locked = false;
-        try {
-          const url = new URL(location.href);
-          url.searchParams.set("mode", this.mode === "raid" ? "raid" : "pvp");
-          history.replaceState({}, "", url);
-        } catch {
-          /* ignore */
-        }
-        this.scheduleSync();
-        this.refresh();
-      } catch (err) {
-        this.pvpStatus = err.message || "加入失败";
-        this.locked = false;
-        this.refresh();
-      }
-    }
-
-    startHostMatch() {
-      if (this.pvpSeat !== "host" || this.drawingMap) return;
-      const net = this.registry.get("net");
-      if (!net?.connected) {
-        this.pvpStatus = "尚未开房";
-        this.refresh();
-        return;
-      }
-      const n = this.pvpConnectedCount();
-      if (n < 2) {
-        this.pvpStatus = `房间 ${this.pvpRoom}　至少 2 人在线才能开战`;
-        this.refresh();
-        return;
-      }
-      if (!this.allOnlineReady()) {
-        this.pvpStatus = `房间 ${this.pvpRoom}　等待全员准备`;
-        this.refresh();
-        return;
-      }
-      this.locked = true;
-      const p1Id = this.heroOf("host") || this.playable[this.p1Index];
-      const p2Id = this.heroOf("guest");
-      const p3Id = n >= 3 ? this.heroOf("guest2") : "";
-      if (!p2Id || (n >= 3 && !p3Id)) {
-        this.locked = false;
-        this.pvpStatus = `房间 ${this.pvpRoom}　还有人未选定英灵（${n} 人在线）`;
-        this.refresh();
-        return;
-      }
-      const stageId = this.stageConfirmed
-        ? this.stageIds[this.stageIndex] || this.stageIds[0]
-        : this.stageIds[Phaser.Math.Between(0, Math.max(0, this.stageIds.length - 1))] || this.stageIds[0];
-      this.pvpStatus = this.stageConfirmed ? "全员已准备，进入选定地图" : "全员已准备，开战";
-      this.refresh();
-      const payload = { p1Id, p2Id, p3Id: p3Id || undefined, stageId, profiles: this.pvpProfiles };
-      if (this.stageConfirmed) {
-        net.send({ type: "start", ...payload });
-        this.beginMatch(p1Id, p2Id, stageId, "host", p3Id || undefined, this.pvpProfiles);
-        return;
-      }
-      net.send({ type: "map_draw", ...payload });
-      this.runMapDraw(stageId, () => {
-        this.beginMatch(p1Id, p2Id, stageId, "host", p3Id || undefined, this.pvpProfiles);
-      });
-    }
-
-    confirm() {
-      if (this.drawingMap || this.locked) return;
-      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
-        if (this.locked) return;
-        if (this.pvpSeat) this.setReady(!this.ensureProfile(this.pvpSeat).ready);
-        return;
-      }
-      if (this.mode === "raid" && !this.pvpSeat) {
-        if (this.locked || !this.playable.length) return;
-        this.locked = true;
-        const p1Id = this.playable[this.p1Index];
-        const stageId = this.stageIds[this.stageIndex] || this.stageIds[0];
-        const pack = {
-          p1Id,
-          p2Id: p1Id,
-          mode: "raid",
-          raid: true,
-          raidSolo: true,
-          stageId,
-          stageIds: this.stageIds,
-          stages: this.stages,
-          p1: this.fighters[p1Id],
-          p2: this.fighters[p1Id],
-        };
-        this.registry.set("match", pack);
-        this.scene.start("loader", pack);
-        return;
-      }
-      if (this.locked || !this.playable.length) return;
-      const wantDraw = (this.mode === "pve" || this.mode === "cricket") && !this.stageConfirmed && this.stageIds.length > 1;
-      if (!this.stageConfirmed && !wantDraw) {
-        setSelectFooter(null, "请先锁定战场", true);
-        this.time.delayedCall(1800, () => this.refresh());
-        return;
-      }
-      this.locked = true;
-      this.cpuDiff = saveCpuDiff(this.cpuDiff);
-      const p1Id = this.playable[this.p1Index];
-      const p2Id = this.playable[this.p2Index] || p1Id;
-      const stageId = this.stageConfirmed
-        ? this.stageIds[this.stageIndex] || this.stageIds[0]
-        : this.stageIds[Phaser.Math.Between(0, Math.max(0, this.stageIds.length - 1))] || this.stageIds[0];
-      try {
-        const url = new URL(location.href);
-        url.searchParams.set("p1", p1Id);
-        url.searchParams.set("p2", p2Id);
-        url.searchParams.set("mode", this.mode);
-        url.searchParams.set("diff", cpuDiffId(this.cpuDiff));
-        if (stageId) url.searchParams.set("stage", stageId);
-        history.replaceState({}, "", url);
-      } catch {
-        /* ignore */
-      }
-      const pack = {
-        p1Id,
-        p2Id,
-        mode: this.mode,
-        cpuDiff: cpuDiffId(this.cpuDiff),
-        stageId,
-        stageIds: this.stageIds,
-        stages: this.stages,
-        p1: this.fighters[p1Id],
-        p2: this.fighters[p2Id],
-      };
-      const go = () => {
-        this.registry.set("match", pack);
-        this.scene.start("loader", pack);
-      };
-      if (wantDraw) {
-        this.runMapDraw(stageId, go);
-        return;
-      }
-      go();
-    }
-
     update() {
-      this.tickShowcaseSpins();
-      if (!this.keys || this.drawingMap || this.locked) return;
-      const pressed = (key) => key && Phaser.Input.Keyboard.JustDown(key);
-      if (pressed(this.keys.Q)) {
-        const order = ["dummy", "pve", "cricket", "raid", "pvp"];
-        this.setMode(order[(order.indexOf(this.mode) + 1) % order.length]);
-      }
-      if (pressed(this.keys.ONE)) this.setMode("dummy");
-      if (pressed(this.keys.TWO)) this.setMode("pve");
-      if (pressed(this.keys.THREE)) this.setMode("cricket");
-      if (pressed(this.keys.FOUR)) this.setMode("pvp");
-      if (pressed(this.keys.SEVEN)) this.setMode("raid");
-      if (this.mode === "pve") {
-        if (pressed(this.keys.FIVE)) this.setCpuDiff("kind");
-        if (pressed(this.keys.SIX)) this.setCpuDiff("fair");
-        if (pressed(this.keys.F)) {
-          const order = ["kind", "fair", "cruel"];
-          const i = Math.max(0, order.indexOf(cpuDiffId(this.cpuDiff)));
-          this.setCpuDiff(order[(i + 1) % order.length]);
-        }
-      }
-      if (this.mode === "pvp" || (this.mode === "raid" && this.pvpSeat)) {
-        const left = pressed(this.keys.A) || pressed(this.keys.LEFT);
-        const right = pressed(this.keys.D) || pressed(this.keys.RIGHT);
-        const readyToggle = pressed(this.keys.R);
-        const n = this.playable.length;
-        if (n && (left || right)) {
-          const dir = left ? n - 1 : 1;
-          this.p1Index = (this.p1Index + dir) % n;
-          this.ensureHeroRailPageFor(this.p1Index);
-          this.broadcastPick();
-          this.refresh();
-          this.playSelectVoice(this.playable[this.p1Index]);
-        }
-        if (readyToggle && this.pvpSeat) this.setReady(!this.ensureProfile(this.pvpSeat).ready);
-        if (pressed(this.keys.E)) this.confirmStage();
-        if ((pressed(this.keys.J) || pressed(this.keys.ENTER) || pressed(this.keys.SPACE)) && this.pvpSeat) {
-          this.setReady(!this.ensureProfile(this.pvpSeat).ready);
-        }
-        return;
-      }
-      if (pressed(this.keys.E)) this.confirmStage();
-      const pickP1 = pressed(this.keys.W) || pressed(this.keys.UP);
-      const pickP2 = pressed(this.keys.S) || pressed(this.keys.DOWN);
-      const left = pressed(this.keys.A) || pressed(this.keys.LEFT);
-      const right = pressed(this.keys.D) || pressed(this.keys.RIGHT);
-      const start = pressed(this.keys.J) || pressed(this.keys.ENTER) || pressed(this.keys.SPACE);
-      if (this.mode === "raid") this.slot = "p1";
-      else if (pickP1) this.slot = "p1";
-      else if (pickP2) this.slot = "p2";
-      const n = this.playable.length;
-      if (n && (left || right)) {
-        const dir = left ? n - 1 : 1;
-        if (this.slot === "p1") {
-          this.p1Index = (this.p1Index + dir) % n;
-          this.ensureHeroRailPageFor(this.p1Index);
-          this.playSelectVoice(this.playable[this.p1Index]);
-        } else {
-          this.p2Index = (this.p2Index + dir) % n;
-          this.ensureHeroRailPageFor(this.p2Index);
-          this.playSelectVoice(this.playable[this.p2Index]);
-        }
-      } else if (pickP1 || pickP2) {
-        this.ensureHeroRailPageFor(this.slot === "p1" ? this.p1Index : this.p2Index);
-      }
-      if (pickP1 || pickP2 || left || right) this.refresh();
-      if (start) this.confirm();
+      if (this.locked) return;
+      const hit = (key) => Phaser.Input.Keyboard.JustDown(this.keys[key]);
+      if (hit("W")) this.chooseSlot("p1");
+      if (hit("S")) this.chooseSlot("p2");
+      if (hit("A"))
+        this.chooseHero(
+          ((this.slot === "p1" ? this.p1Index : this.p2Index) - 1 + this.playable.length) % this.playable.length,
+        );
+      if (hit("D"))
+        this.chooseHero(((this.slot === "p1" ? this.p1Index : this.p2Index) + 1) % this.playable.length);
+      if (hit("LEFT")) this.shiftStage(-1);
+      if (hit("RIGHT")) this.shiftStage(1);
+      if (hit("F"))
+        this.setCpuDiff(CPU_DIFFS[(CPU_DIFFS.findIndex((d) => d.id === this.cpuDiff) + 1) % CPU_DIFFS.length].id);
+      if (hit("J") || hit("ENTER")) this.confirm();
     }
   }
 
@@ -6674,107 +3182,63 @@
     }
 
     preload() {
-      setChrome("select", "正在进入对战…");
-      window.HeroShell?.loading("正在进入战场", "读取本局人物动作与场景资源…");
-      this.load.on("progress", value => window.HeroShell?.progress(value));
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.load.off("progress"); this.load.off("loaderror"); });
+      setChrome("select");
+      window.HeroShell?.loading("GET READY", "读取本局人物动作与战场…");
+      this.load.on("progress", (value) => window.HeroShell?.progress(value));
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.load.off("progress");
+        this.load.off("loaderror");
+      });
       wipeFightAssets(this);
-      // Selection already requests UI sounds. Do not make optional audio a
-      // prerequisite for entering the lightweight raid demo.
-      if (!this.pack?.raid) loadUiSfx(this);
-      const pack = this.pack || {};
-      const { p1Id, p2Id, p3Id } = pack;
-      // Raid roster data came from the prior scene. Avoid a second JSON
-      // round-trip before create(), the former source of a permanent black
-      // transition when a browser request stalled.
-      if (pack.raid) return;
-      const t = Date.now();
-      // Same keys would be skipped from json cache on rematch, so old fighter.json sticks
-      // and preload queues 0 files — create then thinks there is nothing to load.
+      loadUiSfx(this);
+      const { p1Id, p2Id } = this.pack;
       this.cache.json.remove("fresh-p1");
       this.cache.json.remove("fresh-p2");
-      this.cache.json.remove("fresh-p3");
-      if (p1Id) this.load.json("fresh-p1", `/assets/game/heroes/${p1Id}/fighter.json?t=${t}`);
-      if (p2Id && p2Id !== p1Id) this.load.json("fresh-p2", `/assets/game/heroes/${p2Id}/fighter.json?t=${t}`);
-      if (p3Id && p3Id !== p1Id && p3Id !== p2Id) {
-        this.load.json("fresh-p3", `/assets/game/heroes/${p3Id}/fighter.json?t=${t}`);
-      }
+      const t = Date.now();
+      this.load.json("fresh-p1", `/assets/game/heroes/${p1Id}/fighter.json?t=${t}`);
+      if (p2Id !== p1Id) this.load.json("fresh-p2", `/assets/game/heroes/${p2Id}/fighter.json?t=${t}`);
     }
 
     create() {
-      const pack = this.pack || {};
-      const p1Id = pack.p1Id;
-      const p2Id = pack.p2Id;
-      const p3Id = pack.p3Id;
-      const p1 = (!pack.raid && this.cache.json.get("fresh-p1")) || pack.p1;
-      const p2 = p2Id === p1Id ? p1 : (!pack.raid && this.cache.json.get("fresh-p2")) || pack.p2 || p1;
-      let p3 = null;
-      if (p3Id) {
-        if (p3Id === p1Id) p3 = p1;
-        else if (p3Id === p2Id) p3 = p2;
-        else p3 = (!pack.raid && this.cache.json.get("fresh-p3")) || pack.p3;
-      }
-      const roster = this.registry.get("roster") || {};
-      const raidBoss = pack.raid ? raidBossFor(roster, pack) : null;
-      this.pack = {
-        ...pack,
-        p1,
-        p2,
-        p3,
-        bossId: raidBoss?.id || "",
-        boss: raidBoss?.fighter || null,
-      };
-      if (roster.fighters) {
-        if (p1Id && p1) roster.fighters[p1Id] = p1;
-        if (p2Id && p2) roster.fighters[p2Id] = p2;
-        if (p3Id && p3) roster.fighters[p3Id] = p3;
+      const { p1Id, p2Id } = this.pack;
+      const p1 = this.cache.json.get("fresh-p1") || this.pack.p1;
+      const p2 = p1Id === p2Id ? p1 : this.cache.json.get("fresh-p2") || this.pack.p2;
+      this.pack = { ...this.pack, p1, p2 };
+      const roster = this.registry.get("roster");
+      if (roster?.fighters) {
+        roster.fighters[p1Id] = p1;
+        roster.fighters[p2Id] = p2;
       }
       this.failedFiles = [];
       this.load.off("loaderror");
       this.load.on("loaderror", (file) => {
-        const src = file?.src || file?.url || file?.key;
-        this.failedFiles.push(src);
-        console.warn("asset missing", file?.key, src);
+        this.failedFiles.push(file.key);
+        console.warn("asset missing", file.key);
       });
       this.queueFightAssets();
       this.finishLoad(0);
     }
 
     queueFightAssets() {
-      const pack = this.pack || {};
-      // Do not block the first fight behind every map's background and BGM.
-      // A full roster has a dozen stages; loading them all made the transition
-      // appear permanently stuck, especially on a fresh browser cache.
-      if (!pack.raid) {
-        [pack.stageId].filter(Boolean).forEach((id) => {
-          const key = `stage-${id}`;
-          if (this.textures.exists(key)) this.textures.remove(key);
-          const file = pack.stages?.[id]?.file || "stage.png";
-          const bust = pack.stages?.[id]?.committedAt || Date.now();
-          this.load.image(key, `/assets/game/stages/${id}/${file}?t=${encodeURIComponent(bust)}`);
-          queueStageBgm(this, id, pack.stages);
-        });
-      }
-      const loadFighter = pack.raid ? loadRaidFighterSprites : loadFighterSprites;
-      loadFighter(this, "p1", pack.p1Id, pack.p1);
-      if (pack.p2Id && pack.p2Id !== pack.p1Id) loadFighter(this, "p2", pack.p2Id, pack.p2);
-      if (pack.p3Id) {
-        const p3Data =
-          pack.p3 ||
-          (pack.p3Id === pack.p1Id ? pack.p1 : pack.p3Id === pack.p2Id ? pack.p2 : null);
-        loadFighter(this, "p3", pack.p3Id, p3Data);
-      }
-      if (pack.raid && pack.bossId && pack.boss) {
-        loadRaidFighterSprites(this, "boss", pack.bossId, pack.boss);
-      }
+      const pack = this.pack,
+        id = pack.stageId,
+        key = `stage-${id}`;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      this.load.image(
+        key,
+        `/assets/game/stages/${id}/${pack.stages?.[id]?.file || "stage.png"}?t=${pack.stages?.[id]?.committedAt || Date.now()}`,
+      );
+      queueStageBgm(this, id, pack.stages);
+      loadFighterSprites(this, "p1", pack.p1Id, pack.p1);
+      if (pack.p2Id !== pack.p1Id) loadFighterSprites(this, "p2", pack.p2Id, pack.p2);
     }
 
     requiredFightersReady() {
-      const pack = this.pack;
-      return this.textures.exists("p1-idle") &&
-        (pack.p2Id === pack.p1Id || this.textures.exists("p2-idle")) &&
-        (!pack.p3Id || this.textures.exists("p3-idle")) &&
-        (!pack.raid || !pack.bossId || this.textures.exists("boss-idle"));
+      return (
+        this.textures.exists("p1-idle") &&
+        (this.pack.p2Id === this.pack.p1Id || this.textures.exists("p2-idle")) &&
+        this.textures.exists(`stage-${this.pack.stageId}`)
+      );
     }
 
     finishLoad(attempt) {
@@ -6808,40 +3272,21 @@
     }
 
     enterFight() {
-      const { p1, p2, p1Id, p2Id, p3Id, p3 } = this.pack || {};
-      if (!p1 || !this.textures.exists("p1-idle")) {
+      const { p1, p2, p1Id, p2Id } = this.pack;
+      if (!p1 || !p2 || !this.requiredFightersReady()) {
         this.showLoadFail();
         return;
       }
-      let p1Pivots = {};
-      let p2Pivots = {};
-      let p3Pivots = {};
-      let bossPivots = {};
+      let p1Pivots, p2Pivots;
       try {
         p1Pivots = makeAnims(this, "p1", p1);
-        p2Pivots = p2Id === p1Id ? p1Pivots : makeAnims(this, "p2", p2 || p1);
-        if (p3Id) {
-          if (p3Id === p1Id) p3Pivots = p1Pivots;
-          else if (p3Id === p2Id) p3Pivots = p2Pivots;
-          else p3Pivots = makeAnims(this, "p3", p3 || p2);
-        }
-        if (this.pack.raid && this.pack.boss && this.textures.exists("boss-idle")) {
-          bossPivots = makeAnims(this, "boss", this.pack.boss);
-        }
-      } catch (err) {
-        console.warn("makeAnims", err);
+        p2Pivots = p2Id === p1Id ? p1Pivots : makeAnims(this, "p2", p2);
+      } catch (error) {
+        console.warn("makeAnims", error);
         this.showLoadFail();
         return;
       }
-      this.scene.start("fight", {
-        ...this.pack,
-        p1Pivots,
-        p2Pivots,
-        p3Pivots,
-        bossPivots,
-        shareDummy: p2Id === p1Id,
-        mode: this.pack.mode || "dummy",
-      });
+      this.scene.start("fight", { ...this.pack, p1Pivots, p2Pivots, sharedFighter: p1Id === p2Id });
     }
   }
 
@@ -6858,8 +3303,6 @@
       window.HeroShell?.ready();
       this.combatNow = this.time.now;
       this._lastHudPaint = -Infinity;
-      this._lastInputSent = -Infinity;
-      this.pendingState = null;
       const tickClock = (_time, delta) => { this.combatNow += Math.min(50, Math.max(0, delta)); };
       this.events.on(Phaser.Scenes.Events.PRE_UPDATE, tickClock);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PRE_UPDATE, tickClock));
@@ -6873,144 +3316,34 @@
       this.physics.world.gravity.y = GRAVITY;
       this.buildTerrain();
 
-      this.p1 = new Actor(this, "p1", this.pack.p1, this.pack.p1Pivots, this.spawnX(this.pack.pvpThree ? 0.22 : 0.32), 1);
+      this.p1 = new Actor(this, "p1", this.pack.p1, this.pack.p1Pivots, this.spawnX(0.32), 1);
       this.p1.heroId = this.pack.p1Id || this.p1.heroId;
       this.p2 = new Actor(
         this,
-        this.pack.shareDummy ? "p1" : "p2",
+        this.pack.sharedFighter ? "p1" : "p2",
         this.pack.p2,
         this.pack.p2Pivots,
-        this.spawnX(this.pack.pvpThree ? 0.5 : 0.68),
+        this.spawnX(0.68),
         -1
       );
       this.p2.heroId = this.pack.p2Id || this.p2.heroId;
-      this.p3 = null;
-      if (this.pack.pvpThree && this.pack.p3) {
-        this.p3 = new Actor(this, "p3", this.pack.p3, this.pack.p3Pivots, this.spawnX(0.78), 1);
-        this.p3.heroId = this.pack.p3Id || this.p3.heroId;
-      }
-      if (this.pack.shareDummy) {
+      if (this.pack.sharedFighter) {
         this.p2.tint = 0xc5d0ee;
         this.p2.sprite.setTint(this.p2.tint);
       }
-      this.raid = this.pack.mode === "raid" || !!this.pack.raid;
-      this.pve = this.pack.mode === "pve";
-      this.pvp = this.pack.mode === "pvp" || (this.raid && !this.pack.raidSolo);
-      this.cricket = this.pack.mode === "cricket";
       this.cpuDiff = cpuDiffId(this.pack.cpuDiff);
-      this.pvpThree = !!(this.pvp && this.pack.pvpThree && this.p3);
-      this.seat = this.pack.seat || "host";
-      this.isHost = !this.pvp || this.seat === "host";
-      this.net = this.pvp ? this.registry.get("net") : null;
-      this.fightGen = Number(this.pack.fightGen) || Number(this.registry.get("pvpFightGen")) || 0;
-      if (this.pvp) {
-        this.fightGen += 1;
-        this.pack.fightGen = this.fightGen;
-        this.registry.set("pvpFightGen", this.fightGen);
-        if (this.net) this.net._fightGen = this.fightGen;
-      }
-      this.remotePads = { guest: emptyPad(), guest2: emptyPad() };
-      this.guestBuf = { lastUpAt: 0, lastDownAt: 0, pendingJumpAt: 0, pendingJAt: 0, pendingKAt: 0, pendingLAt: 0 };
-      this.guest2Buf = { lastUpAt: 0, lastDownAt: 0, pendingJumpAt: 0, pendingJAt: 0, pendingKAt: 0, pendingLAt: 0 };
-      this.hostBuf = { lastUpAt: 0, lastDownAt: 0, pendingJumpAt: 0, pendingJAt: 0, pendingKAt: 0, pendingLAt: 0 };
       this.p2.anchor = false;
-      this.p2.infinite = !this.pve && !this.pvp && !this.cricket;
+
       this.p2.sprite.body.pushable = true;
       this.p2.sprite.setImmovable(false);
-      if (this.p3) {
-        this.p3.anchor = false;
-        this.p3.infinite = false;
-        this.p3.sprite.body.pushable = true;
-        this.p3.sprite.setImmovable(false);
-      }
-      if (this.raid && this.pack.raidSolo) {
-        this.p2.ko = true;
-        this.p2.sprite.setVisible(false);
-        this.p2.ghost.setVisible(false);
-        this.p2.shell.setVisible(false);
-      }
       this.wireTerrainColliders();
       this.cpuMap = {};
       this.cpu = this.cpuBrain(this.p2);
-      if (this.cricket) {
-        [this.p1, this.p2].forEach((a) => {
-          a.maxHp = Math.round(BASE_HP * 1.35);
-          a.hp = a.maxHp;
-        });
-        this.cpuBrain(this.p1).nextAt = 80;
-        this.cpuBrain(this.p2).nextAt = 280;
-      }
-      const openMs = this.pvp || this.pve || this.cricket ? 1800 : 800;
-      // 所有模式开战前都 3-2-1（含木桩），幕拉开后再喊
       this.countMs = 3800;
       this.countAt = Number.MAX_SAFE_INTEGER;
       this.roundAt = Number.MAX_SAFE_INTEGER;
       this._countdownArmed = false;
       this._countLabelPrev = "";
-      this.profiles = this.pack.profiles || {};
-      const nickOf = (seat) => this.profiles?.[seat]?.nick || defaultNick(seat);
-      this.playerTags = [];
-      this.dummyTag = null;
-      const tagStyle = {
-        fontFamily: UI_FONT,
-        fontSize: 13,
-        color: "#e8c36a",
-        stroke: "#000",
-        strokeThickness: 3,
-      };
-      if (this.pvp) {
-        const tags = this.pvpThree
-          ? [
-              { actor: this.p1, label: nickOf("host") },
-              { actor: this.p2, label: nickOf("guest") },
-              { actor: this.p3, label: nickOf("guest2") },
-            ]
-          : [
-              { actor: this.p1, label: nickOf("host") },
-              { actor: this.p2, label: nickOf("guest") },
-            ];
-        tags.forEach(({ actor, label }) => {
-          const mine = actor === this.myActor();
-          this.playerTags.push(
-            crispUi(
-              this.add
-                .text(actor.sprite.x, actor.sprite.y - 210, mine ? `我·${label}` : label, {
-                  ...tagStyle,
-                  fontSize: 16,
-                })
-                .setOrigin(0.5, 1)
-            )
-          );
-        });
-        this.dummyTag = this.playerTags[this.pvpThree ? 0 : 1];
-      } else if (this.cricket) {
-        [this.p1, this.p2].forEach((actor, i) => {
-          this.playerTags.push(
-            crispUi(
-              this.add
-                .text(actor.sprite.x, actor.sprite.y - 210, i === 0 ? "人机·甲" : "人机·乙", {
-                  ...tagStyle,
-                  fontSize: 16,
-                  color: i === 0 ? "#6ec8ff" : "#ff8a78",
-                })
-                .setOrigin(0.5, 1)
-            )
-          );
-        });
-        this.dummyTag = this.playerTags[1];
-      } else if (!this.raid) {
-        const tagLabel = this.pve ? cpuDiffLabel(this.cpuDiff) : "木桩";
-        this.dummyTag = crispUi(
-          this.add
-            .text(this.p2.sprite.x, this.p2.sprite.y - 210, tagLabel, {
-              ...tagStyle,
-              fontSize: 16,
-              color: this.pve ? "#e8c36a" : "#d7e2ff",
-            })
-            .setOrigin(0.5, 1)
-        );
-      }
-
       this.over = false;
       this.resultShown = false;
       this.hitstop = false;
@@ -7030,30 +3363,11 @@
       if (!this.p1.startMove("opening_cg")) {
         this.p1.startMove("idle", { busy: false });
       }
-      if (this.cricket) {
-        if (!this.p2.startMove("opening_cg")) {
-          this.p2.startMove("idle", { busy: false });
-        }
-      } else {
-        this.p2.startMove("idle", { busy: false });
-      }
-      if (this.p3) this.p3.startMove("idle", { busy: false });
-
+      this.p2.startMove("idle", { busy: false });
       this.projectiles = [];
-      this.raidEnemies = [];
-      this.raidWave = 0;
-      this.raidWaveAt = 0;
-      this.raidCleared = false;
-      this.raidIntroUntil = 0;
-      this._raidDialogueWave = 0;
-      this.raidDialogue = null;
-      this.raidDialogueActive = false;
-      this.raidDialogueStep = 0;
-      this.raidDialogueLines = [];
-      if (this.raid) this.startRaidWave(1);
       this.input.once("pointerdown", () => this.sound.unlock());
       this.input.keyboard.once("keydown", () => this.sound.unlock());
-      this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K,L,I,O,P,H,N,ESC,ENTER,SHIFT,SPACE");
+      this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K,L,ESC,ENTER,SHIFT");
       this.input.keyboard.addCapture("ESC");
       this._leavingFight = false;
       this.input.keyboard.on("keydown-ESC", this.onFightEsc, this);
@@ -7062,15 +3376,14 @@
         killStageBgm(this);
       });
 
-      setChrome(this.raid ? "raid" : this.pvp ? "pvp" : this.pve ? "pve" : this.cricket ? "cricket" : "dummy");
+      setChrome("pve");
       this.syncTitle();
-      if (this.pvp && this.net) this.wireNet();
 
       this.resultWash = this.add.graphics().setScrollFactor(0).setDepth(54).setAlpha(0);
       this.result = this.add
         .text(w / 2, h * 0.46, "", {
-          fontFamily: BRUSH_FONT,
-          fontSize: 168,
+          fontFamily: UI_FONT,
+          fontSize: 96,
           color: "#f3e6c0",
           stroke: "#2a1a0c",
           strokeThickness: 8,
@@ -7091,27 +3404,6 @@
         .setDepth(55)
         .setScrollFactor(0)
         .setAlpha(0);
-      const nextBg = this.add
-        .rectangle(0, 0, 270, 58, 0x7a4a20, 0.96)
-        .setStrokeStyle(3, 0xf2d090, 1)
-        .setInteractive({ useHandCursor: true });
-      this.raidNextLabel = this.add
-        .text(0, 0, "下一关", {
-          fontFamily: UI_FONT,
-          fontSize: 23,
-          color: "#fff0bd",
-          stroke: "#2a1308",
-          strokeThickness: 4,
-        })
-        .setOrigin(0.5);
-      this.raidNextButton = this.add
-        .container(w / 2, h * 0.82, [nextBg, this.raidNextLabel])
-        .setDepth(58)
-        .setScrollFactor(0)
-        .setVisible(false);
-      nextBg.on("pointerover", () => nextBg.setFillStyle(0xa7662a, 1));
-      nextBg.on("pointerout", () => nextBg.setFillStyle(0x7a4a20, 0.96));
-      nextBg.on("pointerdown", () => this.advanceRaidStage());
       this.countText = crispUi(
         this.add
           .text(w / 2, h * 0.42, "", {
@@ -7128,16 +3420,10 @@
       );
 
       this.hpGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
-      this.hud = uiText(this, 16, 92, "", {
-        fontSize: 16,
-        color: "#f8ecd0",
-        stroke: "#3a2410",
-        strokeThickness: 3,
-      }).setScrollFactor(0).setDepth(22);
       this.buildHudChrome();
       this.drawHp();
       this.buildCurtains();
-      this.openCurtains(openMs);
+      this.openCurtains(1200);
     }
 
     stageName() {
@@ -7666,303 +3952,9 @@
       playStageBgm(this, stageId, this.pack?.stages);
     }
 
-    fighters() {
-      if (this.raid && this.pack.raidSolo) return [this.p1];
-      return this.p3 ? [this.p1, this.p2, this.p3] : [this.p1, this.p2];
-    }
+    fighters() { return [this.p1,this.p2]; }
 
-    startRaidWave(wave) {
-      (this.raidEnemies || []).forEach((enemy) => enemy.destroy());
-      this.raidEnemies = [];
-      this.raidWave = wave;
-      const boss = wave >= 3;
-      const count = boss ? 1 : wave === 2 ? 4 : 3;
-      for (let i = 0; i < count; i++) {
-        const x = this.worldW * (0.58 + (i - (count - 1) / 2) * 0.1);
-        const y = this.spawnFloorY(x);
-        const elite = wave === 2 && i === count - 1;
-        this.raidEnemies.push(new RaidEnemy(this, wave * 10 + i, x, y, boss, elite));
-      }
-      const label = boss ? `${this.pack.boss?.displayName || "关底英灵"} 来袭！` : wave === 2 ? "第 2 波 · 精英来袭" : `第 ${wave} 波`;
-      this.raidBanner(label);
-      if (boss) this.showRaidBossDialogue();
-    }
-
-    showRaidBossDialogue() {
-      if (this._raidDialogueWave === 3 || !this.raid) return;
-      this._raidDialogueWave = 3;
-      this.raidDialogueActive = true;
-      this.raidDialogueStep = 0;
-      this.raidIntroUntil = Number.MAX_SAFE_INTEGER;
-      this.raidDialogue?.destroy(true);
-      const w = this.scale.width;
-      const h = this.scale.height;
-      const bossName = this.pack.boss?.displayName || "关底英灵";
-      const heroName = this.p1?.fighter?.displayName || "挑战者";
-      this.raidDialogueLines = raidStoryLines(this.pack.stageId, this.stageName(), bossName, heroName);
-      const panel = this.add.rectangle(0, 0, Math.min(820, w * 0.82), 146, 0x160e12, 0.93).setStrokeStyle(3, 0xd7a75a, 0.9);
-      this.raidDialogueSpeaker = this.add.text(-panel.width / 2 + 28, -56, "", {
-        fontFamily: UI_FONT,
-        fontSize: 19,
-        color: "#ffcb75",
-        stroke: "#000",
-        strokeThickness: 3,
-      });
-      this.raidDialogueLine = this.add.text(-panel.width / 2 + 28, -22, "", {
-        fontFamily: UI_FONT,
-        fontSize: 20,
-        color: "#fff0d0",
-        stroke: "#000",
-        strokeThickness: 3,
-        wordWrap: { width: panel.width - 56 },
-      });
-      this.raidDialogueHint = this.add
-        .text(panel.width / 2 - 24, 59, "点击 / J / Enter 继续  1/8", {
-          fontFamily: UI_FONT,
-          fontSize: 13,
-          color: "#c9b17d",
-        })
-        .setOrigin(1, 0.5);
-      this.raidDialogue = this.add
-        .container(w / 2, h * 0.69, [panel, this.raidDialogueSpeaker, this.raidDialogueLine, this.raidDialogueHint])
-        .setDepth(95)
-        .setScrollFactor(0);
-      this.renderRaidDialogueStep();
-    }
-
-    renderRaidDialogueStep() {
-      if (!this.raidDialogueActive || !this.raidDialogue?.active) return;
-      const lines = this.raidDialogueLines || [];
-      const index = Phaser.Math.Clamp(Number(this.raidDialogueStep) || 0, 0, Math.max(0, lines.length - 1));
-      const entry = lines[index];
-      if (!entry) return;
-      this.raidDialogueStep = index;
-      this.raidDialogueSpeaker?.setText(entry.speaker).setColor(entry.color || "#ffcb75");
-      this.raidDialogueLine?.setText(entry.text);
-      this.raidDialogueHint?.setText(`点击 / J / Enter 继续  ${index + 1}/${lines.length}`);
-      this.raidDialogue?.setAlpha(1);
-    }
-
-    advanceRaidDialogue() {
-      if (!this.raidDialogueActive) return;
-      if (this.pvp && !this.isHost) {
-        this.net?.send({ type: "raid_dialogue_next" });
-        return;
-      }
-      const lines = this.raidDialogueLines || [];
-      if (this.raidDialogueStep < lines.length - 1) {
-        this.raidDialogueStep += 1;
-        this.renderRaidDialogueStep();
-        return;
-      }
-      this.closeRaidDialogue();
-    }
-
-    closeRaidDialogue() {
-      if (!this.raidDialogueActive && !this.raidDialogue) return;
-      this.raidDialogueActive = false;
-      this.raidIntroUntil = this.combatNow + 380;
-      const box = this.raidDialogue;
-      this.raidDialogue = null;
-      if (box?.active) {
-        this.tweens.add({
-          targets: box,
-          alpha: 0,
-          y: box.y - 18,
-          duration: 220,
-          onComplete: () => box.destroy(true),
-        });
-      }
-      if (this.pvp && this.isHost) {
-        this.net?.send({ type: "raid_dialogue_done" });
-      }
-    }
-
-    pauseForRaidDialogue() {
-      if (!this.raid || !this.raidDialogueActive) return false;
-      const confirm =
-        this._edgeJ ||
-        (this.keys?.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) ||
-        (this.keys?.SPACE && Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) ||
-        !!this.input?.activePointer?.justDown;
-      if (confirm) {
-        // 对话期间的确认不能留在出招缓冲里，否则翻页的 J 会在对话结束后打出去
-        this._edgeJ = false;
-        this.pendingJAt = 0;
-        [this.hostBuf, this.guestBuf, this.guest2Buf].forEach((buf) => {
-          if (buf) buf.pendingJAt = 0;
-        });
-        this.advanceRaidDialogue();
-      }
-      if (this.pvp && this.isHost) {
-        ["guest", "guest2"].forEach((seat) => {
-          const pad = this.remotePads?.[seat];
-          if (!pad) return;
-          pad.justJ = false;
-          pad.justK = false;
-          pad.justL = false;
-          pad.justShift = false;
-          pad.justUp = false;
-          pad.justDown = false;
-        });
-      }
-      if (!this.raidDialogueActive) {
-        if (this.pvp && !this.isHost) {
-          this.sendLocalInput();
-          this.applyPendingState();
-        }
-        if (this.pvp && this.isHost) this.sendState();
-        return false;
-      }
-      this.fighters().forEach((actor) => {
-        if (!actor?.ko) {
-          actor.sprite.setVelocityX(0);
-          actor.plantFrame();
-        }
-      });
-      (this.raidEnemies || []).forEach((enemy) => enemy.draw());
-      this.positionPlayerTags();
-      this.drawHp();
-      if (this.pvp && !this.isHost) {
-        this.sendLocalInput();
-        this.applyPendingState();
-      }
-      if (this.pvp && this.isHost) this.sendState();
-      return true;
-    }
-
-    raidBanner(label) {
-      const text = this.add.text(this.scale.width / 2, this.scale.height * 0.25, label, {
-        fontFamily: BRUSH_FONT,
-        fontSize: 62,
-        color: "#f5dfa0",
-        stroke: "#34170d",
-        strokeThickness: 8,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(80);
-      this.tweens.add({ targets: text, alpha: 0, y: text.y - 28, delay: 850, duration: 520, onComplete: () => text.destroy() });
-    }
-
-    tryRaidHit(attacker, enemy) {
-      if (!attacker?.attacking?.() || !enemy || enemy.ko || attacker.hitThisMove) return;
-      const spec = moveSpec(attacker.fighter, attacker.move);
-      const projKey = `${attacker.prefix}-proj-${attacker.move}`;
-      if (spec.projectile?.file && this.textures.exists(projKey) && mechanicSpec(spec).type !== "melee") return;
-      const box = attacker.attackBox();
-      const hurt = enemy.worldHurt();
-      if (!Phaser.Geom.Rectangle.Overlaps(box, hurt)) return;
-      attacker.hitThisMove = true;
-      const hpBefore = enemy.hp;
-      enemy.takeHit(attacker.move, attacker.strikeFacing(), spec);
-      enemy.applyMechanic(attacker, attacker.move, spec);
-      if (isLightAttack(attacker.move)) {
-        this.applyDomainLightLifesteal(attacker, enemy, Math.max(0, hpBefore - enemy.hp));
-      }
-      this.impactAt(enemy.sprite.x, enemy.sprite.y - 30, "light");
-      this.gainMp(attacker, 8);
-      this.freezeHit(spec.hit?.stop || 24, attacker);
-    }
-
-    updateRaid() {
-      if (!this.raid || this.over || this.inCountdown()) return;
-      const players = this.aliveFighters();
-      if (!players.length) {
-        this.beginEndCine();
-        return;
-      }
-      if (this.combatNow < (this.raidIntroUntil || 0)) {
-        (this.raidEnemies || []).forEach((enemy) => enemy.draw());
-        return;
-      }
-      (this.raidEnemies || []).forEach((enemy) => {
-        players.forEach((player) => this.tryRaidHit(player, enemy));
-        enemy.tick(players);
-      });
-      if ((this.raidEnemies || []).some((enemy) => !enemy.ko)) return;
-      if (this.raidWave < 3) {
-        if (!this.raidWaveAt) this.raidWaveAt = this.combatNow + 1200;
-        if (this.combatNow >= this.raidWaveAt) {
-          this.raidWaveAt = 0;
-          players.forEach((p) => {
-            p.hp = Math.min(p.maxHp, p.hp + 42);
-            p.mp = Math.min(p.maxMp, p.mp + 26);
-          });
-          this.startRaidWave(this.raidWave + 1);
-        }
-      } else if (!this.raidCleared) {
-        this.raidCleared = true;
-        this.beginEndCine();
-      }
-    }
-
-    raidProjectileHits() {
-      if (!this.raid) return;
-      const now = this.combatNow;
-      for (const shot of this.projectiles || []) {
-        if (!shot?.sprite?.active || !shot.owner) continue;
-        // Boss 弹道在 updateProjectiles 中反向命中玩家，不能再被当作玩家
-        // 弹道回头打到 Boss 自己。
-        if (shot.owner?.boss) continue;
-        const box = this.projectileHitBox(shot);
-        shot.raidHits = shot.raidHits || {};
-        for (const enemy of this.raidEnemies || []) {
-          if (enemy.ko || (shot.raidHits[enemy.id] || 0) > now) continue;
-          if (!Phaser.Geom.Rectangle.Overlaps(box, enemy.worldHurt())) continue;
-          const repeat = Number.isFinite(shot.raidHits[enemy.id]);
-          const repeatable = Boolean(
-            !shot.hawkingTrap && !shot.yearZeroBind && (shot.persist || shot.pierce || (shot.ticksLeft || 0) > 1)
-          );
-          shot.raidHits[enemy.id] = repeatable ? now + Math.max(90, Number(shot.pulseMs) || 180) : Number.MAX_SAFE_INTEGER;
-          const sourceSpec = moveSpec(shot.owner.fighter, shot.move);
-          let damage = Number.isFinite(shot.damage) ? shot.damage : sourceSpec.damage;
-          if (repeat) damage = Math.max(1, Math.round(damage * 0.24));
-          if (shot.dmgBudget != null) {
-            if (shot.dmgBudget <= 0 && damage > 0) {
-              enemy.applyMechanic(shot.owner, shot.move, sourceSpec, shot);
-              continue;
-            }
-            damage = Math.min(damage, shot.dmgBudget);
-            shot.dmgBudget -= damage;
-          }
-          const hitSpec = {
-            ...sourceSpec,
-            damage,
-            hit: { ...sourceSpec.hit, ...(shot.hitSpec || {}) },
-            effect: shot.effect || sourceSpec.effect,
-            effectStrength: Number.isFinite(shot.effectStrength) ? shot.effectStrength : sourceSpec.effectStrength,
-            ailment: shot.ailment || sourceSpec.ailment,
-          };
-          if (damage > 0) enemy.takeHit(shot.move, shot.facing || shot.owner.strikeFacing?.() || 1, hitSpec);
-          enemy.applyMechanic(shot.owner, shot.move, hitSpec, shot);
-          if (!shot.pierce && !shot.persist) shot.hit = true;
-          if (shot.hawkingTrap) {
-            shot.trapArmed = false;
-            shot.trapExploding = true;
-            shot.trapBoomAt = now + 420;
-            shot.diesAt = Math.min(shot.diesAt || now + 420, now + 420);
-          }
-          this.impactAt(enemy.sprite.x, enemy.sprite.y - 30, "light");
-          this.gainMp(shot.owner, 10);
-        }
-      }
-    }
-
-    myActor() {
-      if (!this.pvp) return this.p1;
-      if (this.seat === "host") return this.p1;
-      if (this.seat === "guest2") return this.p3 || this.p2;
-      return this.p2;
-    }
-
-    padForSeat(seat) {
-      if (seat === "host") return this.readLocalPad();
-      return this.remotePads[seat] || emptyPad();
-    }
-
-    bufForSeat(seat) {
-      if (seat === "host") return this.hostBuf;
-      if (seat === "guest2") return this.guest2Buf;
-      return this.guestBuf;
-    }
+    myActor() { return this.p1; }
 
     faceFromMovement(actor, pad) {
       if (!actor || actor.ko || !pad) return false;
@@ -7984,17 +3976,7 @@
       // 行走/冲刺/跳跃时按方向键朝向；仅无横向输入时自动面敌。
       if (this.faceFromMovement(actor, pad)) return;
       if (actor.reacting?.() || actor.immobilized?.()) return;
-      if (this.raid) {
-        const enemies = (this.raidEnemies || []).filter((enemy) => !enemy.ko);
-        if (!enemies.length) return;
-        let best = enemies[0];
-        enemies.forEach((enemy) => {
-          if (Math.abs(enemy.sprite.x - actor.sprite.x) < Math.abs(best.sprite.x - actor.sprite.x)) best = enemy;
-        });
-        actor.facing = best.sprite.x >= actor.sprite.x ? 1 : -1;
-        actor.syncFacingVisual();
-        return;
-      }
+
       const foes = this.fighters().filter((f) => f !== actor && !f.ko);
       if (!foes.length) return;
       let best = foes[0];
@@ -8011,12 +3993,7 @@
     }
 
     nearestFoe(from) {
-      const raidEnemyCaster = Boolean(this.raid && from?.boss);
-      const foes = this.raid
-        ? raidEnemyCaster
-          ? this.fighters().filter((fighter) => !fighter.ko)
-          : (this.raidEnemies || []).filter((enemy) => !enemy.ko)
-        : this.fighters().filter((f) => f !== from && !f.ko);
+      const foes = this.fighters().filter((f) => f !== from && !f.ko);
       if (!foes.length) return null;
       let best = foes[0];
       let bestD = Math.abs(best.sprite.x - from.sprite.x);
@@ -8034,8 +4011,7 @@
       const facing = from.facing || 1;
       let best = null;
       let bestD = range + 1;
-      const raidEnemyCaster = Boolean(this.raid && from?.boss);
-      const foes = this.raid ? (raidEnemyCaster ? this.fighters() : this.raidEnemies || []) : this.fighters();
+      const foes = this.fighters();
       for (const foe of foes) {
         if (foe === from || foe.ko) continue;
         const dx = foe.sprite.x - from.sprite.x;
@@ -8049,16 +4025,7 @@
       return best;
     }
 
-    projectileCombatTargets(shot) {
-      if (!this.raid) return this.fighters();
-      // 玩家弹道仍由 raidProjectileHits 结算；英雄 Boss 的弹道则走与
-      // 普通对战相同的命中/格挡/机制流程，但目标反转为闯关玩家。
-      const owner = shot?.owner;
-      if (owner?.boss) {
-        return this.fighters().filter((fighter) => !fighter.ko);
-      }
-      return [];
-    }
+    projectileCombatTargets() { return this.fighters(); }
 
     surfaceUnder(x, fromY) {
       const spec = this.collisionSpec();
@@ -8193,13 +4160,7 @@
 
     checkMatchOver() {
       const alive = this.aliveFighters();
-      if (this.pvpThree) {
-        if (alive.length <= 1) {
-          this.beginEndCine();
-          return true;
-        }
-        return false;
-      }
+
       if (this.p1.ko || this.p2.ko) {
         this.beginEndCine();
         return true;
@@ -8207,28 +4168,7 @@
       return false;
     }
 
-    positionPlayerTags() {
-      if (this.outcomeTags?.length) {
-        this.playerTags?.forEach((t) => t.setAlpha(0));
-        if (this.dummyTag) this.dummyTag.setAlpha(0);
-        this.positionOutcomeTags();
-        return;
-      }
-      if (this.pvp && this.playerTags?.length) {
-        const actors = this.p3 ? [this.p1, this.p2, this.p3] : [this.p1, this.p2];
-        actors.forEach((a, i) => {
-          if (this.playerTags[i]) this.playerTags[i].setPosition(a.sprite.x, a.sprite.y - 200);
-        });
-        return;
-      }
-      if (this.cricket && this.playerTags?.length) {
-        [this.p1, this.p2].forEach((a, i) => {
-          if (this.playerTags[i]) this.playerTags[i].setPosition(a.sprite.x, a.sprite.y - 200);
-        });
-        return;
-      }
-      if (this.dummyTag) this.dummyTag.setPosition(this.p2.sprite.x, this.p2.sprite.y - 200);
-    }
+    positionPlayerTags() { if(this.outcomeTags?.length)this.positionOutcomeTags(); }
 
     inCountdown() {
       return this.combatNow < this.roundAt;
@@ -8269,27 +4209,7 @@
       this.fighters().forEach((a) => a.plantFrame());
     }
 
-    syncTitle() {
-      const title = document.querySelector("header p");
-      if (!title) return;
-      const a = this.p1.fighter.displayName;
-      const b = this.p2.fighter.displayName;
-      const map = this.stageName();
-      if (this.raid) {
-        const team = this.fighters().map((fighter) => fighter.fighter.displayName).join(" / ");
-        const level = Math.max(1, (this.stageIds || []).indexOf(this.pack.stageId) + 1);
-        title.textContent = `${team}（合作闯关 · 第 ${level} 关）· ${map}`;
-      } else if (this.pvp) {
-        const you = seatLabel(this.seat);
-        if (this.pvpThree) {
-          title.textContent = `${a} / ${b} / ${this.p3.fighter.displayName}（3 人混战 · ${you}）· ${map}`;
-        } else {
-          title.textContent = `${a} vs ${b}（局域网 ${you}）· ${map}`;
-        }
-      } else if (this.cricket) title.textContent = `${a} vs ${b}（电子斗蛐蛐）· ${map}`;
-      else if (this.pve) title.textContent = `${a} vs ${b}（PVE · ${cpuDiffLabel(this.cpuDiff)}）· ${map}`;
-      else title.textContent = this.pack.shareDummy ? `${a} vs ${a}（同人木桩）· ${map}` : `${a} vs ${b} · ${map}`;
-    }
+    syncTitle() { window.HeroShell?.hint(`${this.p1.fighter.displayName} VS ${this.p2.fighter.displayName} · ${this.stageName()}`); }
 
     actionCost(move) {
       if (move === "super") return COST.super;
@@ -8359,7 +4279,7 @@
         }
         // 全员缓慢回蓝；普攻命中另有 gainMpFromLight。人机与玩家同一套回复，否则技能 CD 形同虚设。
         let mpRegen = 3.2;
-        if (this.pve && p === this.p2) mpRegen = this.cpuProfile().mpRegen;
+        if (p === this.p2) mpRegen = this.cpuProfile().mpRegen;
         p.mp = Phaser.Math.Clamp(p.mp + mpRegen * dt, 0, p.maxMp);
       });
     }
@@ -8376,186 +4296,90 @@
     }
 
     buildHudChrome() {
-      const actors = this.fighters();
-      this.hudFaces = actors.map((p) => {
-        const sel = `${p.prefix}-select`;
-        const idle = `${p.prefix}-idle`;
-        const key = this.textures.exists(sel) ? sel : idle;
-        const img = this.add.sprite(0, 0, key, 0).setScrollFactor(0).setDepth(21);
-        img.setDisplaySize(46, 46);
-        return { actor: p, img };
-      });
-      this.hudCdTexts = actors.map((p) => ({
-        actor: p,
+      this.hudNames = this.fighters().map((p, i) =>
+        uiText(this, i ? 1312 : 32, 22, `${i ? "CPU" : "1P"}  ${p.fighter.displayName}`, {
+          fontSize: 24,
+          color: i ? "#ff9980" : "#8dd4f1",
+          stroke: "#080b13",
+          strokeThickness: 4,
+        })
+          .setOrigin(i, 0)
+          .setScrollFactor(0)
+          .setDepth(23),
+      );
+      this.hudCdTexts = this.fighters().map((actor) => ({
+        actor,
         texts: CD_SLOT_ORDER.map((slot) =>
           uiText(this, 0, 0, slot.label, {
-            fontSize: 11,
-            color: "#f2e6c4",
-            stroke: "#1a1008",
+            fontSize: 13,
+            color: "#f0e7cf",
+            stroke: "#080b13",
             strokeThickness: 3,
           })
             .setScrollFactor(0)
             .setDepth(23)
-            .setOrigin(0.5, 0.5)
+            .setOrigin(0.5),
         ),
       }));
+      uiText(this, 672, 28, "VS", { fontSize: 30, color: "#efc05d", stroke: "#080b13", strokeThickness: 4 })
+        .setOrigin(0.5, 0)
+        .setScrollFactor(0)
+        .setDepth(23);
+      uiText(this, 672, 76, "PVE", { fontSize: 13, color: "#bbc6d0", stroke: "#080b13", strokeThickness: 3 })
+        .setOrigin(0.5, 0)
+        .setScrollFactor(0)
+        .setDepth(23);
     }
 
-    paintFighterHud(g, originX, y, p, flip, barW, faceSize) {
-      const gap = 8;
-      const cdH = 15;
-      const slotRow = 18;
-      const panelH = Math.max(52, faceSize + 6 + slotRow);
-      const innerW = barW + faceSize + gap;
-      const panelW = innerW + 20;
-      let faceX;
-      let barX;
-      let panelX;
-      if (!flip) {
-        panelX = originX - 10;
-        faceX = originX;
-        barX = originX + faceSize + gap;
-      } else {
-        panelX = originX - 10;
-        barX = originX;
-        faceX = originX + barW + gap;
-      }
-      paintValleyPanel(g, panelX, y - 8, panelW, panelH, {
-        selected: true,
-        radius: 10,
-        inset: 4,
-        accent: 0xd4b06a,
-      });
-      const bar = (x, by, hp, max, barFlip, bw, color, h = 12) => {
-        const ratio = max > 0 ? Phaser.Math.Clamp(hp / max, 0, 1) : 0;
-        const fill = Math.max(0, ratio * bw);
-        g.fillStyle(0x2a1c12, 0.92);
-        g.fillRect(x, by, bw, h);
-        g.fillStyle(color, 1);
-        if (barFlip) g.fillRect(x + (bw - fill), by, fill, h);
-        else g.fillRect(x, by, fill, h);
-        g.lineStyle(1, 0xf2d090, 0.85);
-        g.strokeRect(x, by, bw, h);
+    paintFighterHud(g, x, y, p, flip, barW) {
+      const bar = (by, value, max, h, color) => {
+        const width = Math.round(barW * Phaser.Math.Clamp(value / Math.max(1, max), 0, 1));
+        g.fillStyle(0x080b13);
+        g.fillRect(x - 3, by - 3, barW + 6, h + 6);
+        g.fillStyle(0x838d98);
+        g.fillRect(x - 1, by - 1, barW + 2, h + 2);
+        g.fillStyle(0x39232e);
+        g.fillRect(x, by, barW, h);
+        g.fillStyle(color);
+        g.fillRect(flip ? x + barW - width : x, by, width, h);
+        g.fillStyle(0xffffff, 0.3);
+        g.fillRect(flip ? x + barW - width : x, by, width, 3);
       };
-      const hpColor = p.infinite ? 0xd4a017 : p.hp > HP_PER_BAR * 2 ? 0xd4a017 : p.hp > HP_PER_BAR ? 0xd4862a : 0xc4473a;
-      const hp = p.infinite ? p.maxHp : p.hp;
-      bar(barX, y, hp, p.maxHp, flip, barW, hpColor, 10);
-      bar(barX, y + 14, p.mp, p.maxMp, flip, barW, p.mpBanned ? 0x4a4a55 : 0x4b8dff, 8);
-      bar(barX, y + 26, p.sp, p.maxSp, flip, barW, 0x58c77d, 8);
-      g.fillStyle(0x1a120c, 0.95);
-      g.fillRect(faceX - 1, y - 1, faceSize + 2, faceSize + 2);
-      g.lineStyle(1, 0xf2d090, 0.9);
-      g.strokeRect(faceX - 1, y - 1, faceSize + 2, faceSize + 2);
-      const faceRec = this.hudFaces?.find((f) => f.actor === p);
-      if (faceRec?.img) {
-        faceRec.img.setVisible(true).setDisplaySize(faceSize, faceSize).setPosition(faceX + faceSize / 2, y + faceSize / 2);
-      }
-      const cdY = y + faceSize + 4;
-      const boxW = (barW - 18) / 4;
-      const rec = this.hudCdTexts?.find((t) => t.actor === p);
+      bar(y, p.hp, p.maxHp, 22, p.hp / p.maxHp > 0.25 ? 0xe4b944 : 0xd44b41);
+      bar(y + 32, p.mp, p.maxMp, 8, p.mpBanned ? 0x686b7b : 0x4c9bdc);
+      bar(y + 47, p.sp, p.maxSp, 6, 0x75b87a);
+      const rec = this.hudCdTexts.find((t) => t.actor === p),
+        boxW = 92;
       CD_SLOT_ORDER.forEach((slot, i) => {
-        const bx = barX + i * (boxW + 6);
-        const has = !!p.has?.(slot.move);
-        const left = this.skillCdLeft(p, slot.move);
-        const total = Math.max(1, this.skillCdMs(slot.move));
-        g.fillStyle(0x1c140c, 0.95);
-        g.fillRect(bx, cdY, boxW, cdH);
-        if (has) {
-          const ready = Phaser.Math.Clamp(1 - left / total, 0, 1);
-          g.fillStyle(slot.color, left <= 0 ? 1 : 0.38);
-          g.fillRect(bx, cdY + cdH * (1 - ready), boxW, cdH * ready);
-        }
-        g.lineStyle(1, has && left <= 0 ? 0xf2d090 : 0x6a5a40, 0.85);
-        g.strokeRect(bx, cdY, boxW, cdH);
-        const txt = rec?.texts?.[i];
-        if (txt) {
-          txt.setText(!has ? `${slot.label} —` : left > 0 ? `${slot.label} ${(left / 1000).toFixed(1)}s` : `${slot.label} 就绪`);
-          txt.setVisible(true).setPosition(bx + boxW / 2, cdY + cdH / 2);
-          txt.setAlpha(has ? 1 : 0.45);
-        }
+        const bx = flip ? x + barW - (i + 1) * (boxW + 8) + 8 : x + i * (boxW + 8),
+          by = y + 66;
+        const has = !!p.has?.(slot.move),
+          left = this.skillCdLeft(p, slot.move),
+          ready = has && left <= 0;
+        g.fillStyle(0x0c1520, 0.94);
+        g.fillRect(bx, by, boxW, 22);
+        g.fillStyle(ready ? slot.color : 0x455164);
+        g.fillRect(bx, by + 20, boxW * (has ? 1 - left / Math.max(1, this.skillCdMs(slot.move)) : 0), 2);
+        rec.texts[i]
+          .setPosition(bx + boxW / 2, by + 10)
+          .setText(
+            !has
+              ? `${slot.label} —`
+              : left > 0
+                ? `${slot.label} ${(left / 1000).toFixed(1)}`
+                : `${slot.label} READY`,
+          )
+          .setAlpha(has ? 1 : 0.5);
       });
     }
 
     drawHp() {
-      // UI refreshes at 30 Hz; combat and rendering retain the display frame rate.
       if (this.combatNow - this._lastHudPaint < 1000 / 30) return;
       this._lastHudPaint = this.combatNow;
-      const g = this.hpGfx;
-      const w = this.scale.width;
-      g.clear();
-      const mark = (p) =>
-        p.ailment === "burn" && this.combatNow < p.ailmentUntil
-          ? "·燃"
-          : p.ailment === "freeze" && this.combatNow < p.ailmentUntil
-            ? "·冻"
-            : p.ailment === "poison" && this.combatNow < p.ailmentUntil
-              ? "·毒"
-              : "";
-      const info = (p) => {
-        const hpBit = p.infinite ? "HP ∞" : `HP ${Math.round(p.hp)}/${p.maxHp}`;
-        const mpBit = p.mpBanned ? "MP BAN" : `MP ${Math.round(p.mp)}`;
-        return `${hpBit}  ${mpBit}  SP ${Math.round(p.sp)}`;
-      };
-      if (this.raid) {
-        const team = this.fighters();
-        const face = team.length >= 3 ? 40 : 46;
-        const bw = team.length >= 3 ? Math.min(300, Math.floor((w - 80) / 3) - 52) : 360;
-        const gap = 18;
-        const slotW = bw + face + 8;
-        let x = Math.max(16, Math.floor((w - (slotW * team.length + gap * (team.length - 1))) / 2));
-        team.forEach((p) => {
-          this.paintFighterHud(g, x, 12, p, false, bw, face);
-          x += slotW + gap;
-        });
-        const remain = (this.raidEnemies || []).filter((enemy) => !enemy.ko).length;
-        const combo = Math.max(
-          0,
-          ...(this.raidEnemies || []).map((enemy) =>
-            this.combatNow <= (enemy.comboUntil || 0) ? Number(enemy.comboHits) || 0 : 0
-          )
-        );
-        this.hud
-          .setY(92)
-          .setText(
-            `第 ${Math.max(1, (this.stageIds || []).indexOf(this.pack.stageId) + 1)} 关 · 第 ${this.raidWave || 1} 波　剩余魔兽 ${remain}${this.raidWave === 2 ? " · 精英" : ""}${this.raidWave >= 3 ? ` · BOSS ${this.pack.boss?.displayName || "英灵"}` : ""}${combo >= 2 ? `　连击 ×${combo}` : ""}`
-          );
-        return;
-      }
-      const face = this.pvpThree ? 40 : 46;
-      if (this.pvpThree) {
-        const bw = Math.min(300, Math.floor((w - 80) / 3) - 52);
-        const gap = 18;
-        const slotW = bw + face + 8;
-        const total = slotW * 3 + gap * 2;
-        let x = Math.floor((w - total) / 2);
-        [this.p1, this.p2, this.p3].forEach((p) => {
-          this.paintFighterHud(g, x, 12, p, false, bw, face);
-          x += slotW + gap;
-        });
-        const seatTag = (p) => {
-          if (p === this.p1) return this.seat === "host" ? "我" : "主机";
-          if (p === this.p2) return this.seat === "guest" ? "我" : "客人1";
-          return this.seat === "guest2" ? "我" : "客人2";
-        };
-        this.hud.setY(92);
-        this.hud.setText(
-          [this.p1, this.p2, this.p3]
-            .map((p) => `${p.fighter.displayName}${mark(p)} ${seatTag(p)} ${info(p)}`)
-            .join("    ")
-        );
-        return;
-      }
-      const barW = 360;
-      this.paintFighterHud(g, 16, 12, this.p1, false, barW, face);
-      const rightInner = barW + face + 8;
-      this.paintFighterHud(g, w - 16 - rightInner, 12, this.p2, true, barW, face);
-      const foe = this.pvp ? "P2" : this.pve ? "CPU" : this.cricket ? "人机" : "木桩";
-      this.hud.setY(92);
-      this.hud.setText(
-        this.cricket
-          ? `${this.p1.fighter.displayName}${mark(this.p1)}  甲 ${info(this.p1)}     ${this.p2.fighter.displayName}${mark(this.p2)}  乙 ${info(this.p2)}`
-          : `${this.p1.fighter.displayName}${mark(this.p1)}  ${info(this.p1)}     ${this.p2.fighter.displayName}${mark(this.p2)}  ${foe} ${info(this.p2)}`
-      );
+      const g = this.hpGfx.clear(),
+        barW = 536;
+      this.paintFighterHud(g, 32, 60, this.p1, false, barW);
+      this.paintFighterHud(g, this.scale.width - 32 - barW, 60, this.p2, true, barW);
     }
 
     resolvePush(a, b) {
@@ -8594,9 +4418,9 @@
 
     applyBlockedHit(target, attacker, move, rawDmg) {
       const taken = Math.max(1, Math.round((rawDmg || moveDamage(move)) * GUARD_DAMAGE));
-      if (!target.infinite) target.hp = Math.max(0, target.hp - taken);
+      target.hp = Math.max(0, target.hp - taken);
       this.gainMpFromLight(move, attacker, target, 5, 4);
-      if (target.hp <= 0 && !target.infinite) {
+      if (target.hp <= 0 && true) {
         target.hp = 0;
         target.ko = true;
         target.startMove("defeat_cg", { voice: "defeat", busy: true });
@@ -8784,9 +4608,9 @@
     applyDomainLightLifesteal(attacker, defender, dealt) {
       if (!this.domainAuraActive(attacker) || !(dealt > 0)) return;
       const heal = Math.max(1, Math.round(dealt * 0.6));
-      if (!attacker.infinite) {
+
         attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
-      }
+
       this.floatHeal(attacker, heal);
     }
 
@@ -8795,7 +4619,7 @@
       const banned = new Set();
       for (const shot of this.projectiles || []) {
         if (!shot?.domainField || !shot.sprite?.active) continue;
-        if (this.raid && !shot.owner?.boss) continue;
+
         const box = this.projectileHitBox(shot);
         for (const target of this.fighters()) {
           if (!target || target === shot.owner || target.ko) continue;
@@ -8842,25 +4666,14 @@
       const mid = (minX + maxX) / 2;
       const span = maxX - minX;
 
-      if (!this.cricket) {
         if (Math.abs(cam.zoom - 1) > 0.001) cam.setZoom(1);
         cam.scrollY = 0;
         this._camZoomWant = 1;
-      } else {
-        // 地图本身按高度铺满；这里只是镜头变焦。用滞回避免两人距离轻微变化就抖缩放
-        const raw = Phaser.Math.Clamp(w / Math.max(1100, span + 640), 0.84, 1);
-        if (!Number.isFinite(this._camZoomWant)) this._camZoomWant = 1;
-        if (raw < this._camZoomWant - 0.045) this._camZoomWant = raw;
-        else if (raw > this._camZoomWant + 0.07) this._camZoomWant = Math.min(1, raw);
-        cam.setZoom(Phaser.Math.Linear(cam.zoom, this._camZoomWant, 0.045));
-        if (Math.abs(cam.scrollY) > 0.5) cam.scrollY = Phaser.Math.Linear(cam.scrollY, 0, 0.2);
-        else cam.scrollY = 0;
-      }
 
       cam.setBounds(0, 0, worldW, h);
       const viewW = w / Math.max(0.5, cam.zoom);
       const want = Phaser.Math.Clamp(mid - viewW / 2, 0, Math.max(0, worldW - viewW));
-      cam.scrollX = Phaser.Math.Linear(cam.scrollX, want, this.cricket ? 0.08 : 0.14);
+      cam.scrollX = Phaser.Math.Linear(cam.scrollX, want, 0.14);
     }
 
     noteKo(actor) {
@@ -9534,7 +5347,7 @@
       const hpBefore = defender.hp;
       defender.takeHit(attacker.move, strikeDir, atkSpec);
       if (isLightAttack(attacker.move)) {
-        const lost = defender.infinite ? atkSpec.damage : Math.max(0, hpBefore - defender.hp);
+        const lost = Math.max(0, hpBefore - defender.hp);
         this.applyDomainLightLifesteal(attacker, defender, lost);
       }
       this.freezeHit(hit.stop || 32, attacker);
@@ -11526,13 +7339,13 @@
       target.takeHit(shot.move, hitDir, fromSpec);
       const steal = Number(shot.lifesteal) || 0;
       if (steal > 0 && shot.owner && !shot.owner.ko) {
-        // 木桩无限血时仍按本次伤害结算吸血；实战按实际掉血
-        const lost = target.infinite ? dmg : Math.max(0, hpBefore - target.hp);
+        // 按实际掉血结算吸血
+        const lost = Math.max(0, hpBefore - target.hp);
         if (lost > 0) {
           const heal = Math.max(1, Math.round(lost * steal));
-          if (!shot.owner.infinite) {
+
             shot.owner.hp = Math.min(shot.owner.maxHp, shot.owner.hp + heal);
-          }
+
           this.floatHeal(shot.owner, heal);
         }
       }
@@ -11975,540 +7788,45 @@
     }
 
     fitResultTitle(label, mood) {
-      const w = this.scale.width;
-      const maxW = w * 0.9;
-      const maxH = this.scale.height * 0.28;
-      const win = mood === "win";
-      const lose = mood === "lose";
-      const fill = win ? "#f3e6c0" : lose ? "#f2d8d0" : "#e0e0e0";
-      const stroke = win ? "#3a2a10" : lose ? "#3a0c0c" : "#1a1a1a";
-      let size = label.includes("\n") ? 132 : 196;
-      const minSize = 56;
-      this.result.setFontFamily(BRUSH_FONT).setColor(fill).setStroke(stroke, 6).setAlign("center").setLineSpacing(10);
-      do {
-        this.result.setFontSize(size).setText(label);
-        const strokeW = Math.max(3, Math.round(size / 28));
-        this.result.setStroke(stroke, strokeW);
-      } while ((this.result.width > maxW || this.result.height > maxH) && (size -= 8) >= minSize);
-      const padW = Math.min(w * 0.94, Math.max(420, this.result.width + 96));
-      const padH = Math.max(180, this.result.height + 72);
-      return { padW, padH };
+      this.result
+        .setFontFamily(UI_FONT)
+        .setFontSize(96)
+        .setText(label)
+        .setColor(mood === "win" ? "#efc05d" : "#f19580")
+        .setStroke("#080b13", 8);
+      return { padW: Math.min(1250, this.result.width + 80), padH: 164 };
     }
 
     paintResultTitle(label, mood) {
-      const w = this.scale.width;
-      const h = this.scale.height;
-      this.resultWash?.clear();
-      if (mood === "info") {
-        this.result.setFontFamily(UI_FONT).setFontSize(52).setColor("#f2e6c4").setStroke("#000", 8);
-        this.result.setText(label).setAlpha(1).setScale(1);
-        this.resultWash?.setAlpha(0);
-        return;
-      }
-      const win = mood === "win";
-      const lose = mood === "lose";
-      const fill = win ? 0xc4a050 : lose ? 0x8a1820 : 0x6a6a70;
       const { padW, padH } = this.fitResultTitle(label, mood);
-      this.resultWash.fillStyle(fill, 0.22);
-      this.resultWash.fillEllipse(w / 2, h * 0.46, padW, padH);
-      this.resultWash.fillStyle(fill, 0.1);
-      this.resultWash.fillEllipse(w / 2 + Math.min(80, padW * 0.12), h * 0.5, padW * 0.42, padH * 0.42);
-      this.resultWash.setAlpha(1);
-      this.result.setAlpha(0).setScale(0.86);
-      if (this.result.texture?.setFilter) this.result.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
-      this.tweens.add({
-        targets: this.result,
-        alpha: 1,
-        scale: 1,
-        duration: 640,
-        ease: "Cubic.easeOut",
-      });
-    }
-
-    nextRaidStageId() {
-      const ids = (this.stageIds || []).filter(Boolean);
-      if (!ids.length) return this.pack.stageId;
-      const at = Math.max(0, ids.indexOf(this.pack.stageId));
-      return ids[(at + 1) % ids.length];
-    }
-
-    showRaidNextButton(show) {
-      if (!this.raidNextButton) return;
-      this.raidNextButton.setVisible(!!show);
-      if (!show) return;
-      const nextId = this.nextRaidStageId();
-      const nextName = this.pack.stages?.[nextId]?.displayName || "下一关";
-      this.raidNextLabel?.setText(`下一关 · ${nextName}`);
-    }
-
-    advanceRaidStage() {
-      if (!this.raid || !this.raidCleared || !this.resultShown) return;
-      const nextId = this.nextRaidStageId();
-      if (this.pvp && !this.isHost) {
-        this.net?.send({ type: "rematch_request", next: true, stageId: nextId });
-        this.raidNextButton?.setVisible(false);
-        this.resultHint?.setText("等待主机进入下一关…");
-        return;
-      }
-      this.pack.stageId = nextId;
-      this.registry.set("match", this.pack);
-      try {
-        const url = new URL(location.href);
-        url.searchParams.set("mode", "raid");
-        url.searchParams.set("stage", nextId);
-        history.replaceState({}, "", url);
-      } catch {
-        /* ignore */
-      }
-      if (this.pvp && this.isHost) this.net?.send({ type: "rematch", stageId: nextId, next: true });
-      killStageBgm(this);
-      this.scene.start("loader", this.pack);
+      this.resultWash
+        .clear()
+        .fillStyle(0x080b13, 0.85)
+        .fillRect((this.scale.width - padW) / 2, this.scale.height * 0.46 - padH / 2, padW, padH)
+        .setAlpha(1);
+      this.result.setAlpha(1).setScale(1);
     }
 
     announceResult() {
       if (this.resultShown || !this.result) return;
       this.resultShown = true;
-      const mine = this.myActor();
-      let winMine = false;
-      let loseMine = false;
-      if (this.raid) {
-        const cleared = !!this.raidCleared && this.aliveFighters().length > 0;
-        winMine = cleared;
-        loseMine = !cleared;
-        this.paintResultTitle(cleared ? "闯关成功" : "闯关失败", cleared ? "win" : "lose");
-        playUiSfx(this, cleared ? UI_SFX.resultWin : UI_SFX.resultLose, { volume: 0.72 });
-        this.showRaidNextButton(cleared);
-      } else if (this.cricket) {
-        const winner = !this.p1.ko && this.p2.ko ? this.p1 : !this.p2.ko && this.p1.ko ? this.p2 : null;
-        this.paintResultTitle(winner ? `${winner.fighter.displayName}\n胜利` : "双倒", winner ? "win" : "draw");
-        if (winner) playUiSfx(this, UI_SFX.resultWin, { volume: 0.78 });
-        else playUiSfx(this, UI_SFX.resultLose, { volume: 0.45, rate: 0.92 });
-      } else {
-        if (this.pvpThree) {
-          const alive = this.aliveFighters();
-          winMine = alive.length === 1 && alive[0] === mine;
-          loseMine = mine.ko && !winMine;
-        } else if (this.pvp) {
-          winMine =
-            this.seat === "host" ? this.p2.ko && !this.p1.ko : this.p1.ko && !this.p2.ko;
-          loseMine =
-            this.seat === "host" ? this.p1.ko && !this.p2.ko : this.p2.ko && !this.p1.ko;
-        } else {
-          winMine = this.p2.ko && !this.p1.ko;
-          loseMine = this.p1.ko && !this.p2.ko;
-        }
-        this.paintResultTitle(winMine ? "胜利" : loseMine ? "败北" : "双倒", winMine ? "win" : loseMine ? "lose" : "draw");
-        if (winMine) playUiSfx(this, UI_SFX.resultWin, { volume: 0.78 });
-        else if (loseMine) playUiSfx(this, UI_SFX.resultLose, { volume: 0.62 });
-        else playUiSfx(this, UI_SFX.resultLose, { volume: 0.45, rate: 0.92 });
-      }
-      this.resultHint.setText(
-        this.raid
-          ? this.raidCleared
-            ? "点击按钮或按 J / Enter 进入下一关　　Esc 返回选人"
-            : "J / Enter 重新挑战　　Esc 返回选人"
-          : this.pvp
-          ? "J / Enter 再战（同人同图）　　任一方 Esc 全员回房间"
-          : this.cricket
-            ? "J / Enter 再看一场　　Esc 重选英灵"
-            : "J / Enter 再战　　Esc 重选英灵"
-      ).setAlpha(1);
-    }
-
-    returnToPvpLobby(fromPeer) {
-      if (!this.sys?.isActive()) return;
-      // 已离开过但仍停在对局：再按 Esc 强制切走（防偶发卡死）
-      if (this._leavingFight) {
-        try {
-          killStageBgm(this);
-          this.registry.set("pvpResume", { refreshStage: true, pullPeers: true });
-          this.scene.start("select");
-        } catch {
-          /* ignore */
-        }
-        return;
-      }
-      this._leavingFight = true;
-      clearNetLobbyPings(this.net);
-      if (this.net) this.net._fightGen = this.fightGen || 0;
-      if (this.net?.connected) {
-        if (this.isHost) {
-          const payload = {
-            type: "state",
-            stageId: this.pack.stageId,
-            over: true,
-            p1: this.packActor(this.p1),
-            p2: this.packActor(this.p2),
-          };
-          if (this.p3) payload.p3 = this.packActor(this.p3);
-          this.net.send(payload);
-        }
-        if (!fromPeer) {
-          const net = this.net;
-          const gen = this.fightGen || net._fightGen || 0;
-          const ping = () => {
-            try {
-              if (net?.connected) net.send({ type: "lobby_return", gen });
-            } catch {
-              /* ignore */
-            }
-          };
-          ping();
-          queueNetLobbyPings(net, [140, 360]);
-        }
-      }
-      this.net?.discard?.(["start", "map_draw", "ready", "state", "lobby_return"]);
-      this.net?.swallow?.(["start", "map_draw", "input"]);
-      this.registry.set("pvpResume", { refreshStage: true, pullPeers: true });
-      killStageBgm(this);
-      this.scene.start("select");
+      const win = this.p2.ko && !this.p1.ko,
+        lose = this.p1.ko && !this.p2.ko;
+      this.paintResultTitle(
+        win ? "YOU WIN" : lose ? "YOU LOSE" : "DRAW GAME",
+        win ? "win" : lose ? "lose" : "draw",
+      );
+      playUiSfx(this, win ? UI_SFX.resultWin : UI_SFX.resultLose, { volume: 0.7 });
+      this.resultHint.setText("J / ENTER  再战     ESC  选人").setAlpha(1);
+      window.HeroShell?.result();
     }
 
     onFightEsc() {
       if (!this.sys?.isActive()) return;
-      if (this.pvp) this.returnToPvpLobby(false);
-      else {
+
         killStageBgm(this);
         this.scene.start("select");
-      }
-    }
 
-    wireNet() {
-      const net = this.net;
-      if (!net) return;
-      clearNetLobbyPings(net);
-      net._fightGen = this.fightGen || net._fightGen || 0;
-      // 丢掉上一局 inbox 里的 state/lobby_return，否则抽完图进战会立刻被弹回选人
-      net.discard?.(["state", "lobby_return", "start", "map_draw"]);
-      net.swallow?.(["pick", "start", "map_draw", "ready", "nick", "lobby_state", "roster", "stage_pick"]);
-      net.on("close", () => {
-        if (!this.sys.isActive()) return;
-        this.remotePads = {guest: emptyPad(), guest2: emptyPad()};
-        this.over = true;
-        this.paintResultTitle("连接已断开", "info");
-        this.resultHint.setText("Esc 返回选人后重新加入房间").setAlpha(1);
-      });
-      net.on("input", (msg) => {
-        if (!this.isHost) return;
-        const from = msg._from;
-        if (from !== "guest" && from !== "guest2") return;
-        const next = padFromMsg(msg);
-        const prev = this.remotePads[from] || emptyPad();
-        // 硬直/特写期间后续包会把 just* 冲掉，边沿一直保持到 driveActor 吃掉
-        next.justUp = next.justUp || prev.justUp;
-        next.justDown = next.justDown || prev.justDown;
-        next.justJ = next.justJ || prev.justJ;
-        next.justK = next.justK || prev.justK;
-        next.justL = next.justL || prev.justL;
-        next.justShift = next.justShift || prev.justShift;
-        this.remotePads[from] = next;
-      });
-      net.on("state", (msg) => {
-        if (this.isHost) return;
-        this.pendingState = msg;
-      });
-      net.on("raid_dialogue_next", () => {
-        if (!this.isHost || !this.raid || !this.raidDialogueActive) return;
-        this.advanceRaidDialogue();
-      });
-      net.on("raid_dialogue_done", () => {
-        if (this.isHost || !this.raid) return;
-        this.closeRaidDialogue();
-      });
-      net.on("rematch", (msg) => {
-        if (this.isHost) return;
-        if (msg?.stageId && this.stageIds.includes(msg.stageId)) {
-          this.pack.stageId = msg.stageId;
-          this.registry.set("match", this.pack);
-        }
-        killStageBgm(this);
-        this.scene.start("loader", this.pack);
-      });
-      net.on("rematch_request", (msg) => {
-        if (!this.isHost || !this.over || !this.resultShown) return;
-        if (this.raid && this.raidCleared && msg?.next) {
-          this.advanceRaidStage();
-          return;
-        }
-        this.net?.send({ type: "rematch" });
-        killStageBgm(this);
-        this.scene.start("loader", this.pack);
-      });
-      net.on("lobby_return", (msg) => {
-        const gen = Number(msg?.gen);
-        const mine = Number(this.fightGen);
-        if (Number.isFinite(gen) && Number.isFinite(mine) && gen !== mine) return;
-        this.returnToPvpLobby(true);
-      });
-      net.on("peer", (msg) => {
-        if (msg.event === "left") {
-          this.over = true;
-          if (this.result) {
-            const who = msg.seat ? seatLabel(msg.seat) : "有人";
-            this.paintResultTitle(`${who} 离线`, "info");
-            this.resultHint.setText("Esc 返回英灵选择").setAlpha(1);
-          }
-        }
-      });
-    }
-
-    packActor(a) {
-      const now = this.combatNow;
-      const cdLeft = (move) => Math.max(0, (a.moveCdUntil?.[move] || 0) - now);
-      return {
-        clock: now,
-        x: a.sprite.x,
-        y: a.sprite.y,
-        vx: a.sprite.body.velocity.x,
-        vy: a.sprite.body.velocity.y,
-        hp: a.hp,
-        mp: a.mp,
-        sp: a.sp,
-        move: a.move,
-        facing: a.facing,
-        busy: a.busy,
-        ko: a.ko,
-        frame: a.textureIndex(),
-        stunUntil: a.stunUntil,
-        downedUntil: a.downedUntil,
-        willKnockdown: a.willKnockdown,
-        airFalling: a.airFalling,
-        invulnUntil: a.invulnUntil,
-        breakoutAt: a.breakoutAt,
-        pitFalling: a.pitFalling,
-        ailment: a.ailment,
-        ailmentUntil: a.ailmentUntil,
-        cd: {
-          skill: cdLeft("skill"),
-          combo_up: cdLeft("combo_up"),
-          combo_down: cdLeft("combo_down"),
-          super: cdLeft("super"),
-        },
-      };
-    }
-
-    applyActor(a, data) {
-      if (!data) return;
-      a.sprite.x = data.x;
-      a.sprite.y = data.y;
-      a.sprite.setVelocity(data.vx || 0, data.vy || 0);
-      a.hp = data.hp;
-      if (Number.isFinite(data.mp)) a.mp = data.mp;
-      if (Number.isFinite(data.sp)) a.sp = data.sp;
-      a.facing = data.facing;
-      a.syncFacingVisual();
-      a.busy = !!data.busy;
-      a.ko = !!data.ko;
-      const localDeadline = value => value ? this.combatNow + Math.max(0, value - (Number.isFinite(data.clock) ? data.clock : this.combatNow)) : 0;
-      a.stunUntil = localDeadline(data.stunUntil);
-      a.downedUntil = localDeadline(data.downedUntil);
-      a.willKnockdown = !!data.willKnockdown;
-      a.airFalling = !!data.airFalling;
-      a.hitThisMove = !!data.hitThisMove;
-      a.invulnUntil = localDeadline(data.invulnUntil);
-      a.breakoutAt = localDeadline(data.breakoutAt);
-      a.pitFalling = !!data.pitFalling;
-      if (data.ailment && data.ailment !== a.ailment) {
-        if (data.ailment === "none") a.clearAilment();
-        else a.applyAilment(data.ailment, 1);
-      }
-      if (Number.isFinite(data.ailmentUntil)) a.ailmentUntil = localDeadline(data.ailmentUntil);
-      if (data.cd && typeof data.cd === "object") {
-        const now = this.combatNow;
-        a.moveCdUntil = a.moveCdUntil || { skill: 0, combo_up: 0, combo_down: 0, super: 0 };
-        CD_SLOT_ORDER.forEach(({ move }) => {
-          if (Number.isFinite(data.cd[move])) a.moveCdUntil[move] = now + Math.max(0, data.cd[move]);
-        });
-      }
-      if (data.move && data.move !== a.move) {
-        const prev = a.move;
-        const next = data.move;
-        // 客人端靠状态包换招，必须重置，否则小技能/奥义特效只生成一次后永久失效
-        a.projSpawned = false;
-        a.hitThisMove = false;
-        if (prev === "super" && next !== "super") this.interruptActorSuper(a);
-        a.move = next;
-        const key = `${a.prefix}-${data.move}`;
-        if (a.scene.anims.exists(key)) {
-          a.sprite.anims.play(
-            { key, startFrame: 0, skipMissedFrames: false },
-            LOOP.has(data.move)
-          );
-          if (typeof data.frame === "number") a.applyMoveFrame(data.move, data.frame);
-        }
-        if (next === "super") this.beginSuperCutin(a);
-        // 网络跳帧时动画 update 可能赶不上出弹点，换招后立刻补一次
-        a.maybeSpawnProjectile();
-      } else if (typeof data.frame === "number" && a.move === data.move && a.textureIndex() !== data.frame) {
-        a.applyMoveFrame(a.move, data.frame);
-        a.maybeSpawnProjectile();
-      } else {
-        a.plantFrame(true);
-      }
-    }
-
-    sendState() {
-      if (!this.isHost || !this.net?.connected) return;
-      const payload = {
-        type: "state",
-        stageId: this.pack.stageId,
-        over: this.over,
-        p1: this.packActor(this.p1),
-        p2: this.packActor(this.p2),
-      };
-      if (this.p3) payload.p3 = this.packActor(this.p3);
-      if (this.raid) {
-        payload.raid = {
-          wave: this.raidWave,
-          cleared: this.raidCleared,
-          dialogueOpen: !!this.raidDialogueActive,
-          dialogueStep: this.raidDialogueStep || 0,
-          enemies: (this.raidEnemies || []).map((enemy) => ({
-            id: enemy.id,
-            x: enemy.sprite.x,
-            y: enemy.sprite.y,
-            hp: enemy.hp,
-            maxHp: enemy.maxHp,
-            boss: enemy.boss,
-            elite: enemy.elite,
-            ko: enemy.ko,
-            hitstun: Math.max(0, enemy.hitstunUntil - this.combatNow),
-            comboHits: enemy.comboHits,
-            comboLeft: Math.max(0, enemy.comboUntil - this.combatNow),
-            action: enemy.action,
-            heroMove: enemy.heroActionMove || "",
-            attackSeq: enemy.attackSeq || 0,
-            actionLeft: Math.max(0, enemy.actionUntil - this.combatNow),
-            actionDuration: Math.max(0, enemy.actionUntil - enemy.actionStartedAt),
-            actionHitLeft: Math.max(0, enemy.actionHitAt - this.combatNow),
-            actionHit: enemy.actionHit,
-            facing: enemy.facing,
-            rooted: Math.max(0, enemy.rootedUntil - this.combatNow),
-            slowed: Math.max(0, enemy.slowedUntil - this.combatNow),
-            slowMul: enemy.slowMul,
-            ailment: enemy.ailment,
-            ailmentLeft: Math.max(0, enemy.ailmentUntil - this.combatNow),
-            timeLock: Math.max(0, enemy.timeLockUntil - this.combatNow),
-            timeLockBanking: enemy.timeLockBanking,
-            timeLockBank: enemy.timeLockBank,
-          })),
-        };
-      }
-      this.net.send(payload);
-    }
-
-    applyPendingState() {
-      const msg = this.pendingState;
-      if (!msg) return;
-      this.pendingState = null;
-      if (msg.stageId && msg.stageId !== this.pack.stageId) {
-        const idx = this.stageIds.indexOf(msg.stageId);
-        if (idx >= 0) {
-          this.stageIndex = idx;
-          this.pack.stageId = msg.stageId;
-          const key = `stage-${msg.stageId}`;
-          if (this.textures.exists(key)) {
-            this.mountStage(msg.stageId);
-            this.syncTitle();
-          }
-        }
-      }
-      this.applyActor(this.p1, msg.p1);
-      this.applyActor(this.p2, msg.p2);
-      if (this.p3 && msg.p3) this.applyActor(this.p3, msg.p3);
-      if (this.raid && msg.raid) this.applyRaidState(msg.raid);
-      if (msg.over && !this.over) {
-        this.beginEndCine();
-      }
-    }
-
-    applyRaidState(data) {
-      const prevWave = this.raidWave;
-      this.raidWave = Number(data.wave) || this.raidWave;
-      this.raidCleared = !!data.cleared;
-      const current = new Map((this.raidEnemies || []).map((enemy) => [enemy.id, enemy]));
-      const next = [];
-      (data.enemies || []).forEach((state) => {
-        let enemy = current.get(state.id);
-        if (!enemy) enemy = new RaidEnemy(this, state.id, state.x, state.y, !!state.boss, !!state.elite);
-        enemy.sprite.setPosition(state.x, state.y);
-        enemy.constrainToArena();
-        enemy.hp = state.hp;
-        enemy.maxHp = state.maxHp || enemy.maxHp;
-        enemy.ko = !!state.ko;
-        enemy.hitstunUntil = this.combatNow + Math.max(0, Number(state.hitstun) || 0);
-        enemy.comboHits = Math.max(0, Number(state.comboHits) || 0);
-        enemy.comboUntil = this.combatNow + Math.max(0, Number(state.comboLeft) || 0);
-        enemy.action = state.action || "idle";
-        enemy.heroActionMove = state.heroMove || enemy.heroActionMove || "";
-        enemy.move = enemy.action === "hero_move" ? enemy.heroActionMove || "attack" : enemy.action === "hurt" ? "hurt" : "idle";
-        enemy.attackSeq = Math.max(0, Number(state.attackSeq) || 0);
-        enemy.actionUntil = this.combatNow + Math.max(0, Number(state.actionLeft) || 0);
-        enemy.actionStartedAt = enemy.actionUntil - Math.max(0, Number(state.actionDuration) || 0);
-        enemy.actionHitAt = this.combatNow + Math.max(0, Number(state.actionHitLeft) || 0);
-        enemy.actionHit = !!state.actionHit;
-        enemy.facing = Number(state.facing) < 0 ? -1 : 1;
-        enemy.rootedUntil = this.combatNow + Math.max(0, Number(state.rooted) || 0);
-        enemy.slowedUntil = this.combatNow + Math.max(0, Number(state.slowed) || 0);
-        enemy.slowMul = Number.isFinite(state.slowMul) ? state.slowMul : 1;
-        enemy.ailment = state.ailment || "none";
-        enemy.ailmentUntil = this.combatNow + Math.max(0, Number(state.ailmentLeft) || 0);
-        enemy.timeLockUntil = this.combatNow + Math.max(0, Number(state.timeLock) || 0);
-        enemy.timeLockBanking = !!state.timeLockBanking;
-        enemy.timeLockBank = Math.max(0, Number(state.timeLockBank) || 0);
-        const netCastKey = `${enemy.attackSeq}:${enemy.heroActionMove}`;
-        if (
-          enemy.boss &&
-          enemy.action === "hero_move" &&
-          enemy.actionHit &&
-          enemy._netCastKey !== netCastKey
-        ) {
-          enemy._netCastKey = netCastKey;
-          const profile = enemy.attackProfile();
-          if (profile.hasProjectile && profile.exactSpec) {
-            enemy.projSpawned = true;
-            this.spawnProjectile(enemy, profile.move, profile.exactSpec);
-          }
-        }
-        if (enemy.hitstunUntil > this.combatNow) enemy.hitAt = Math.max(enemy.hitAt, this.combatNow + 80);
-        enemy.sprite.setVisible(!enemy.ko);
-        enemy.gfx.setVisible(!enemy.ko);
-        enemy.heroSprite?.setVisible(!enemy.ko);
-        enemy.heroLabel?.setVisible(!enemy.ko);
-        enemy.draw();
-        next.push(enemy);
-        current.delete(state.id);
-      });
-      current.forEach((enemy) => enemy.destroy());
-      this.raidEnemies = next;
-      if (prevWave !== this.raidWave && this.raidWave >= 3) this.showRaidBossDialogue();
-      if (this.raidWave >= 3 && data.dialogueOpen) {
-        if (!this.raidDialogueActive) {
-          this._raidDialogueWave = 0;
-          this.showRaidBossDialogue();
-        }
-        this.raidDialogueStep = Math.max(0, Number(data.dialogueStep) || 0);
-        this.renderRaidDialogueStep();
-      } else if (this.raidDialogueActive && data.dialogueOpen === false) {
-        this.closeRaidDialogue();
-      }
-    }
-
-    readLocalPad() {
-      const pad = emptyPad();
-      pad.left = this.keys.A.isDown;
-      pad.right = this.keys.D.isDown;
-      pad.up = this.keys.W.isDown;
-      pad.down = this.keys.S.isDown;
-      pad.shift = this.keys.SHIFT.isDown;
-      pad.guard = this.keys.S.isDown;
-      pad.justUp = this._edgeUp || Phaser.Input.Keyboard.JustDown(this.keys.W);
-      pad.justDown = this._edgeDown || Phaser.Input.Keyboard.JustDown(this.keys.S);
-      pad.justJ = this._edgeJ || Phaser.Input.Keyboard.JustDown(this.keys.J);
-      pad.justK = this._edgeK || Phaser.Input.Keyboard.JustDown(this.keys.K);
-      pad.justL = this._edgeL || Phaser.Input.Keyboard.JustDown(this.keys.L);
-      pad.justShift = this._edgeShift || Phaser.Input.Keyboard.JustDown(this.keys.SHIFT);
-      return pad;
     }
 
     /** 每帧最先收边沿；hitstop/倒计时提前 return 也不会把 JustDown 吃掉。 */
@@ -12522,60 +7840,16 @@
       this._edgeShift = Phaser.Input.Keyboard.JustDown(this.keys.SHIFT);
       if (this._edgeJ) {
         this.pendingJAt = now;
-        if (this.hostBuf) this.hostBuf.pendingJAt = now;
       }
       if (this._edgeK) {
         this.pendingKAt = now;
-        if (this.hostBuf) this.hostBuf.pendingKAt = now;
       }
       if (this._edgeL) {
         this.pendingLAt = now;
-        if (this.hostBuf) this.hostBuf.pendingLAt = now;
       }
-    }
-
-    sendLocalInput() {
-      if (this.isHost || !this.net?.connected) return;
-      const pad = this.readLocalPad();
-      const state = [pad.left,pad.right,pad.up,pad.down,pad.shift,pad.guard].join();
-      const edge = pad.justUp || pad.justDown || pad.justJ || pad.justK || pad.justL || pad.justShift;
-      if (!edge && state === this._lastInputState && this.combatNow - this._lastInputSent < 1000 / 30) return;
-      this._lastInputState = state;
-      this._lastInputSent = this.combatNow;
-      this.net.send({ type: "input", ...pad });
-    }
-
-    vertFromPad(pad, buf, now, onGround = true) {
-      if (pad.justUp) {
-        buf.lastUpAt = now;
-        // 刚点上时清掉过期的下方向记忆，避免上+K 被吃成下+K
-        if (!pad.down && !pad.guard) buf.lastDownAt = 0;
-        if (onGround) buf.pendingJumpAt = now;
-      }
-      if (pad.justDown) buf.lastDownAt = now;
-      const upHeld = !!pad.up;
-      const downHeld = !!(pad.down || pad.guard);
-      const upTap = now - (buf.lastUpAt || 0) <= DIR_WINDOW;
-      const downTap = now - (buf.lastDownAt || 0) <= DIR_WINDOW;
-      // 当前按住优先；上下同时按时取更晚按下的一侧
-      if (upHeld && !downHeld) return "up";
-      if (downHeld && !upHeld) return "down";
-      if (upHeld && downHeld) return (buf.lastUpAt || 0) >= (buf.lastDownAt || 0) ? "up" : "down";
-      if (upTap && downTap) return (buf.lastUpAt || 0) >= (buf.lastDownAt || 0) ? "up" : "down";
-      if (upTap) return "up";
-      if (downTap) return "down";
-      return "";
     }
 
     /** 仅当前按住的上下（技能用，不受点按缓冲干扰） */
-    vertHeldFromPad(pad) {
-      const upHeld = !!pad.up;
-      const downHeld = !!(pad.down || pad.guard);
-      if (upHeld && !downHeld) return "up";
-      if (downHeld && !upHeld) return "down";
-      if (upHeld && downHeld) return "up";
-      return "";
-    }
 
     vertHeld() {
       const upHeld = this.keys.W.isDown;
@@ -12661,116 +7935,6 @@
       return "skill";
     }
 
-    driveActor(p, pad, buf) {
-      if (p.ko) return;
-      const s = p.sprite;
-      const onGround = p.grounded();
-      const now = this.combatNow;
-      // 必须在任何 early-return 之前记下边沿，否则硬直中按 K 会被整帧吃掉
-      if (pad.justJ) buf.pendingJAt = now;
-      if (pad.justK) buf.pendingKAt = now;
-      if (pad.justL) buf.pendingLAt = now;
-      const vdir = this.vertFromPad(pad, buf, now, onGround);
-      const vdirSkill = this.vertHeldFromPad(pad);
-      p.tickGetUp();
-      if (pad.justL && this.tryBreakout(p)) return;
-      if (pad.justShift && this.tryDashEscape(p, pad.left, pad.right)) return;
-      if (!p.canAct()) {
-        if (p.immobilized()) s.setVelocityX(0);
-        else if (p.busy && p.grounded() && !ATTACKS.has(p.move) && !HIT[p.move]?.knockdown) {
-          s.setVelocityX(s.body.velocity.x * 0.86);
-        }
-        if (p.busy || p.immobilized() || p.stunUntil > now || p.comboLocked()) return;
-      }
-      if (p.busy) {
-        if (onGround && !ATTACKS.has(p.move)) s.setVelocityX(0);
-        return;
-      }
-      const wantL = pad.justL || (buf.pendingLAt && now - buf.pendingLAt <= ACTION_BUF_MS);
-      const wantK = pad.justK || (buf.pendingKAt && now - buf.pendingKAt <= ACTION_BUF_MS);
-      const wantJ = pad.justJ || (buf.pendingJAt && now - buf.pendingJAt <= ACTION_BUF_MS);
-      if (wantL) {
-        if (this.canSpend(p, "super") && p.startMove("super", moveVoiceOpts("super"))) {
-          this.spend(p, "super");
-          buf.pendingLAt = 0;
-          s.setVelocityX(p.facing * moveSpec(p.fighter, "super").lunge);
-          return;
-        }
-        if (!this.canSpend(p, "super")) buf.pendingLAt = 0;
-      }
-      if (wantK) {
-        const anim = this.resolveSkillAnim(p, this.pickSkillPad(onGround, vdirSkill));
-        if (this.canSpend(p, anim) && p.startMove(anim, moveVoiceOpts(anim))) {
-          this.spend(p, anim);
-          buf.pendingKAt = 0;
-          buf.pendingJumpAt = 0;
-          if (anim === "attack_up" || anim === "combo_up") {
-            s.setVelocityY(0);
-            if (onGround) s.y = Math.min(s.y, this.supportY(p));
-          }
-          if (
-            anim === "combo_down" &&
-            onGround &&
-            !this.isGroundFrontDown(p.fighter) &&
-            !this.isHawkingHero(p.fighter) &&
-            !this.isYearZeroHero(p.fighter)
-          ) {
-            s.setVelocityY(-360);
-          }
-          s.setVelocityX(p.facing * moveSpec(p.fighter, anim).lunge);
-          return;
-        }
-        // 蓝/耐不足或没有该招：清缓冲，避免稍后突然放出来
-        if (!this.canSpend(p, anim) || !p.has(anim)) buf.pendingKAt = 0;
-      }
-      if (wantJ) {
-        const anim = this.pickAttackPad(onGround, vdir);
-        if (this.canSpend(p, anim) && p.startMove(anim, moveVoiceOpts(anim))) {
-          this.spend(p, anim);
-          buf.pendingJAt = 0;
-          buf.pendingJumpAt = 0;
-          if (anim === "attack_up" || anim === "combo_up") {
-            s.setVelocityY(0);
-            if (onGround) s.y = Math.min(s.y, this.supportY(p));
-          }
-          if (anim === "attack_down" && onGround) s.setVelocityY(-360);
-          s.setVelocityX(p.facing * moveSpec(p.fighter, anim).lunge);
-          return;
-        }
-        if (!this.canSpend(p, anim) || !p.has(anim)) buf.pendingJAt = 0;
-      }
-      if (pad.guard && onGround && this.canGuard(p)) {
-        s.setVelocityX(0);
-        p.startMove("guard", { busy: false });
-        buf.pendingJumpAt = 0;
-        return;
-      }
-      // 空中二段跳：点跳立刻起跳
-      if (!onGround && pad.justUp && p.jumpsLeft > 0) {
-        buf.pendingJumpAt = 0;
-        this.beginJumpFor(p, pad);
-        return;
-      }
-      if (onGround && buf.pendingJumpAt && now - buf.pendingJumpAt >= JUMP_DELAY) {
-        buf.pendingJumpAt = 0;
-        this.beginJumpFor(p, pad);
-        return;
-      }
-      let vx = this.steerVelocityX(p, pad.left, pad.right, pad.shift);
-      p.syncFacingVisual();
-      s.setVelocityX(vx);
-      p.plantFrame();
-      if (p.move === "jump" && s.body.velocity.y < 0) return;
-      if (!p.grounded()) {
-        if (p.move !== "jump" && s.body.velocity.y < -40 && !ATTACKS.has(p.move)) p.startMove("jump", { busy: false });
-      } else if (vx !== 0) {
-        const canDash = pad.shift && p.sp > 8 && !this.domainDashLocked(p);
-        p.startMove(canDash ? "dash" : "walk", { busy: false });
-      } else if (p.move !== "idle") {
-        p.startMove("idle", { busy: false });
-      }
-    }
-
     stampDirBuffer() {
       const now = this.combatNow;
       this.pressedUp = this._edgeUp || Phaser.Input.Keyboard.JustDown(this.keys.W);
@@ -12828,7 +7992,7 @@
     }
 
     controlPlayer() {
-      if (this.pvp) return;
+
       const p = this.p1;
       const s = p.sprite;
       const justL = this._edgeL;
@@ -12845,14 +8009,6 @@
       if (justJ) this.pendingJAt = now;
       if (justK) this.pendingKAt = now;
       if (justL) this.pendingLAt = now;
-
-      if (!this.pve) {
-        if (Phaser.Input.Keyboard.JustDown(this.keys.I)) p.startMove("opening_cg");
-        if (Phaser.Input.Keyboard.JustDown(this.keys.O)) p.startMove("win_cg", { voice: "win" });
-        if (Phaser.Input.Keyboard.JustDown(this.keys.P)) p.startMove("defeat_cg", { voice: "defeat" });
-        if (Phaser.Input.Keyboard.JustDown(this.keys.H)) p.startMove(onGround ? "hurt" : "air_hurt", { voice: "hurt" });
-        if (Phaser.Input.Keyboard.JustDown(this.keys.N)) p.startMove("knockdown");
-      }
 
       p.tickGetUp();
       if (justL && this.tryBreakout(p)) return;
@@ -12960,18 +8116,6 @@
       } else if (p.move !== "idle") {
         p.startMove("idle", { busy: false });
       }
-    }
-
-    controlDummy() {
-      const d = this.p2;
-      if (d.ko) return;
-      d.tickGetUp();
-      if (!d.canAct()) return;
-      d.facing = this.p1.sprite.x < d.sprite.x ? -1 : 1;
-      d.syncFacingVisual();
-      if (Math.abs(d.sprite.body.velocity.x) < 30) d.sprite.setVelocityX(0);
-      if (d.move !== "idle" && d.move !== "guard") d.startMove("idle", { busy: false });
-      else d.plantFrame();
     }
 
     cpuBrain(d) {
@@ -13383,7 +8527,7 @@
           if (d.move !== "walk") d.startMove("walk", { busy: false });
           return;
         }
-        // 仍有地面就朝对手挤，避免斗蛐蛐隔空对站
+        // 仍有地面就朝对手挤，避免隔空对站
         if (this.cpuSurfaceAt(p.sprite.x) != null || this.cpuSurfaceAt(ahead) != null) {
           d.sprite.setVelocityX(dir * WALK);
           if (d.move !== "walk") d.startMove("walk", { busy: false });
@@ -13402,41 +8546,13 @@
       }
 
       const spec = this.cpuProfile();
-      const dash = (this.cricket || spec.dashChase) && opts.dash && dist > 280 && d.has("dash") && d.sp > 16;
+      const dash = spec.dashChase && opts.dash && dist > 280 && d.has("dash") && d.sp > 16;
       d.sprite.setVelocityX(dir * (dash ? DASH : WALK));
       d.startMove(dash ? "dash" : "walk", { busy: false });
     }
 
-    showCpuSpecial(d, p, brain, dist, opts = {}) {
-      const now = this.combatNow;
-      if (now < brain.skillAt) return false;
-      const kinds = ["skill", "combo_up", "combo_down", "super"].filter((m) => d.has(m));
-      if (!kinds.length) return false;
-      let pool = kinds.filter((m) => !brain.used.includes(m) && m !== brain.lastKind);
-      if (!pool.length) {
-        brain.used = [];
-        pool = kinds.filter((m) => m !== brain.lastKind);
-        if (!pool.length) pool = kinds.slice();
-      }
-      const withoutSuper = pool.filter((m) => m !== "super");
-      if (pool.includes("super") && brain.used.filter((k) => k !== "super").length < 2 && withoutSuper.length) {
-        pool = withoutSuper;
-      }
-      if (opts.siege) {
-        pool = pool.filter((m) => m === "skill" || m === "super" || m === "combo_up" || m === "combo_down");
-      }
-      if (p.move === "super") pool = pool.filter((m) => m !== "super");
-      pool = pool.filter((m) => this.canSpend(d, m));
-      const anim = this.cpuPickBestSpecial(d, p, dist, pool);
-      if (!anim || !this.cpuStrike(d, anim)) return false;
-      brain.lastKind = anim;
-      brain.used.push(anim);
-      brain.skillAt = now + 360;
-      brain.nextAt = now + Phaser.Math.Between(opts.siege ? 280 : 300, opts.siege ? 480 : 460);
-      return true;
-    }
-
     /** 对手硬直/连击中：贴身加压，制造压制感 */
+
     cpuPressAdvantage(d, p, brain, now) {
       if (!p || p.ko || p.downed()) return false;
       const locked = p.comboLocked?.() || (p.reacting?.() && !p.willKnockdown && !p.airFalling);
@@ -13465,99 +8581,6 @@
         return true;
       }
       return false;
-    }
-
-    controlShowCpu(d, p) {
-      if (d.ko) return;
-      d.tickGetUp();
-      const now = this.combatNow;
-      const brain = this.cpuBrain(d);
-      if (this.cpuTryDashEscape(d, p, brain, now)) return;
-      if (!d.canAct() || d.busy) return;
-      const dx = p.sprite.x - d.sprite.x;
-      const dy = p.sprite.y - d.sprite.y;
-      const dist = Math.abs(dx);
-      const samePlane = Math.abs(dy) < 64;
-      d.facing = dx < 0 ? -1 : 1;
-      d.syncFacingVisual();
-      if (now < this.roundAt || (p.move === "opening_cg" && p.busy)) {
-        d.sprite.setVelocityX(0);
-        if (d.move !== "idle") d.startMove("idle", { busy: false });
-        return;
-      }
-      if (!d.grounded()) {
-        this.cpuSteerAir(d, p);
-        return;
-      }
-      brain.landX = null;
-      brain.retreatUntil = 0;
-      const killPit = this.cpuBlockingPit(d, d.facing, p);
-      const pitSiege = !!(
-        killPit &&
-        !this.cpuPitHasFloor(killPit, d.sprite.y) &&
-        this.cpuSafeCrossLand(killPit, d.sprite.x, d.sprite.y, d.facing, DASH) == null
-      );
-
-      if (this.cpuPressAdvantage(d, p, brain, now)) return;
-
-      if (pitSiege) {
-        this.cpuHoldNearLedge(d, killPit, d.facing);
-        if (now >= brain.nextAt) {
-          if (this.showCpuSpecial(d, p, brain, dist, { siege: true })) return;
-          if (dist < 220) this.cpuStrike(d, p.airborne() ? "attack_up" : "attack");
-          brain.nextAt = now + Phaser.Math.Between(240, 400);
-        }
-        return;
-      }
-
-      // 倒地无敌：贴上去等，不要跳走
-      if (p.downed() || p.invulnerable()) {
-        if (dist > 120) this.cpuNavigate(d, p, { dash: dist > 240, noHop: samePlane });
-        else {
-          d.sprite.setVelocityX(0);
-          if (d.move !== "idle") d.startMove("idle", { busy: false });
-        }
-        return;
-      }
-
-      // 同平面：先打后走。贴身就出拳，绝不无故后退/起跳
-      if (samePlane) {
-        if (now >= brain.nextAt) {
-          if (dist < 420 && this.showCpuSpecial(d, p, brain, dist)) return;
-          if (dist < 198) {
-            let anim = "attack";
-            if (p.airborne() && d.has("attack_up")) anim = "attack_up";
-            else if (dist < 70 && d.has("attack_down") && Math.random() < 0.22) anim = "attack_down";
-            this.cpuStrike(d, anim);
-            brain.nextAt = now + Phaser.Math.Between(240, 400);
-            return;
-          }
-        }
-        if (dist > 70) {
-          this.cpuNavigate(d, p, { dash: dist > 220, noHop: true });
-          return;
-        }
-        d.sprite.setVelocityX(0);
-        if (now < brain.nextAt) {
-          if (d.move !== "idle" && !ATTACKS.has(d.move)) d.startMove("idle", { busy: false });
-          else d.plantFrame();
-          return;
-        }
-        this.cpuStrike(d, "attack");
-        brain.nextAt = now + 280;
-        return;
-      }
-
-      // 不同高度：只为够到对手才跳
-      if (now >= brain.nextAt && dist < 240 && Math.abs(dy) < 110) {
-        if (this.showCpuSpecial(d, p, brain, dist)) return;
-        if (p.airborne() && d.has("attack_up") && this.cpuStrike(d, "attack_up")) {
-          brain.nextAt = now + 320;
-          return;
-        }
-      }
-      this.cpuNavigate(d, p, { dash: dist > 240, noHop: false });
-      if (now >= brain.nextAt) brain.nextAt = now + 160;
     }
 
     controlCpu() {
@@ -13668,14 +8691,7 @@
         this.tickCountdown();
         this.positionPlayerTags();
         this.drawHp();
-        // 客人端 cutin/hitstop 期间仍要吃状态包，否则大招残影与显隐会卡住
-        if (this.pvp && !this.isHost) {
-          this.sendLocalInput();
-          this.applyPendingState();
-          // 仍要推进弹道寿命，否则奥义全屏特效会卡到永远
-          this.updateProjectiles();
-        }
-        if (this.pvp && this.isHost) this.sendState();
+
         return;
       }
       if (this.inCountdown()) {
@@ -13687,139 +8703,48 @@
         });
         this.positionPlayerTags();
         this.drawHp();
-        if (this.pvp && !this.isHost) {
-          this.sendLocalInput();
-          this.applyPendingState();
-        }
-        if (this.pvp && this.isHost) this.sendState();
+
         return;
       }
       if (this.countText) this.countText.setAlpha(0);
-      if (this.pauseForRaidDialogue()) return;
       if (this.over) {
         this.plantAllFrames();
         this.positionPlayerTags();
         this.drawHp();
-        if (this.pvp && !this.isHost) this.applyPendingState();
+
         if (
           this.resultShown &&
           (this._edgeJ || Phaser.Input.Keyboard.JustDown(this.keys.ENTER))
         ) {
-          if (this.raid && this.raidCleared) {
-            this.advanceRaidStage();
-            return;
-          }
-          if (this.pvp && !this.isHost) {
-            this.net?.send({ type: "rematch_request" });
-            return;
-          }
-          if (this.pvp && this.isHost) this.net?.send({ type: "rematch" });
+
           killStageBgm(this);
           this.scene.start("loader", this.pack);
         }
         return;
       }
-      if (this.pvp) {
-        if (!this.isHost) {
-          this.sendLocalInput();
-          this.applyPendingState();
-          this.faceFromMovement(this.myActor(), {
-            left: this.keys.A.isDown,
-            right: this.keys.D.isDown,
-          });
-          this.tickCountdown();
-          this.plantAllFrames();
-          // 客人端本地生成特效，必须自己推进/销毁，否则小技能看不见、奥义残留
-          this.updateProjectiles();
-          this.positionPlayerTags();
-          this.drawHp();
-          return;
-        }
-        this.fighters().forEach((a) => a.tickGetUp());
-        this.regenResources();
-        this.tickTimeLocks();
-        this.tickYearZeroWireBinds();
-        this.refreshDomainMpBan();
-        const hostPad = this.padForSeat("host");
-        const guestPad = this.padForSeat("guest");
-        const guest2Pad = this.padForSeat("guest2");
-        this.driveActor(this.p1, hostPad, this.hostBuf);
-        this.driveActor(this.p2, guestPad, this.guestBuf);
-        if (this.p3) this.driveActor(this.p3, guest2Pad, this.guest2Buf);
-        ["guest", "guest2"].forEach((seat) => {
-          const pad = this.remotePads[seat];
-          if (!pad) return;
-          pad.justUp = false;
-          pad.justDown = false;
-          pad.justJ = false;
-          pad.justK = false;
-          pad.justL = false;
-          pad.justShift = false;
-        });
-        [
-          { actor: this.p1, pad: hostPad },
-          { actor: this.p2, pad: guestPad },
-          { actor: this.p3, pad: guest2Pad },
-        ].forEach(({ actor, pad }) => {
-          if (!actor) return;
-          actor.stayOnStage();
-          this.faceNearestThreat(actor, pad);
-        });
-        this.resolveAllPush();
-        if (!this.raid) this.tryAllHits();
-        this.updateProjectiles();
-        this.raidProjectileHits();
-        this.updateRaid();
-        this.plantAllFrames();
-        this.resolveAllPush();
-        this.checkMatchOver();
-        this.sendState();
-        this.positionPlayerTags();
-        this.drawHp();
-        return;
-      }
+
       this.p1.tickGetUp();
       this.p2.tickGetUp();
       this.regenResources();
       this.tickTimeLocks();
       this.tickYearZeroWireBinds();
-      if (this.raid) {
-        this.controlPlayer();
-        const localPad = { left: this.keys.A.isDown, right: this.keys.D.isDown };
-        this.fighters().forEach((p) => {
-          p.stayOnStage();
-          this.faceNearestThreat(p, p === this.p1 ? localPad : null);
-        });
-        this.updateProjectiles();
-        this.raidProjectileHits();
-        this.updateRaid();
-        this.plantAllFrames();
-        this.positionPlayerTags();
-        this.drawHp();
-        return;
-      }
-      if (this.cricket) {
-        this.controlShowCpu(this.p1, this.p2);
-        this.controlShowCpu(this.p2, this.p1);
-      } else {
-        this.controlPlayer();
-        if (this.pve) this.controlCpu();
-        else this.controlDummy();
-      }
+
+      this.controlPlayer();
+      this.controlCpu();
+
       this.p1.stayOnStage();
       this.p2.stayOnStage();
       this.resolvePush(this.p1, this.p2);
       this.p1.ensureAttackAnimLive?.();
       this.p2.ensureAttackAnimLive?.();
       this.tryHit(this.p1, this.p2);
-      if (this.pve || this.cricket) this.tryHit(this.p2, this.p1);
+      this.tryHit(this.p2, this.p1);
       this.updateProjectiles();
       this.p1.plantFrame();
       this.p2.plantFrame();
       this.resolvePush(this.p1, this.p2);
       if (this.p1.ko || this.p2.ko) this.beginEndCine();
       this.positionPlayerTags();
-      this.dummyTag?.setPosition(this.p2.sprite.x, this.p2.sprite.y - 200);
       this.drawHp();
     }
   }
@@ -13829,7 +8754,7 @@
     parent: "game",
     width: 1344,
     height: 768,
-    backgroundColor: "#1a1410",
+    backgroundColor: "#080c13",
     pixelArt: true,
     roundPixels: true,
     scale: {
