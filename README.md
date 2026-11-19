@@ -8,6 +8,22 @@ A local pixel-art PVE fighting game built with Phaser 3. Pick a fighter and stag
 - English / Chinese interface switching with a saved language preference.
 - Importable fighter and stage packs from the companion asset studio.
 
+## Screenshots
+
+Captured from the running game with the included fighters and stages.
+
+**Classic arcade selection.** Choose both fighters, preview the stage, and set the CPU difficulty before the match.
+
+![English arcade character-select screen with Lu Bu, Tokugawa Ieyasu, the fighter roster, stage preview and three CPU difficulty options](docs/media/character-select.jpg)
+
+**Pixel-art PVE combat.** Lu Bu faces Tokugawa Ieyasu at Bronze Sparrow Terrace, with health, energy, stamina and skill cooldowns visible in the combat HUD.
+
+![Lu Bu versus CPU Tokugawa Ieyasu at Bronze Sparrow Terrace, showing pixel-art fighters, layered platforms and the combat HUD](docs/media/bronze-sparrow-combat.jpg)
+
+**Unexpected matchups, different worlds.** Stephen Hawking meets Isaac Newton aboard the Lunar Station. This capture shows the Chinese interface; English is available from the same language selector.
+
+![Chinese-language PVE battle between Stephen Hawking and Isaac Newton inside a lunar station overlooking Earth](docs/media/lunar-arena-zh-CN.jpg)
+
 ## Run
 
 You need Python 3.11+ and a desktop browser. No Python packages or npm dependencies are required to play.
