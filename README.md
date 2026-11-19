@@ -10,19 +10,29 @@ A local pixel-art PVE fighting game built with Phaser 3. Pick a fighter and stag
 
 ## Screenshots
 
-Captured from the running game with the included fighters and stages.
+Real gameplay, captured with the English interface and English super-move effects. Click a picture for the full-size view.
 
-**Classic arcade selection.** Choose both fighters, preview the stage, and set the CPU difficulty before the match.
+**Classic arcade selection:** pick both fighters, preview the stage and choose the CPU difficulty.
 
-![English arcade character-select screen with Lu Bu, Tokugawa Ieyasu, the fighter roster, stage preview and three CPU difficulty options](docs/media/character-select.jpg)
+![English character selection: Lu Bu versus Tokugawa Ieyasu, fighter roster, stage preview and CPU difficulty](docs/media/en/character-select.jpg)
 
-**Pixel-art PVE combat.** Lu Bu faces Tokugawa Ieyasu at Bronze Sparrow Terrace, with health, energy, stamina and skill cooldowns visible in the combat HUD.
+### Skills · K
 
-![Lu Bu versus CPU Tokugawa Ieyasu at Bronze Sparrow Terrace, showing pixel-art fighters, layered platforms and the combat HUD](docs/media/bronze-sparrow-combat.jpg)
+| Lu Bu · Halberd Throw | Newton · Spectrum Beam |
+| --- | --- |
+| ![English gameplay: Lu Bu launches a flaming halberd across Bronze Sparrow Terrace](docs/media/en/halberd-skill.jpg) | ![English gameplay: Isaac Newton fires a rainbow spectrum beam through a prism](docs/media/en/prism-skill.jpg) |
 
-**Unexpected matchups, different worlds.** Stephen Hawking meets Isaac Newton aboard the Lunar Station. This capture shows the Chinese interface; English is available from the same language selector.
+### Supers · L
 
-![Chinese-language PVE battle between Stephen Hawking and Isaac Newton inside a lunar station overlooking Earth](docs/media/lunar-arena-zh-CN.jpg)
+| Lu Bu · Red Hare Rampage | Hawking · Singularity |
+| --- | --- |
+| ![English super cut-in: mounted Lu Bu with SUPER and RED HARE RAMPAGE carved lettering](docs/media/en/red-hare-super.jpg) | ![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY carved lettering](docs/media/en/singularity-super.jpg) |
+
+### Pixel-art arenas
+
+| Bronze Sparrow Terrace | Lunar Station |
+| --- | --- |
+| ![English PVE combat: Lu Bu versus Tokugawa Ieyasu, layered platforms and health, energy, stamina and cooldown HUD](docs/media/en/bronze-sparrow-combat.jpg) | ![English PVE combat: Stephen Hawking versus Isaac Newton in a lunar station overlooking Earth](docs/media/en/lunar-arena.jpg) |
 
 ## Run
 
@@ -40,7 +50,7 @@ Open <http://127.0.0.1:8788>. Stop the server with `Ctrl+C`. It binds to localho
 
 Choose **English** or **简体中文** from the language selector in the top toolbar. Chinese is the original default. Your explicit choice is saved in this browser and restored on later visits; the browser or operating-system language does not override it.
 
-Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Existing voice recordings and text drawn into artwork remain unchanged.
+Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Super cut-ins render their carved titles in the selected language, including `SUPER`, `RED HARE RAMPAGE` and `SINGULARITY` in English. Switching during a cut-in repaints its lettering without restarting the move. Existing voice recordings and text baked into imported artwork remain unchanged.
 
 Imported asset packs may provide `displayNameEn` or `i18n.en.displayName` in `fighter.json` / `stage.json`. Without an English name, the original authored name is shown. Source metadata is never rewritten by switching languages. If browser storage is unavailable, language changes work for the current page session.
 
@@ -65,7 +75,7 @@ Returning to Select preserves both fighters and the stage, and the current page 
 | Return to Select | `Esc` |
 | Rematch with the same fighters and stage after the result | `J` / `Enter`, or the Rematch button |
 
-Gold is health, blue is energy, and green is stamina. Skills consume energy; attacks, dashes and escapes consume stamina. Skill slots show cooldowns; `READY` means available. Knock out the opponent to win.
+Gold is health, blue is energy, and green is stamina. Skills consume energy; attacks, dashes and escapes consume stamina. Skill slots show cooldowns; `READY` (English) / `就绪` (Chinese) means available. Knock out the opponent to win.
 
 The top toolbar includes sound, fullscreen and the **Move List** (`F1`). The bottom bar provides Pause. Opening the Move List or leaving the window pauses combat and cooldowns. Close the guide or choose **Resume Fight** to continue. Loading failures provide a reload or return-to-select action.
 

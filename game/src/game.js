@@ -1260,16 +1260,13 @@
     const root = scene.add.container(0, 0).setScrollFactor(0);
     const paint = () => {
       root.removeAll(true);
-      let child;
-      if (window.HeroI18n?.language === "en") {
-        child = crispUi(scene.add.text(0, 0, t(source), {
-          fontFamily: UI_FONT, fontSize: Math.min(72, fontSize), color: "#efc05d",
-          stroke: "#180e14", strokeThickness: 6,
-        })).setOrigin(0.5).setRotation(opts.rot || 0);
-        while (child.width > scene.scale.width * 0.34 && parseInt(child.style.fontSize, 10) > 18) {
-          child.setFontSize(parseInt(child.style.fontSize, 10) - 2);
-        }
-      } else child = paintSuperTitleGlyph(scene, source, fontSize, opts);
+      const english = window.HeroI18n?.language === "en";
+      const child = paintSuperTitleGlyph(scene, english ? t(source).toUpperCase() : source,
+        english ? Math.max(64, fontSize) : fontSize, {
+          ...opts,
+          latin: english,
+          tracking: english ? 4 : opts.tracking,
+        });
       root.add(child);
     };
     paint();
@@ -1286,10 +1283,17 @@
     const chars = Array.from(String(text || ""));
     const n = Math.max(1, chars.length);
     const uid = `fierce-kanji-${++_fierceKanjiSeq}`;
-    const cell = fontSize + tracking;
+    // Measure Latin glyphs instead of spacing every letter like a full-width Han glyph.
+    const measure = document.createElement("canvas").getContext("2d");
+    if (!measure) return scene.add.container(0, 0).setScrollFactor(0);
+    const font = opts.latin ? `bold ${Math.round(fontSize)}px GameUI, monospace` :
+      `${Math.round(fontSize)}px BrushUI, STKaiti, KaiTi, serif`;
+    measure.font = font;
+    const widths = chars.map(ch => opts.latin ? measure.measureText(ch).width : fontSize);
+    const textWidth = widths.reduce((sum, width) => sum + width, 0) + (n - 1) * tracking;
     const padX = Math.ceil(fontSize * 0.7);
     const padY = Math.ceil(fontSize * 0.95);
-    const tw = Math.ceil(n * cell - tracking + padX * 2);
+    const tw = Math.ceil(textWidth + padX * 2);
     const th = Math.ceil(fontSize * 1.75 + padY * 2);
     const hi = 3;
     const canvas = document.createElement("canvas");
@@ -1307,11 +1311,16 @@
     ctx.scale(0.9, 1.22);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `${Math.round(fontSize)}px BrushUI, STKaiti, KaiTi, serif`;
+    ctx.font = font;
     ctx.lineJoin = "miter";
     ctx.miterLimit = 2;
 
-    const startX = -((n - 1) * cell) / 2;
+    let cursor = -textWidth / 2;
+    const positions = widths.map(width => {
+      const center = cursor + width / 2;
+      cursor += width + tracking;
+      return center;
+    });
     const inkAt = (ch, x, dx, dy, color, alpha = 1) => {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = color;
@@ -1321,7 +1330,7 @@
     // ① 厚黑刀底（主体分量）
     const rim = Math.max(4, Math.round(fontSize * 0.07));
     chars.forEach((ch, i) => {
-      const x = startX + i * cell;
+      const x = positions[i];
       [
         [rim, rim + 1],
         [-rim, rim],
@@ -1336,14 +1345,14 @@
 
     // ② 暗红刻面（偏暗、不饱和，与黑对半）
     chars.forEach((ch, i) => {
-      const x = startX + i * cell;
+      const x = positions[i];
       inkAt(ch, x, 0.5, 0.5, "#2a0808", 1);
       inkAt(ch, x, 0, 0, fill, 1);
     });
 
     // ③ 单侧刃口高光（只刮一条边，避免整字变亮红块）
     chars.forEach((ch, i) => {
-      const x = startX + i * cell;
+      const x = positions[i];
       inkAt(ch, x, -1.4, -2.0, hot, 0.38);
     });
 
@@ -1353,7 +1362,7 @@
     ctx.lineWidth = Math.max(2.2, fontSize * 0.028);
     ctx.lineCap = "square";
     chars.forEach((ch, i) => {
-      const x = startX + i * cell;
+      const x = positions[i];
       const s = fontSize * 0.48;
       ctx.beginPath();
       ctx.moveTo(x - s * 0.85, -s * 0.55);
@@ -1429,6 +1438,9 @@
     }
     scene.textures.addCanvas(uid, canvas);
     const spr = scene.add.image(0, 0, uid).setOrigin(0.5).setScrollFactor(0);
+    // The texture is baked at 3x resolution, but occupies logical game pixels.
+    const fit = Math.min(1, scene.scale.width * 0.58 / tw);
+    spr.setDisplaySize(tw * fit, th * fit);
     if (spr.texture?.setFilter) spr.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     spr.once("destroy", () => { if (scene.textures.exists(uid)) scene.textures.remove(uid); });
     return spr;
@@ -3145,7 +3157,7 @@
       const pages = Math.ceil(this.playable.length / 10);
       this.prevPage.setVisible(pages > 1);
       this.nextPage.setVisible(pages > 1);
-      this.pageLabel.setText(pages > 1 ? `${this.page + 1} / ${pages}` : "SELECT YOUR FIGHTER");
+      this.pageLabel.setText(pages > 1 ? `${this.page + 1} / ${pages}` : t("SELECT YOUR FIGHTER"));
       paintArcadePanel(g, 486, 466, 372, 152, { accent: 0x929b9f });
       const key = `stage-thumb-${this.stageIds[this.stageIndex]}`;
       compactStagePreview(this, key);
@@ -4405,7 +4417,7 @@
               ? `${slot.label} —`
               : left > 0
                 ? `${slot.label} ${(left / 1000).toFixed(1)}`
-                : `${slot.label} READY`,
+                : `${slot.label} ${t("READY")}`,
           )
           .setAlpha(has ? 1 : 0.5);
       });
@@ -4945,19 +4957,19 @@
         hot: "#b42222",
         tracking: 58,
       });
-      tag.setPosition(w / 2, h * 0.38);
+      tag.setPosition(faceRight ? w * 0.63 : w * 0.37, h * 0.38);
       tag.setScale(2.05);
       tag.setAlpha(0);
 
-      const nameSize = moveName.length >= 6 ? 44 : moveName.length >= 4 ? 54 : 64;
-      const nameTrack = moveName.length >= 6 ? 22 : moveName.length >= 4 ? 28 : 34;
+      const nameSize = moveName.length >= 6 ? 64 : moveName.length >= 4 ? 76 : 84;
+      const nameTrack = moveName.length >= 6 ? 18 : moveName.length >= 4 ? 24 : 28;
       const name = makeSekiroBrushKanji(this, moveName, nameSize, {
         rot: faceRight ? -0.04 : 0.04,
         fill: "#6e1414",
         hot: "#a81e1e",
         tracking: nameTrack,
       });
-      name.setPosition(w / 2, h * 0.58);
+      name.setPosition(faceRight ? w * 0.63 : w * 0.37, h * 0.58);
       name.setScale(1.7);
       name.setAlpha(0);
 

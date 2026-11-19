@@ -158,6 +158,7 @@
     }
   });
   function refreshLocale() {
+    $('phaseLabel').textContent = mode === 'pve' ? '1P VS CPU' : t('SELECT');
     $('muteButton').textContent = t(muted ? '声音：关' : '声音：开');
     $('fullscreenButton').textContent = t(document.fullscreenElement ? '退出全屏' : '全屏');
     $('helpContext').textContent = t(pausedScene ? '对战已暂停，关闭后继续。' : '推荐横屏与实体键盘');
@@ -203,7 +204,7 @@
       $('backButton').hidden = $('pauseButton').hidden = !fight;
       $('startButton').hidden = fight;
       $('rematchButton').hidden = true;
-      $('phaseLabel').textContent = fight ? '1P VS CPU' : 'SELECT';
+      $('phaseLabel').textContent = fight ? '1P VS CPU' : t('SELECT');
       $('quickHint').textContent = t(
         fight ? 'A D 移动 · W 跳跃 · S 防守 · J 普攻 · K 技能 · L 奥义' : '选择英灵与对手',
       );

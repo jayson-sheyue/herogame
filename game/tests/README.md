@@ -40,6 +40,14 @@ This increment was originally completed on `codex/pve-arcade`, adding English / 
 
 Language switching does not translate voice recordings or text embedded in artwork. The nine built-in playable fighters and twelve stages have English display names. Imported packs use their own English metadata when supplied, otherwise the authored name. Full user guides are linked from the repository's `README.md` and `README.zh-CN.md`.
 
+## Localized effects and README gallery acceptance
+
+2026-11-19, macOS, local browser at 1280×720:
+
+- 29 automated regressions passed. The new rendering-contract check covers all nine built-in super names plus the super tag in Chinese → English → Chinese, logical display sizing, viewport width limits, texture disposal and language-listener cleanup. Canvas pixel appearance is checked in the browser; the automated check uses rendering substitutes.
+- Real keyboard input triggered Lu Bu’s halberd throw and mounted super, Newton’s spectrum beam, and Hawking’s super. The README gallery has seven real screenshots per language: selection, two skills, two super cut-ins and two arenas. Each README references only its own language directory.
+- Super cut-ins use the same red/black carved effect in both languages. Latin titles use measured glyph widths; the 3x baked textures render at logical dimensions. Live language switching repaints an active cut-in; selection headings, loading headings, the Select footer label and the ready indicator also follow the chosen language.
+
 ## Performance boundaries
 
 The game retains a maximum 1024×576 preview texture, per-texture frame-scan caching, loading only the current battle stage, and 30 Hz HUD updates while combat runs every frame. Selection no longer polls room or roster data; refresh after importing assets. No measured FPS or total-memory claim is made.

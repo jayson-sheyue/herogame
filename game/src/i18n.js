@@ -3,6 +3,15 @@
   // Plain UI strings are also their Chinese fallback. Asset data is never rewritten.
   const zh = {
     'fight.button': '开战',
+    'CHARACTER SELECT': '英灵选择',
+    'STAGE SELECT': '战场选择',
+    'SELECT YOUR FIGHTER': '请选择英灵',
+    'PVE / SINGLE PLAYER': 'PVE / 单人挑战',
+    'GET READY': '准备开战',
+    'LOADING': '读取中',
+    'READY': '就绪',
+    'SELECT': '选人',
+
     英灵大乱斗: '英灵大乱斗',
     '英灵大乱斗 · PVE': '英灵大乱斗 · PVE',
     '英灵大乱斗 / PVE': '英灵大乱斗 / PVE',
@@ -89,6 +98,15 @@
   };
   const en = {
     'fight.button': 'Start',
+    'CHARACTER SELECT': 'CHARACTER SELECT',
+    'STAGE SELECT': 'STAGE SELECT',
+    'SELECT YOUR FIGHTER': 'SELECT YOUR FIGHTER',
+    'PVE / SINGLE PLAYER': 'PVE / SINGLE PLAYER',
+    'GET READY': 'GET READY',
+    'LOADING': 'LOADING',
+    'READY': 'READY',
+    'SELECT': 'SELECT',
+
     英灵大乱斗: 'HERO CLASH',
     '英灵大乱斗 · PVE': 'Hero Clash · PVE',
     '英灵大乱斗 / PVE': 'HERO CLASH / PVE',
