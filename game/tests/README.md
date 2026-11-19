@@ -1,43 +1,45 @@
-# PVE 分支验证
+# PVE verification
 
-在仓库根目录运行 `python3 game/check.py`，需要 Python 3.11+、Node.js 22+，不安装额外依赖。
+**English** | [简体中文](README.zh-CN.md)
 
-## 自动检查
+Run `python3 game/check.py` from the repository root. Requires Python 3.11+ and Node.js 22+, with no additional dependencies.
 
-- Python / JavaScript 语法检查。
-- `game.test.cjs`：PVE 双方与指定地图、难度、重复开战保护，地图循环，选择保留与旧模式参数清理，同角色素材共享，双方与战场加载就绪，旧元数据替换，暂停冷却，难度区别，胜负与双倒，纹理缓存和地图预览尺寸。
-- `shell.test.cjs`：帮助与原生按钮的键盘隔离，暂停 / 恢复与输入缓冲清理，重复失焦，静音偏好及无音频环境，加载失败恢复，再战数据保留、对局中帮助关闭。
+## Automated checks
 
-以上是轻量场景 / DOM 替身的规则检查，不能替代 Phaser 渲染和全部角色招式实测。删除的模式及其专用房间测试不再属于本分支。
+- Python and JavaScript syntax checks.
+- `game.test.cjs`: PVE opponents, selected stage and difficulty, duplicate-start protection, stage wrapping, selection persistence and obsolete mode-parameter cleanup, shared mirror-match assets, fighter/stage readiness, refreshed metadata, paused cooldowns, difficulty behavior, wins/losses/double knockouts, texture caching and preview dimensions.
+- `shell.test.cjs`: keyboard isolation for help and native controls, pause/resume and input-buffer clearing, repeated focus loss, mute preferences including no-audio environments, loading recovery, rematch data retention and closing help during a fight.
 
-## 实际验收记录
+These use lightweight scene and DOM substitutes. They do not replace Phaser rendering tests or exhaustive checks of every move. Removed game modes and their dedicated room tests are outside the current version.
 
-2026-11-19，macOS、本机浏览器，Python 3.14 / Node.js 25：
+## Recorded PVE acceptance
 
-- 19 条自动回归和语法检查通过。
-- 选人界面用键盘切换双方角色、当前地图和三档难度；鼠标点击对手立绘、头像、地图箭头与难度均有对应结果。
-- 蒋介石镜像 PVE 正常加载、倒数、交战、结算，Enter 再战；再战后通过返回按钮及 Esc 回到选人，角色与地图保留。
-- 甄嬛 / 牛顿与甄嬛 / 吕布分别进入对战；后者使用另一张地图。实测移动、技能，帮助、暂停与恢复。
-- 对局中打开出招表会暂停，关闭后恢复；选人帮助关闭后可继续选人。
-- 静音、全屏进出有效；刷新保留静音、难度、角色与地图。
-- 桌面 1280×850、竖屏 390×844 实际检查：选人和战斗画面完整缩放；窄屏出招表、底部开战入口在视口内。竖屏显示横屏与实体键盘提示，没有触屏战斗控件。
-- 页面、脚本、字体与资源索引通过真实本机 HTTP 服务返回 200；已删除的 `/src/net.js` 与 `/api/lan` 返回 404。
-- 本轮浏览器采集的错误 / 警告日志为空。
+2026-11-19, macOS, local browser, Python 3.14 / Node.js 25:
 
-尚未逐一验收全部英灵招式、每张地图的碰撞，也未验证 Windows / Linux 或所有浏览器。失败加载的恢复入口由规则测试覆盖，没有修改真实素材制造故障。无扬声器听音结论。
+- 19 automated regressions and syntax checks passed at the PVE-only stage.
+- Keyboard selection changed both fighters, the stage and all three difficulties. Mouse clicks on opponent portraits, fighter tiles, stage arrows and difficulty buttons produced the expected changes.
+- A Chiang Kai-shek mirror match loaded, counted down, fought and reached its result. Enter started a rematch. The return button and Esc returned to Select while preserving fighters and stage.
+- Zhen Huan / Newton and Zhen Huan / Lu Bu entered fights; the latter used another stage. Movement, skills, help, pause and resume were exercised.
+- Opening the Move List paused a fight; closing it resumed play. Closing help on Select restored selection controls.
+- Mute and fullscreen entry/exit worked. Refresh preserved mute, difficulty, fighter and stage choices.
+- Desktop 1280×850 and portrait 390×844 were inspected. Selection and combat scaled within the viewport; help and the bottom Start action remained accessible. Portrait mode recommended landscape and a physical keyboard. No touch combat controls are provided.
+- The real local HTTP server returned 200 for the page, scripts, font and asset index. Removed `/src/net.js` and `/api/lan` returned 404.
+- Captured browser error/warning logs were empty.
 
-## 系统语言增量验收
+Not every fighter move or stage collision was checked, and Windows, Linux and all browser engines were not verified. Loading-failure recovery was covered with substitutes without damaging real assets. No speaker/audio-quality acceptance is claimed.
 
-本次增量继续在 `codex/pve-arcade`，默认中文，新增顶部 English / 简体中文设置。
+## Interface-language acceptance
 
-- 27 条自动回归通过，包含 8 项新增语言检查：默认中文且不跟随浏览器、英文偏好恢复、存储不可用、页面文案与无障碍标签覆盖、文字绑定销毁清理、资源名称回退、加载失败后恢复，以及对局本地化不改变血量 / 战斗时钟。
-- 本机浏览器实测中文 → English → 中文 → English；选人和地图保持，刷新恢复英文。英文选人、帮助、加载、对局 HUD、奥义（SUPER / The Upper Hand）、结算和再战正常。
-- 在有伤害的对局中切换语言，名称与提示更新，生命槽与战斗位置没有重新初始化；英文帮助正常暂停并恢复。
-- 桌面 1280×850、窄屏 390×844 检查英文工具栏、帮助换行、开战入口；修正了英文横屏提示被意外绘制到桌面画布底部的样式作用域。
-- 语言检查阶段浏览器错误 / 警告日志为空。加载失败与被禁止的存储通过替身验证，未破坏实际素材或浏览器设置来制造故障。
+This increment was originally completed on `codex/pve-arcade`, adding English / Chinese settings while keeping Chinese as the initial default.
 
-界面语言不翻译原有语音或素材图片。内置 9 位可用英灵、12 张地图有英文显示名称；导入内容优先使用资源包提供的英文名称，否则保留作者原名。中英使用说明分别见仓库的 `README.md` / `README.en.md`，互相链接。
+- 27 automated regressions passed, including eight added language checks: explicit default and preference restoration, unavailable storage, page/accessible-label coverage, text-binding cleanup, asset-name fallback, error recovery, and localization without changing health or the combat clock.
+- The local browser exercised Chinese → English → Chinese → English, preserving selections and stage. Refresh restored English. English selection, help, loading, HUD, super titles (`SUPER` / `The Upper Hand`), results and rematch worked.
+- Changing language during an ongoing, damaged fight updated names and hints without reinitializing health bars or fighter positions. English help paused and resumed normally.
+- Desktop 1280×850 and portrait 390×844 were checked for toolbar fit, help wrapping and the Start action. A CSS scope issue that drew a portrait hint below the desktop canvas was corrected.
+- Captured browser error/warning logs were empty during these checks. Failed loading and blocked storage were tested with substitutes rather than damaging assets or changing browser privacy settings.
 
-## 性能边界
+Language switching does not translate voice recordings or text embedded in artwork. The nine built-in playable fighters and twelve stages have English display names. Imported packs use their own English metadata when supplied, otherwise the authored name. Full user guides are linked from the repository's `README.md` and `README.zh-CN.md`.
 
-保留预览图最大 1024×576 的纹理限制、按纹理对象缓存帧扫描、每局只加载当前战场，以及 30 Hz 的 HUD 更新；战斗仍逐帧运行。选人不再轮询联机信息或名单，导入新资源后刷新页面。没有实测 FPS / 总内存数字，不据此作数值承诺。
+## Performance boundaries
+
+The game retains a maximum 1024×576 preview texture, per-texture frame-scan caching, loading only the current battle stage, and 30 Hz HUD updates while combat runs every frame. Selection no longer polls room or roster data; refresh after importing assets. No measured FPS or total-memory claim is made.

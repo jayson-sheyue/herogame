@@ -1,7 +1,9 @@
-# PVE 对战端
+# PVE game client
 
-从仓库根目录运行 `python3 game/serve.py`，打开 <http://127.0.0.1:8788>。
+**English** | [简体中文](README.zh-CN.md)
 
-这个分支仅含玩家对 CPU 的 PVE。选人、难度、出招、资源导入和运行前提见[仓库说明](../README.md)，验证记录见[测试说明](tests/README.md)。
+From the repository root, run `python3 game/serve.py`, then open <http://127.0.0.1:8788>.
 
-本地快速检查：`python3 game/check.py`（另需 Node.js 22+）。
+The game features player-versus-CPU combat. See the [main README](../README.md) for setup, language settings, controls and asset imports, and the [test record](tests/README.md) for verification details.
+
+Quick development checks: `python3 game/check.py` (requires Node.js 22+ in addition to Python).
