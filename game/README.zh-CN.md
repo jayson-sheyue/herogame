@@ -2,7 +2,9 @@
 
 [English](README.md) | **简体中文**
 
-从仓库根目录运行 `python3 game/serve.py`，打开 <http://127.0.0.1:8788>。
+直接打开 [GitHub Pages 在线试玩](https://jayson-sheyue.github.io/herogame/)，需要电脑实体键盘。
+
+本地开发：从仓库根目录运行 `python3 game/serve.py`，打开 <http://127.0.0.1:8788>。
 
 游戏提供玩家对 CPU 的 PVE 格斗。选人、难度、系统语言、出招和资源导入见[仓库说明](../README.zh-CN.md)，验证记录见[测试说明](tests/README.zh-CN.md)。
 

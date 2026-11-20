@@ -685,15 +685,26 @@
   }
 
   async function fetchRoster(prev = null) {
+    // Published builds carry one catalog; local play still discovers imported packs.
+    const web = window.HeroWeb;
+    if (web) {
+      const { fighters, stages, catalog } = web;
+      return {
+        playable: sortRoster(catalog.heroes.filter((id) => isPlayable(fighters[id], id)), fighters),
+        fighters,
+        stageIds: catalog.stages,
+        stages,
+      };
+    }
     const t = Date.now();
-    const catalog = await fetchJson(`/assets/game/index.json?t=${t}`);
+    const catalog = await fetchJson(`assets/game/index.json?t=${t}`);
     const ids = catalog.heroes || [];
     const fighters = { ...(prev?.fighters || {}) };
     await Promise.all(
       ids.map(async (id) => {
         if (fighters[id]?.sprites?.idle) return;
         try {
-          fighters[id] = await fetchJson(`/assets/game/heroes/${id}/fighter.json?t=${t}`);
+          fighters[id] = await fetchJson(`assets/game/heroes/${id}/fighter.json?t=${t}`);
         } catch {
           fighters[id] = null;
         }
@@ -711,7 +722,7 @@
     await Promise.all(
       stageIds.map(async (id) => {
         try {
-          stages[id] = await fetchJson(`/assets/game/stages/${id}/stage.json?t=${t}`);
+          stages[id] = await fetchJson(`assets/game/stages/${id}/stage.json?t=${t}`);
         } catch {
           stages[id] = { id, displayName: id, file: "stage.png" };
         }
@@ -958,7 +969,8 @@
 
   function loadRosterHeroTextures(scene, loader, id, fighter, bust = "") {
     let queued = 0;
-    const select = fighter?.sprites?.select;
+    const sprites = fighter?.previewSprites || fighter?.sprites;
+    const select = sprites?.select;
     if (select?.file) {
       const cardKey = rosterCardPortraitKey(id);
       if (!scene.textures.exists(cardKey)) {
@@ -966,17 +978,17 @@
           ? encodeURIComponent(select.committedAt)
           : bust.startsWith("?t=")
             ? bust.slice(3)
-            : String(Date.now());
-        loader.image(cardKey, `/assets/game/heroes/${id}/${select.file}?t=${t}`);
+            : window.HeroWeb?.revision || String(Date.now());
+        loader.image(cardKey, `assets/game/heroes/${id}/${select.file}?t=${t}`);
         queued += 1;
       }
     }
-    const idle = fighter?.sprites?.idle;
+    const idle = sprites?.idle;
     if (idle?.file) {
       const key = `roster-${id}`;
       if (!scene.textures.exists(key)) {
         const frames = Math.max(1, idle.frames || 6);
-        loader.spritesheet(key, `/assets/game/heroes/${id}/${idle.file}${bust}`, {
+        loader.spritesheet(key, `assets/game/heroes/${id}/${idle.file}${bust}`, {
           frameWidth: idle.frameWidth,
           frameHeight: idle.frameHeight,
           startFrame: 0,
@@ -985,12 +997,12 @@
         queued += 1;
       }
     }
-    const ta = fighter?.sprites?.turnaround;
+    const ta = sprites?.turnaround;
     if (ta?.file) {
       const taKey = rosterCardFrontKey(id);
       if (!scene.textures.exists(taKey)) {
         const frames = Math.max(1, ta.frames || 4);
-        loader.spritesheet(taKey, `/assets/game/heroes/${id}/${ta.file}${bust}`, {
+        loader.spritesheet(taKey, `assets/game/heroes/${id}/${ta.file}${bust}`, {
           frameWidth: ta.frameWidth,
           frameHeight: ta.frameHeight,
           startFrame: 0,
@@ -1540,7 +1552,7 @@
 
   function loadFighterSprites(scene, prefix, heroId, fighter) {
     if (!fighter) return;
-    const heroRoot = `/assets/game/heroes/${heroId}`;
+    const heroRoot = `assets/game/heroes/${heroId}`;
     Object.entries(fighter.sprites || {}).forEach(([id, spec]) => {
       if (id === "turnaround" || id === "select" || String(id).startsWith("fx_") || !spec.file) return;
       const frames = Math.max(1, spec.frames || 6);
@@ -1598,8 +1610,8 @@
     if (!file) return;
     const key = stageBgmKey(stageId);
     if (scene.cache.audio.exists(key)) return;
-    const bust = meta?.bgmMeta?.committedAt || meta?.committedAt || Date.now();
-    scene.load.audio(key, `/assets/game/stages/${stageId}/${file}?t=${encodeURIComponent(bust)}`);
+    const bust = meta?.bgmMeta?.committedAt || meta?.committedAt || window.HeroWeb?.revision || Date.now();
+    scene.load.audio(key, `assets/game/stages/${stageId}/${file}?t=${encodeURIComponent(bust)}`);
   }
 
   function fadeBgmVolume(scene, sound, toVol, ms, onDone) {
@@ -1677,7 +1689,7 @@
   };
 
   function loadUiSfx(scene) {
-    const root = "/assets/game/ui/sfx";
+    const root = "assets/game/ui/sfx";
     Object.entries({
       click: "click.wav",
       clickFirm: "click_firm.wav",
@@ -2850,7 +2862,7 @@
       try {
         roster = await fetchRoster();
       } catch {
-        window.HeroShell?.fail("未能读取游戏资源", "请确认 serve.py 正在运行，且 assets/game/index.json 存在，然后重试。");
+        window.HeroShell?.fail("未能读取游戏资源", "请检查网络连接并重新加载。若仍失败，请稍后重试。");
         return;
       }
       if (!roster.playable.length || !roster.stageIds.length) {
@@ -2878,13 +2890,13 @@
         if (!this.cache.audio.exists(key))
           this.load.audio(
             key,
-            `/assets/game/heroes/${id}/${fighters[id]?.voice?.lines?.select?.file || "voice/select.mp3"}`,
+            `assets/game/heroes/${id}/${fighters[id]?.voice?.lines?.select?.file || "voice/select.mp3"}`,
           );
       });
       stageIds.forEach((id) => {
         const key = `stage-thumb-${id}`;
         if (!this.textures.exists(key))
-          this.load.image(key, `/assets/game/stages/${id}/${stages[id]?.file || "stage.png"}`);
+          this.load.image(key, `assets/game/stages/${id}/${stages[id]?.preview || stages[id]?.file || "stage.png"}`);
       });
     }
 
@@ -3216,9 +3228,11 @@
       const { p1Id, p2Id } = this.pack;
       this.cache.json.remove("fresh-p1");
       this.cache.json.remove("fresh-p2");
-      const t = Date.now();
-      this.load.json("fresh-p1", `/assets/game/heroes/${p1Id}/fighter.json?t=${t}`);
-      if (p2Id !== p1Id) this.load.json("fresh-p2", `/assets/game/heroes/${p2Id}/fighter.json?t=${t}`);
+      if (!window.HeroWeb) {
+        const t = Date.now();
+        this.load.json("fresh-p1", `assets/game/heroes/${p1Id}/fighter.json?t=${t}`);
+        if (p2Id !== p1Id) this.load.json("fresh-p2", `assets/game/heroes/${p2Id}/fighter.json?t=${t}`);
+      }
     }
 
     create() {
@@ -3248,7 +3262,7 @@
       if (this.textures.exists(key)) this.textures.remove(key);
       this.load.image(
         key,
-        `/assets/game/stages/${id}/${pack.stages?.[id]?.file || "stage.png"}?t=${pack.stages?.[id]?.committedAt || Date.now()}`,
+        `assets/game/stages/${id}/${pack.stages?.[id]?.file || "stage.png"}?t=${pack.stages?.[id]?.committedAt || window.HeroWeb?.revision || Date.now()}`,
       );
       queueStageBgm(this, id, pack.stages);
       loadFighterSprites(this, "p1", pack.p1Id, pack.p1);

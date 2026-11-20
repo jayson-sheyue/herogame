@@ -55,3 +55,9 @@ Language switching does not translate voice recordings or text embedded in artwo
 ## Performance boundaries
 
 The game retains a maximum 1024×576 preview texture, per-texture frame-scan caching, loading only the current battle stage, and 30 Hz HUD updates while combat runs every frame. Selection no longer polls room or roster data; refresh after importing assets. No measured FPS or total-memory claim is made.
+
+## Static web export
+
+2026-11-20: 33 automated regressions and syntax checks passed, including the bundled catalog, one-frame selection previews and relative arena-preview URLs. The exporter validates page dependencies and all published fighter/stage file references, checks itch.io file/size/path limits, and verifies every converted fighter sheet against the original decoded RGBA pixels. The current build contains nine playable fighters and twelve stages.
+
+The actual export was served under a subdirectory, then exercised in a browser: English/Chinese selection, fight loading, Lu Bu’s halberd skill and English super, pause/resume, Move List and return to selection. Captured warnings/errors were empty. This does not claim all moves, every arena, mobile touch play or a fixed cold-load time.

@@ -1,11 +1,11 @@
 @font-face {
   font-family: GameUI;
-  src: url("/fonts/GameUI.ttf") format("truetype");
+  src: url("../fonts/GameUI.ttf") format("truetype");
   font-display: swap;
 }
 @font-face {
   font-family: BrushUI;
-  src: url("/fonts/BrushUI.ttf") format("truetype");
+  src: url("../fonts/BrushUI.ttf") format("truetype");
   font-display: swap;
 }
 :root {

@@ -9,7 +9,7 @@
       if (window.location.protocol === "file:")
         window.location.replace(`http://127.0.0.1:8788/${window.location.search}${window.location.hash}`);
     </script>
-    <link rel="stylesheet" href="/src/ui.css?v=arcade2" />
+    <link rel="stylesheet" href="./src/ui.css?v=arcade2" />
   </head>
   <body>
     <header>
@@ -109,12 +109,12 @@
       <p data-i18n="冷却和战斗计时已停止。">冷却和战斗计时已停止。</p>
       <button data-i18n="继续对战" id="resumeButton" class="primary">继续对战</button>
     </dialog>
-    <script src="/src/i18n.js?v=1"></script>
-    <script src="/src/shell.js?v=arcade2"></script>
+    <script src="./src/i18n.js?v=1"></script>
+    <script src="./src/shell.js?v=arcade2"></script>
     <script
-      src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"
-      onerror="HeroShell.fail('游戏引擎加载失败', '请检查网络后重试，首次进入需要连接 jsDelivr。')"
+      src="./vendor/phaser-3.80.1.min.js"
+      onerror="HeroShell.fail('游戏引擎加载失败', '请检查网络连接并重新加载。若仍失败，请稍后重试。')"
     ></script>
-    <script src="/src/game.js?v=arcade2"></script>
+    <script src="./src/game.js?v=arcade2"></script>
   </body>
 </html>

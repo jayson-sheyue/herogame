@@ -20,10 +20,50 @@ const context = {
 };
 vm.runInNewContext(
   source.slice(0, source.indexOf('  const game = new Phaser.Game')) +
-    'window.testGame = {Select,Load,Fight,scanFrameCached,compactStagePreview};})();',
+    'window.testGame = {Select,Load,Fight,scanFrameCached,compactStagePreview,fetchRoster,loadRosterHeroTextures};})();',
   context,
 );
 const { Select, Load, Fight, scanFrameCached, compactStagePreview } = context.window.testGame;
+
+test('published catalog needs no JSON requests and excludes incomplete fighters', async () => {
+  const sprites = Object.fromEntries(['idle', 'walk', 'jump', 'attack', 'air_attack', 'attack_down',
+    'attack_up', 'hurt', 'guard', 'skill', 'super'].map((id) => [id, { file: `${id}.png` }]));
+  const web = {catalog: {heroes: ['a', 'broken'], stages: ['arena']},
+    fighters: {a: {sprites}, broken: {sprites: {idle: {file: 'idle.png'}}}}, stages: {arena: {file: 'arena.webp'}}};
+  context.window.HeroWeb = web;
+  try {
+    const roster = await context.window.testGame.fetchRoster();
+    assert.deepEqual(Array.from(roster.playable), ['a']);
+    assert.equal(roster.fighters, web.fighters);
+    assert.equal(roster.stages, web.stages);
+  } finally { delete context.window.HeroWeb; }
+});
+
+test('published selection loads one-frame previews through subdirectory-safe paths', () => {
+  const calls = [];
+  const loader = {image: (key, url) => calls.push({key, url}),
+    spritesheet: (key, url, spec) => calls.push({key, url, spec})};
+  const scene = {textures: {exists: () => false}};
+  const fighter = {sprites: {idle: {file: 'idle.png', frames: 6}},
+    previewSprites: {idle: {file: 'previews/idle.webp', frames: 1, frameWidth: 280, frameHeight: 672}}};
+  context.window.testGame.loadRosterHeroTextures(scene, loader, 'a', fighter);
+  assert.equal(calls[0].url, 'assets/game/heroes/a/previews/idle.webp');
+  assert.equal(calls[0].spec.endFrame, 0);
+  assert.equal(fighter.sprites.idle.frames, 6);
+  assert.equal(fighter.sprites.idle.file, 'idle.png');
+});
+
+test('selection uses arena preview while leaving full arena metadata intact', () => {
+  const scene = new Select(), images = [];
+  const stage = {file: 'arena.webp', preview: 'small.webp'};
+  scene.registry = {get: () => ({playable: [], stageIds: ['arena'], stages: {arena: stage}})};
+  scene.textures = {exists: () => false};
+  scene.cache = {audio: {exists: () => true}};
+  scene.load = {on() {}, image: (key, url) => images.push({key, url})};
+  scene.preload();
+  assert.equal(images[0].url, 'assets/game/stages/arena/small.webp');
+  assert.equal(stage.file, 'arena.webp');
+});
 
 function selection() {
   const scene = new Select(),

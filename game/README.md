@@ -2,7 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-From the repository root, run `python3 game/serve.py`, then open <http://127.0.0.1:8788>.
+Play immediately at [GitHub Pages](https://jayson-sheyue.github.io/herogame/). A desktop keyboard is required.
+
+For local development: From the repository root, run `python3 game/serve.py`, then open <http://127.0.0.1:8788>.
 
 The game features player-versus-CPU combat. See the [main README](../README.md) for setup, language settings, controls and asset imports, and the [test record](tests/README.md) for verification details.
 

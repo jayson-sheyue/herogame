@@ -2,11 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A local pixel-art PVE fighting game built with Phaser 3. Pick a fighter and stage, then challenge the CPU through a classic arcade character-select screen and combat HUD.
+A browser-based pixel-art PVE fighting game built with Phaser 3. Pick a fighter and stage, then challenge the CPU through a classic arcade character-select screen and combat HUD.
 
 - Player-versus-CPU fights with three difficulty levels and mirror matches.
 - English / Chinese interface switching with a saved language preference.
 - Importable fighter and stage packs from the companion asset studio.
+
+**[▶ Play in your browser](https://jayson-sheyue.github.io/herogame/)** — no installation, account or command line. Choose a fighter, then press **J / Enter** or click **FIGHT**. Desktop keyboard required; no touch combat controls.
 
 ## Screenshots
 
@@ -40,7 +42,7 @@ Giant, staggered lettering sweeps across the fighter and arena. These super cut-
 | --- | --- |
 | ![English PVE combat: Lu Bu versus Tokugawa Ieyasu, layered platforms and health, energy, stamina and cooldown HUD](docs/media/en/bronze-sparrow-combat.jpg) | ![English PVE combat: Stephen Hawking versus Isaac Newton in a lunar station overlooking Earth](docs/media/en/lunar-arena.jpg) |
 
-## Run
+## Run locally (optional)
 
 You need Python 3.11+ and a desktop browser. No Python packages or npm dependencies are required to play.
 
@@ -50,7 +52,11 @@ cd herogame
 python3 game/serve.py
 ```
 
-Open <http://127.0.0.1:8788>. Stop the server with `Ctrl+C`. It binds to localhost by default; use `--port 8790` for another port. The first visit requires an internet connection to load Phaser 3.80.1 from jsDelivr. A physical keyboard and landscape window are recommended; there are no touch combat controls.
+Open <http://127.0.0.1:8788>. Stop the server with `Ctrl+C`. It binds to localhost by default; use `--port 8790` for another port. Phaser 3.80.1 is bundled locally; no third-party CDN is needed. A physical keyboard and landscape window are recommended; there are no touch combat controls.
+
+## Web publishing
+
+Pushes to `main` run the game checks, build the static game and deploy to GitHub Pages automatically. The same workflow provides a ready-to-upload itch.io HTML5 ZIP. See the [web publishing guide](docs/WEB-PUBLISHING.md) for building, previewing and uploading it.
 
 ## Interface language
 

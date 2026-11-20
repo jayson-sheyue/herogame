@@ -44,8 +44,8 @@
     正在集结英灵: '正在集结英灵',
     '读取人物与战场，首次进入可能需要稍等片刻。': '读取人物与战场，首次进入可能需要稍等片刻。',
     未能读取游戏资源: '未能读取游戏资源',
-    '请确认 serve.py 正在运行，且 assets/game/index.json 存在，然后重试。':
-      '请确认 serve.py 正在运行，且 assets/game/index.json 存在，然后重试。',
+    '请检查网络连接并重新加载。若仍失败，请稍后重试。':
+      '请检查网络连接并重新加载。若仍失败，请稍后重试。',
     还没有可用的英灵或战场: '还没有可用的英灵或战场',
     '请先导入完整资源包，再重新加载。': '请先导入完整资源包，再重新加载。',
     '读取英灵与战场…': '读取英灵与战场…',
@@ -53,7 +53,6 @@
     英灵资源加载失败: '英灵资源加载失败',
     '请确认资源包完整。返回选人后可换一名英灵重试。': '请确认资源包完整。返回选人后可换一名英灵重试。',
     游戏引擎加载失败: '游戏引擎加载失败',
-    '请检查网络后重试，首次进入需要连接 jsDelivr。': '请检查网络后重试，首次进入需要连接 jsDelivr。',
     '浏览器未允许全屏，可使用浏览器的全屏菜单。': '浏览器未允许全屏，可使用浏览器的全屏菜单。',
     '正在读取资源，请稍候…': '正在读取资源，请稍候…',
     选择英灵与对手: '选择英灵与对手',
@@ -140,8 +139,8 @@
     '读取人物与战场，首次进入可能需要稍等片刻。':
       'Loading fighters and stages. The first load may take a moment.',
     未能读取游戏资源: 'Could not load game assets',
-    '请确认 serve.py 正在运行，且 assets/game/index.json 存在，然后重试。':
-      'Check that serve.py is running and assets/game/index.json exists, then retry.',
+    '请检查网络连接并重新加载。若仍失败，请稍后重试。':
+      'Check your connection and reload. If loading still fails, try again later.',
     还没有可用的英灵或战场: 'No fighters or stages available',
     '请先导入完整资源包，再重新加载。': 'Import a complete asset pack, then reload.',
     '读取英灵与战场…': 'Loading portraits and stage previews…',
@@ -150,8 +149,6 @@
     '请确认资源包完整。返回选人后可换一名英灵重试。':
       'Check the asset pack. Return to Select to try another fighter.',
     游戏引擎加载失败: 'Game engine failed to load',
-    '请检查网络后重试，首次进入需要连接 jsDelivr。':
-      'Check your connection and reload. The first visit requires access to jsDelivr.',
     '浏览器未允许全屏，可使用浏览器的全屏菜单。':
       'Fullscreen was blocked. Try your browser’s fullscreen menu.',
     '正在读取资源，请稍候…': 'Loading assets. Please wait…',

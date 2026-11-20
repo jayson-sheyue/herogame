@@ -2,11 +2,13 @@
 
 [English](README.md) | **简体中文**
 
-基于 Phaser 3 的本地像素格斗游戏。选择英灵与战场，在经典街机界面中挑战 CPU。
+基于 Phaser 3、浏览器点开即玩的像素格斗游戏。选择英灵与战场，在经典街机界面中挑战 CPU。
 
 - 玩家对 CPU 的 PVE 格斗，支持三档难度和同角色对战。
 - 中文 / English 界面即时切换并记住偏好。
 - 可导入套图工坊导出的英灵与地图资源包。
+
+**[▶ 网页点开即玩](https://jayson-sheyue.github.io/herogame/)** —— 无需安装、注册或运行命令。选好英灵，按 **J / Enter** 或点击 **开战**。需要电脑实体键盘，当前没有触屏战斗控件。
 
 ## 游戏截图
 
@@ -40,7 +42,7 @@
 | --- | --- |
 | ![中文 PVE 对战：吕布对德川家康，展示分层平台、生命、能量、体力与技能冷却](docs/media/zh-CN/bronze-sparrow-combat.jpg) | ![中文 PVE 对战：霍金与牛顿在月球空间站交手，窗外为地球](docs/media/zh-CN/lunar-arena.jpg) |
 
-## 运行
+## 本地运行（可选）
 
 需要 Python 3.11+ 和桌面浏览器，无需安装 Python 或 npm 依赖。
 
@@ -50,7 +52,11 @@ cd herogame
 python3 game/serve.py
 ```
 
-打开 <http://127.0.0.1:8788>，按 `Ctrl+C` 停服。默认仅监听本机；自定义端口使用 `--port 8790`。首次启动需要联网从 jsDelivr 加载 Phaser 3.80.1。推荐实体键盘与横屏，当前没有触屏战斗按键。
+打开 <http://127.0.0.1:8788>，按 `Ctrl+C` 停服。默认仅监听本机；自定义端口使用 `--port 8790`。Phaser 3.80.1 已随项目提供，无需连接第三方 CDN。推荐实体键盘与横屏，当前没有触屏战斗按键。
+
+## 网页发布
+
+推送到 `main` 后，工作流会执行检查、构建静态游戏并自动部署到 GitHub Pages，同时提供可上传到 itch.io 的 HTML5 ZIP。构建、预览与上传方法见[网页发布指南](docs/WEB-PUBLISHING.zh-CN.md)。
 
 ## 系统语言
 
