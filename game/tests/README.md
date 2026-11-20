@@ -50,6 +50,8 @@ Language switching does not translate voice recordings or text embedded in artwo
 
 2026-11-20: Super lettering now varies glyph size, baseline and angle, splits prefixes from enlarged impact words, uses paper-colored lead glyphs, and enters diagonally. Chinese and English Lu Bu / Hawking cut-ins were exercised and their four README screenshots replaced. The 29 regressions also check font-size and angle variation, both facing angles, rotated bounds and texture disposal for all nine built-in titles.
 
+2026-11-20: Visible ink is now cropped before display scaling, so transparent font margins cannot shrink the lettering. Move names fill an envelope up to 78% of game width / 80% of game height; the super tag aligns to the outer edge. The 30 regressions include a transparent-margin crop case and a minimum envelope-fill assertion. The four bilingual cut-in screenshots were refreshed and supers now use full-width README images.
+
 ## Performance boundaries
 
 The game retains a maximum 1024×576 preview texture, per-texture frame-scan caching, loading only the current battle stage, and 30 Hz HUD updates while combat runs every frame. Selection no longer polls room or roster data; refresh after importing assets. No measured FPS or total-memory claim is made.

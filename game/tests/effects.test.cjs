@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function setup() {
+function setup(inkBox = null) {
   const window = {};
   const document = {
     documentElement: {}, querySelectorAll: () => [], getElementById: () => null,
@@ -17,7 +17,15 @@ function setup() {
         measureText: ch => ({ width: ch === 'I' ? 12 : 38 }),
         fillText(ch, x) { canvas.ink.push({ ch, x, font: this.font, alpha: this.globalAlpha }); },
         // Pixel appearance is checked in the real browser, not this rendering substitute.
-        getImageData: () => ({ data: new Uint8ClampedArray(0) }),
+        getImageData() {
+          const data = new Uint8ClampedArray(inkBox ? canvas.width * canvas.height * 4 : 0);
+          if (inkBox) for (const [x,y] of [[inkBox.left,inkBox.top], [inkBox.right,inkBox.bottom]])
+            data[(y * canvas.width + x) * 4 + 3] = 255;
+          return { data };
+        },
+        drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh) {
+          canvas.crop = { sx, sy, sw, sh, dx, dy, dw, dh };
+        },
       };
       canvas.getContext = () => ctx;
       return canvas;
@@ -62,9 +70,11 @@ test('every built-in super repaints actual effect glyphs in both languages and r
       assert.equal(normalize(highlights.map(item => item.ch).join('')), normalize(expected));
       assert.ok(new Set(highlights.map(item => item.font)).size > 1, 'impact glyphs must vary in size');
       assert.ok(new Set(canvas.turns).size > 2, 'glyphs need independent angles');
-      assert.ok(image.width <= scene.scale.width * 0.54 + 1);
-      assert.ok(image.height <= 370, 'oversized glyphs stay inside the cut-in height');
-      assert.ok(image.width <= canvas.width / 3, '3x texture must render at logical size');
+      const maxW = scene.scale.width * (source === '奥义' ? 0.64 : 0.78);
+      const maxH = 768 * (source === '奥义' ? 0.40 : 0.80);
+      assert.ok(image.width <= maxW + 0.01 && image.height <= maxH + 0.01);
+      assert.ok(Math.max(image.width / maxW, image.height / maxH) > 0.99,
+        'lettering must fill its screen-sized envelope, even when the source font is small');
     };
     rendered(source);
     i18n.setLanguage('en');
@@ -88,4 +98,18 @@ test('selection and combat-ready labels follow the chosen language', () => {
     assert.equal(i18n.t(key), key);
     i18n.setLanguage('zh-CN');
   }
+});
+
+test('transparent font margins cannot shrink the visible super lettering', () => {
+  const { makeSekiroBrushKanji, scene, textures } = setup({ left: 40, top: 80, right: 100, bottom: 260 });
+  const root = makeSekiroBrushKanji(scene, '赤兔战争践踏', 64);
+  const image = root.children[0], ink = textures.get(image.key);
+  assert.equal(ink.crop.sx, 40);
+  assert.equal(ink.crop.sy, 80);
+  assert.equal(ink.crop.sw, 61);
+  assert.equal(ink.crop.sh, 181);
+  assert.ok(Math.abs(image.height - 768 * 0.80) < 0.01);
+  assert.ok(Math.abs(image.width / image.height - ink.width / ink.height) < 0.0001);
+  root.destroy();
+  assert.equal(textures.size, 0);
 });

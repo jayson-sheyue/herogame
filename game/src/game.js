@@ -1391,18 +1391,37 @@
     ctx.globalCompositeOperation = "source-over";
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const d = img.data;
+    let left = canvas.width, top = canvas.height, right = -1, bottom = -1;
     // Keep ragged, hard ink edges at game scale without flattening the warm highlights.
     for (let y = 0; y < canvas.height; y++) {
       for (let x = 0; x < canvas.width; x++) {
         const i = (y * canvas.width + x) * 4;
         if (d[i+3] < 65) d[i+3] = 0;
         else if (d[i+3] < 190 && (x * 41 + y * 19) % 5 === 0) d[i+3] = 0;
+        if (d[i+3] > 0) {
+          left = Math.min(left, x); right = Math.max(right, x);
+          top = Math.min(top, y); bottom = Math.max(bottom, y);
+        }
       }
     }
     ctx.putImageData(img, 0, 0);
-    scene.textures.addCanvas(uid, canvas);
+    // Scale actual ink, not the font's generous transparent bounds. Keep raster baking
+    // bounded, then let the lettering fill the cut-in instead of a small right-hand panel.
+    let ink = canvas;
+    if (right >= left && bottom >= top) {
+      const pad = hi * 3;
+      ink = document.createElement("canvas");
+      ink.width = right - left + 1 + pad * 2;
+      ink.height = bottom - top + 1 + pad * 2;
+      ink.getContext("2d").drawImage(canvas, left, top, right-left+1, bottom-top+1,
+        pad, pad, right-left+1, bottom-top+1);
+    }
+    scene.textures.addCanvas(uid, ink);
     const spr = scene.add.image(0, 0, uid).setOrigin(0.5).setScrollFactor(0);
-    spr.setDisplaySize(w, h);
+    const maxWidth = scene.scale.width * (opts.tag ? 0.64 : 0.78);
+    const maxHeight = (scene.scale.height || 768) * (opts.tag ? 0.40 : 0.80);
+    const displayScale = Math.min(maxWidth / ink.width, maxHeight / ink.height);
+    spr.setDisplaySize(ink.width * displayScale, ink.height * displayScale);
     if (spr.texture?.setFilter) spr.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     spr.once("destroy", () => { if (scene.textures.exists(uid)) scene.textures.remove(uid); });
     return spr;
@@ -4917,7 +4936,8 @@
         rot: faceRight ? -0.24 : 0.19,
         fill: "#b73224",
       });
-      tag.setPosition(faceRight ? w * 0.58 : w * 0.42, h * 0.27);
+      const tagWidth = tag.getBounds().width;
+      tag.setPosition(faceRight ? w - tagWidth / 2 - 24 : tagWidth / 2 + 24, h * 0.2);
       tag.setScale(2.05);
       tag.setAlpha(0);
 
@@ -4926,8 +4946,8 @@
         rot: faceRight ? -0.19 : 0.17,
         fill: "#ab3024",
       });
-      const nameX = faceRight ? w * 0.68 : w * 0.32;
-      const nameY = h * 0.6;
+      const nameX = faceRight ? w * 0.60 : w * 0.40;
+      const nameY = h * 0.59;
       name.setPosition(nameX + (faceRight ? 110 : -110), nameY + 54);
       name.setScale(1.7);
       name.setAlpha(0);

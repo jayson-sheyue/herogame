@@ -24,11 +24,15 @@ Real gameplay, captured with the English interface and English super-move effect
 
 ### Supers · L
 
-Oversized lead letters, staggered words and diagonal motion give each super its own impact frame.
+Giant, staggered lettering sweeps across the fighter and arena. These super cut-ins are shown at full width.
 
-| Lu Bu · Red Hare Rampage | Hawking · Singularity |
-| --- | --- |
-| ![English super cut-in: mounted Lu Bu with SUPER and Red Hare / RAMPAGE lettering with oversized lead characters and staggered angles](docs/media/en/red-hare-super.jpg) | ![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY lettering with oversized lead characters and staggered angles](docs/media/en/singularity-super.jpg) |
+**Lu Bu · Red Hare Rampage**
+
+![English super cut-in: mounted Lu Bu with SUPER and Red Hare / RAMPAGE lettering with oversized lead characters and staggered angles](docs/media/en/red-hare-super.jpg)
+
+**Hawking · Singularity**
+
+![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY lettering with oversized lead characters and staggered angles](docs/media/en/singularity-super.jpg)
 
 ### Pixel-art arenas
 
