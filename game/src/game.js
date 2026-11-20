@@ -1255,19 +1255,38 @@
 
   let _fierceKanjiSeq = 0;
 
-  /** 奥义字：刀刻感——字距拉开、红黑对半、硬边斜切，避免一团饱和红 */
+  // Keep the move readable as a phrase, with the impact word breaking its baseline.
+  function cutinLettering(text, fontSize, latin, tag) {
+    const chars = Array.from(text);
+    let rows;
+    if (tag) rows = [{ text, size: fontSize, x: 0, y: 0, tag: true }];
+    else if (latin && text.includes(" ")) {
+      const words = text.split(/\s+/);
+      const impact = words.pop().toUpperCase();
+      rows = [
+        { text: words.join(" "), size: fontSize * 0.88, x: -70, y: -74 },
+        { text: impact, size: fontSize * 1.56, x: 28, y: 54, impact: true },
+      ];
+    } else if (!latin && chars.length > 2) {
+      const split = text === "三河魂" || text === "铁十字之辉" ? chars.length - 1 :
+        text === "去城市化" ? 1 : chars.length - 2;
+      rows = [
+        { text: chars.slice(0, split).join(""), size: fontSize * 0.94, x: -84, y: -76 },
+        { text: chars.slice(split).join(""), size: fontSize * 1.62, x: 42, y: 48, impact: true },
+      ];
+    } else rows = [{ text: latin ? text.toUpperCase() : text, size: fontSize * 1.3, x: 0, y: 0, impact: true }];
+    return rows;
+  }
+
+  /** 刀刻字效：大字破框、错落基线、字粒独立倾斜；语言切换保留正在播放的入场动画。 */
   function makeSekiroBrushKanji(scene, source, fontSize, opts = {}) {
     const root = scene.add.container(0, 0).setScrollFactor(0);
     const paint = () => {
       root.removeAll(true);
-      const english = window.HeroI18n?.language === "en";
-      const child = paintSuperTitleGlyph(scene, english ? t(source).toUpperCase() : source,
-        english ? Math.max(64, fontSize) : fontSize, {
-          ...opts,
-          latin: english,
-          tracking: english ? 4 : opts.tracking,
-        });
-      root.add(child);
+      const latin = window.HeroI18n?.language === "en";
+      root.add(paintSuperTitleGlyph(scene, t(source), fontSize, {
+        ...opts, latin, tag: source === "奥义",
+      }));
     };
     paint();
     const off = window.HeroI18n?.onChange(paint);
@@ -1276,171 +1295,114 @@
   }
 
   function paintSuperTitleGlyph(scene, text, fontSize, opts = {}) {
-    const rot = opts.rot ?? -0.07;
-    const fill = opts.fill || "#8a1414";
-    const hot = opts.hot || "#c42828";
-    const tracking = opts.tracking != null ? opts.tracking : Math.round(fontSize * 0.42);
-    const chars = Array.from(String(text || ""));
-    const n = Math.max(1, chars.length);
+    const rot = opts.rot ?? -0.18;
     const uid = `fierce-kanji-${++_fierceKanjiSeq}`;
-    // Measure Latin glyphs instead of spacing every letter like a full-width Han glyph.
     const measure = document.createElement("canvas").getContext("2d");
     if (!measure) return scene.add.container(0, 0).setScrollFactor(0);
-    const font = opts.latin ? `bold ${Math.round(fontSize)}px GameUI, monospace` :
-      `${Math.round(fontSize)}px BrushUI, STKaiti, KaiTi, serif`;
-    measure.font = font;
-    const widths = chars.map(ch => opts.latin ? measure.measureText(ch).width : fontSize);
-    const textWidth = widths.reduce((sum, width) => sum + width, 0) + (n - 1) * tracking;
-    const padX = Math.ceil(fontSize * 0.7);
-    const padY = Math.ceil(fontSize * 0.95);
-    const tw = Math.ceil(textWidth + padX * 2);
-    const th = Math.ceil(fontSize * 1.75 + padY * 2);
-    const hi = 3;
+    const fontAt = size => opts.latin ? `bold ${Math.round(size)}px GameUI, Impact, sans-serif` :
+      `${Math.round(size)}px BrushUI, STKaiti, KaiTi, serif`;
+    const glyphs = [];
+    const rows = cutinLettering(String(text || ""), fontSize, opts.latin, opts.tag);
+    rows.forEach(row => {
+      const chars = Array.from(row.text);
+      const rowGlyphs = chars.map((ch, i) => {
+        const large = row.tag ? (i === 0 ? 1.6 : i === chars.length - 1 ? 1.23 : 0.94) :
+          row.impact ? (i === 0 ? 1.28 : i % 3 === 1 ? 0.93 : 1.08) : (i % 3 === 0 ? 1.13 : 0.91);
+        const size = row.size * large;
+        measure.font = fontAt(size);
+        const width = opts.latin ? measure.measureText(ch).width : size;
+        return { ch, size, width, angle: [-0.09, 0.065, -0.035, 0.09][i % 4],
+          // A paper-colored lead glyph punches through the red lettering.
+          accent: i === 0 && (row.tag || row.impact) };
+      });
+      const tracking = opts.latin ? 1 : -row.size * 0.09;
+      const width = rowGlyphs.reduce((sum, g) => sum + g.width + tracking, -tracking);
+      let cursor = row.x - width / 2;
+      rowGlyphs.forEach((g, i) => {
+        g.x = cursor + g.width / 2;
+        g.y = row.y - i * (row.tag ? 8 : 4) + [12, -10, 5, -5][i % 4];
+        cursor += g.width + tracking;
+        glyphs.push(g);
+      });
+    });
+    // Fit the *rotated* ink bounds, including oversized glyphs and their heavy rim.
+    const points = glyphs.flatMap(g => {
+      const angle = rot + g.angle;
+      const cx = g.x * Math.cos(rot) - g.y * Math.sin(rot);
+      const cy = g.x * Math.sin(rot) + g.y * Math.cos(rot);
+      const x = g.width / 2 + g.size * 0.16;
+      const y = g.size * 0.8;
+      return [[-x,-y], [x,-y], [x,y], [-x,y]].map(([dx,dy]) => ({
+        x: cx + dx * Math.cos(angle) - dy * Math.sin(angle),
+        y: cy + dx * Math.sin(angle) + dy * Math.cos(angle),
+      }));
+    });
+    const minX = Math.min(0, ...points.map(p => p.x)) - 14;
+    const maxX = Math.max(0, ...points.map(p => p.x)) + 14;
+    const minY = Math.min(0, ...points.map(p => p.y)) - 14;
+    const maxY = Math.max(0, ...points.map(p => p.y)) + 14;
+    const tw = maxX - minX, th = maxY - minY;
+    const fit = Math.min(1, scene.scale.width * 0.54 / tw, 370 / th);
+    const w = Math.ceil(tw * fit), h = Math.ceil(th * fit), hi = 3;
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(8, tw * hi);
-    canvas.height = Math.max(8, th * hi);
+    canvas.width = Math.max(8, w * hi);
+    canvas.height = Math.max(8, h * hi);
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      return scene.add.container(0, 0).setScrollFactor(0);
-    }
-    ctx.imageSmoothingEnabled = false;
-    ctx.setTransform(hi, 0, 0, hi, 0, 0);
-    ctx.translate(tw / 2, th / 2);
+    if (!ctx) return scene.add.container(0, 0).setScrollFactor(0);
+    ctx.setTransform(hi * fit, 0, 0, hi * fit, -minX * hi * fit, -minY * hi * fit);
     ctx.rotate(rot);
-    // 刀刻：略拉高、略收窄
-    ctx.scale(0.9, 1.22);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = font;
     ctx.lineJoin = "miter";
     ctx.miterLimit = 2;
-
-    let cursor = -textWidth / 2;
-    const positions = widths.map(width => {
-      const center = cursor + width / 2;
-      cursor += width + tracking;
-      return center;
-    });
-    const inkAt = (ch, x, dx, dy, color, alpha = 1) => {
+    const inkAt = (g, color, dx = 0, dy = 0, alpha = 1) => {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate(g.angle);
+      ctx.font = fontAt(g.size);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = color;
-      ctx.fillText(ch, x + dx, dy);
+      ctx.fillText(g.ch, dx, dy);
+      ctx.restore();
     };
-
-    // ① 厚黑刀底（主体分量）
-    const rim = Math.max(4, Math.round(fontSize * 0.07));
-    chars.forEach((ch, i) => {
-      const x = positions[i];
-      [
-        [rim, rim + 1],
-        [-rim, rim],
-        [rim, -rim],
-        [-rim, -rim],
-        [0, rim + 2],
-        [rim + 2, 0],
-        [-rim - 1, 0],
-        [0, -rim - 1],
-      ].forEach(([dx, dy]) => inkAt(ch, x, dx, dy, "#050203", 1));
+    glyphs.forEach(g => {
+      const rim = Math.max(5, g.size * 0.07);
+      [[rim,rim+3], [-rim,rim], [rim,-rim], [-rim,-rim], [0,rim+4], [rim+2,0], [-rim-2,0], [0,-rim]]
+        .forEach(([dx,dy]) => inkAt(g, "#070405", dx, dy));
     });
-
-    // ② 暗红刻面（偏暗、不饱和，与黑对半）
-    chars.forEach((ch, i) => {
-      const x = positions[i];
-      inkAt(ch, x, 0.5, 0.5, "#2a0808", 1);
-      inkAt(ch, x, 0, 0, fill, 1);
+    glyphs.forEach(g => {
+      inkAt(g, "#4c100e", 3, 5);
+      inkAt(g, g.accent ? "#e9d3a3" : opts.fill || "#ab3024");
     });
-
-    // ③ 单侧刃口高光（只刮一条边，避免整字变亮红块）
-    chars.forEach((ch, i) => {
-      const x = positions[i];
-      inkAt(ch, x, -1.4, -2.0, hot, 0.38);
+    glyphs.forEach(g => inkAt(g, g.accent ? "#fff0c7" : "#ee7450", -1.4, -2, 0.6));
+    // Slash inside existing ink, without drawing stray lines across transparent gaps.
+    ctx.globalCompositeOperation = "source-atop";
+    glyphs.forEach(g => {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate(g.angle);
+      ctx.strokeStyle = "#120708";
+      ctx.lineWidth = Math.max(2, g.size * 0.025);
+      const r = g.size * 0.46;
+      ctx.beginPath(); ctx.moveTo(-r, -r * 0.55); ctx.lineTo(r, r * 0.7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r); ctx.lineTo(r * 0.8, r * 0.3); ctx.stroke();
+      ctx.restore();
     });
-
-    // ④ 斜刀黑切：切开红面，露出黑口，红黑交错
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = "#030101";
-    ctx.lineWidth = Math.max(2.2, fontSize * 0.028);
-    ctx.lineCap = "square";
-    chars.forEach((ch, i) => {
-      const x = positions[i];
-      const s = fontSize * 0.48;
-      ctx.beginPath();
-      ctx.moveTo(x - s * 0.85, -s * 0.55);
-      ctx.lineTo(x + s * 0.55, s * 0.7);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x - s * 0.15, -s * 0.75);
-      ctx.lineTo(x + s * 0.75, s * 0.25);
-      ctx.stroke();
-    });
-
-    // 阈值硬化 + 边缘啃齿
+    ctx.globalCompositeOperation = "source-over";
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const d = img.data;
-    const wpx = canvas.width;
-    const hpx = canvas.height;
-    const solid = new Uint8Array(wpx * hpx);
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      const a = d[i + 3];
-      if (a < 52) {
-        d[i + 3] = 0;
-        continue;
-      }
-      const r = d[i];
-      const g = d[i + 1];
-      const b = d[i + 2];
-      // 压掉过饱和大红：偏亮的红往暗红收
-      if (r > 160 && r > g * 2.2 && r > b * 2.2) {
-        d[i] = Math.round(r * 0.62 + 28);
-        d[i + 1] = Math.round(g * 0.55 + 6);
-        d[i + 2] = Math.round(b * 0.55 + 6);
-      }
-      // 灰雾边 → 实黑或剔掉
-      if (a < 170 && r < 55 && g < 40 && b < 40) {
-        if (a > 100) {
-          d[i] = 5;
-          d[i + 1] = 2;
-          d[i + 2] = 2;
-          d[i + 3] = 255;
-          solid[p] = 1;
-        } else {
-          d[i + 3] = 0;
-        }
-        continue;
-      }
-      d[i + 3] = 255;
-      solid[p] = 1;
-    }
-    for (let y = 1; y < hpx - 1; y++) {
-      for (let x = 1; x < wpx - 1; x++) {
-        const p = y * wpx + x;
-        if (!solid[p]) continue;
-        let empty = 0;
-        if (!solid[p - 1]) empty++;
-        if (!solid[p + 1]) empty++;
-        if (!solid[p - wpx]) empty++;
-        if (!solid[p + wpx]) empty++;
-        if (empty === 0) continue;
-        if ((x * 41 + y * 19 + p) % 6 === 0 || empty >= 3) {
-          d[p * 4 + 3] = 0;
-          solid[p] = 0;
-        }
+    // Keep ragged, hard ink edges at game scale without flattening the warm highlights.
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const i = (y * canvas.width + x) * 4;
+        if (d[i+3] < 65) d[i+3] = 0;
+        else if (d[i+3] < 190 && (x * 41 + y * 19) % 5 === 0) d[i+3] = 0;
       }
     }
     ctx.putImageData(img, 0, 0);
-
-    if (scene.textures.exists(uid)) {
-      try {
-        scene.textures.remove(uid);
-      } catch {
-        /* ignore */
-      }
-    }
     scene.textures.addCanvas(uid, canvas);
     const spr = scene.add.image(0, 0, uid).setOrigin(0.5).setScrollFactor(0);
-    // The texture is baked at 3x resolution, but occupies logical game pixels.
-    const fit = Math.min(1, scene.scale.width * 0.58 / tw);
-    spr.setDisplaySize(tw * fit, th * fit);
+    spr.setDisplaySize(w, h);
     if (spr.texture?.setFilter) spr.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     spr.once("destroy", () => { if (scene.textures.exists(uid)) scene.textures.remove(uid); });
     return spr;
@@ -4952,24 +4914,21 @@
 
       const moveName = this.superMoveName(actor);
       const tag = makeSekiroBrushKanji(this, "奥义", 118, {
-        rot: faceRight ? -0.06 : 0.06,
-        fill: "#7a1616",
-        hot: "#b42222",
-        tracking: 58,
+        rot: faceRight ? -0.24 : 0.19,
+        fill: "#b73224",
       });
-      tag.setPosition(faceRight ? w * 0.63 : w * 0.37, h * 0.38);
+      tag.setPosition(faceRight ? w * 0.58 : w * 0.42, h * 0.27);
       tag.setScale(2.05);
       tag.setAlpha(0);
 
       const nameSize = moveName.length >= 6 ? 64 : moveName.length >= 4 ? 76 : 84;
-      const nameTrack = moveName.length >= 6 ? 18 : moveName.length >= 4 ? 24 : 28;
       const name = makeSekiroBrushKanji(this, moveName, nameSize, {
-        rot: faceRight ? -0.04 : 0.04,
-        fill: "#6e1414",
-        hot: "#a81e1e",
-        tracking: nameTrack,
+        rot: faceRight ? -0.19 : 0.17,
+        fill: "#ab3024",
       });
-      name.setPosition(faceRight ? w * 0.63 : w * 0.37, h * 0.58);
+      const nameX = faceRight ? w * 0.68 : w * 0.32;
+      const nameY = h * 0.6;
+      name.setPosition(nameX + (faceRight ? 110 : -110), nameY + 54);
       name.setScale(1.7);
       name.setAlpha(0);
 
@@ -5087,6 +5046,8 @@
       this.tweens.add({
         targets: name,
         alpha: 1,
+        x: nameX,
+        y: nameY,
         scale: 1,
         duration: 120,
         delay: 420,

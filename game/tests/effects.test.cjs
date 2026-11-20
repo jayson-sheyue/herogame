@@ -9,12 +9,13 @@ function setup() {
   const document = {
     documentElement: {}, querySelectorAll: () => [], getElementById: () => null,
     createElement() {
-      const canvas = { width: 0, height: 0, ink: [] };
+      const canvas = { width: 0, height: 0, ink: [], turns: [] };
       const ctx = {
-        setTransform() {}, translate() {}, rotate() {}, scale() {},
+        save() {}, restore() {},
+        setTransform() {}, translate() {}, rotate(angle) { canvas.turns.push(angle); }, scale() {},
         beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, putImageData() {},
         measureText: ch => ({ width: ch === 'I' ? 12 : 38 }),
-        fillText: (ch, x) => canvas.ink.push({ ch, x }),
+        fillText(ch, x) { canvas.ink.push({ ch, x, font: this.font, alpha: this.globalAlpha }); },
         // Pixel appearance is checked in the real browser, not this rendering substitute.
         getImageData: () => ({ data: new Uint8ClampedArray(0) }),
       };
@@ -50,14 +51,19 @@ function setup() {
 
 test('every built-in super repaints actual effect glyphs in both languages and releases textures', () => {
   const { makeSekiroBrushKanji, SUPER_TITLES, i18n, scene, textures } = setup();
-  for (const source of ['奥义', ...Object.values(SUPER_TITLES)]) {
+  for (const source of ['奥义', ...Object.values(SUPER_TITLES)]) for (const rot of [-0.24, 0.19]) {
     i18n.setLanguage('zh-CN');
-    const root = makeSekiroBrushKanji(scene, source, 64);
+    const root = makeSekiroBrushKanji(scene, source, 64, { rot });
     const rendered = expected => {
       assert.equal(textures.size, 1);
       const image = root.children[0], canvas = textures.get(image.key);
-      assert.equal(canvas.ink.slice(-expected.length).map(item => item.ch).join(''), expected);
-      assert.ok(image.width <= scene.scale.width * 0.58);
+      const highlights = canvas.ink.filter(item => item.alpha === 0.6);
+      const normalize = text => text.replace(/\s/g, '').toLowerCase();
+      assert.equal(normalize(highlights.map(item => item.ch).join('')), normalize(expected));
+      assert.ok(new Set(highlights.map(item => item.font)).size > 1, 'impact glyphs must vary in size');
+      assert.ok(new Set(canvas.turns).size > 2, 'glyphs need independent angles');
+      assert.ok(image.width <= scene.scale.width * 0.54 + 1);
+      assert.ok(image.height <= 370, 'oversized glyphs stay inside the cut-in height');
       assert.ok(image.width <= canvas.width / 3, '3x texture must render at logical size');
     };
     rendered(source);

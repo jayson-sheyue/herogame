@@ -24,9 +24,11 @@ Real gameplay, captured with the English interface and English super-move effect
 
 ### Supers · L
 
+Oversized lead letters, staggered words and diagonal motion give each super its own impact frame.
+
 | Lu Bu · Red Hare Rampage | Hawking · Singularity |
 | --- | --- |
-| ![English super cut-in: mounted Lu Bu with SUPER and RED HARE RAMPAGE carved lettering](docs/media/en/red-hare-super.jpg) | ![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY carved lettering](docs/media/en/singularity-super.jpg) |
+| ![English super cut-in: mounted Lu Bu with SUPER and Red Hare / RAMPAGE lettering with oversized lead characters and staggered angles](docs/media/en/red-hare-super.jpg) | ![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY lettering with oversized lead characters and staggered angles](docs/media/en/singularity-super.jpg) |
 
 ### Pixel-art arenas
 
@@ -50,7 +52,7 @@ Open <http://127.0.0.1:8788>. Stop the server with `Ctrl+C`. It binds to localho
 
 Choose **English** or **简体中文** from the language selector in the top toolbar. Chinese is the original default. Your explicit choice is saved in this browser and restored on later visits; the browser or operating-system language does not override it.
 
-Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Super cut-ins render their carved titles in the selected language, including `SUPER`, `RED HARE RAMPAGE` and `SINGULARITY` in English. Switching during a cut-in repaints its lettering without restarting the move. Existing voice recordings and text baked into imported artwork remain unchanged.
+Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Super cut-ins render their carved titles in the selected language, using `SUPER` and English move names with uppercase impact words such as `RAMPAGE` and `SINGULARITY`. Switching during a cut-in repaints its lettering without restarting the move. Existing voice recordings and text baked into imported artwork remain unchanged.
 
 Imported asset packs may provide `displayNameEn` or `i18n.en.displayName` in `fighter.json` / `stage.json`. Without an English name, the original authored name is shown. Source metadata is never rewritten by switching languages. If browser storage is unavailable, language changes work for the current page session.
 
