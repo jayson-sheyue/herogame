@@ -19,6 +19,7 @@
     英灵大乱斗游戏画面: '英灵大乱斗游戏画面',
     '游戏画面。操作方法见出招表。': '游戏画面。操作方法见出招表。',
     系统语言: '系统语言',
+    跟随浏览器: '自动',
     '声音：开': '声音：开',
     '声音：关': '声音：关',
     全屏: '全屏',
@@ -113,6 +114,7 @@
     英灵大乱斗游戏画面: 'Hero Clash game screen',
     '游戏画面。操作方法见出招表。': 'Game screen. Open the Move List for keyboard controls.',
     系统语言: 'Interface language',
+    跟随浏览器: 'Auto',
     '声音：开': 'Sound: On',
     '声音：关': 'Sound: Off',
     全屏: 'Fullscreen',
@@ -221,12 +223,25 @@
     peak_of_liberty: 'Liberty Peak',
   };
   const listeners = new Set();
-  let language = 'zh-CN';
+  const choices = ['auto', 'zh-CN', 'en'];
+  function browserLanguage() {
+    const browser = typeof navigator === 'undefined' ? null : navigator;
+    const preferred = [...(Array.isArray(browser?.languages) ? browser.languages : []), browser?.language];
+    for (const locale of preferred) {
+      const base = typeof locale === 'string' ? locale.trim().toLowerCase().split(/[-_]/)[0] : '';
+      if (base === 'zh') return 'zh-CN';
+      if (base === 'en') return 'en';
+    }
+    return 'en';
+  }
+  let preference = 'auto';
   try {
-    if (localStorage.getItem('herogame-language') === 'en') language = 'en';
+    const saved = localStorage.getItem('herogame-language');
+    if (choices.includes(saved)) preference = saved;
   } catch {
     /* session only */
   }
+  let language = preference === 'auto' ? browserLanguage() : preference;
   const t = (key) => {
     if (language === 'en' && Object.hasOwn(en, key)) return en[key];
     return Object.hasOwn(zh, key) ? zh[key] : key;
@@ -241,11 +256,15 @@
     get language() {
       return language;
     },
+    get preference() {
+      return preference;
+    },
     setLanguage(next) {
-      if (!['zh-CN', 'en'].includes(next)) return false;
-      language = next;
+      if (!choices.includes(next)) return false;
+      preference = next;
+      language = next === 'auto' ? browserLanguage() : next;
       try {
-        localStorage.setItem('herogame-language', language);
+        localStorage.setItem('herogame-language', preference);
       } catch {
         /* keep working in memory */
       }
@@ -297,8 +316,16 @@
         .querySelectorAll('[data-i18n-aria]')
         .forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
       const select = document.getElementById('languageSelect');
-      if (select) select.value = language;
+      if (select) select.value = preference;
     },
   });
   api.applyDOM();
+  window.addEventListener?.('languagechange', () => {
+    if (preference !== 'auto') return;
+    const next = browserLanguage();
+    if (next === language) return;
+    language = next;
+    api.applyDOM();
+    [...listeners].forEach((listener) => listener());
+  });
 })();

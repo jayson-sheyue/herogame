@@ -61,3 +61,7 @@ The game retains a maximum 1024×576 preview texture, per-texture frame-scan cac
 2026-11-20: 33 automated regressions and syntax checks passed, including the bundled catalog, one-frame selection previews and relative arena-preview URLs. The exporter validates page dependencies and all published fighter/stage file references, checks itch.io file/size/path limits, and verifies every converted fighter sheet against the original decoded RGBA pixels. The current build contains nine playable fighters and twelve stages.
 
 The actual export was served under a subdirectory, then exercised in a browser: English/Chinese selection, fight loading, Lu Bu’s halberd skill and English super, pause/resume, Move List and return to selection. Captured warnings/errors were empty. This does not claim all moves, every arena, mobile touch play or a fixed cold-load time.
+
+## Automatic interface language
+
+2026-11-20: The initial-language rule now follows browser preferences instead of always starting in Chinese. 36 automated regressions pass, covering Chinese/English locale variants, ordered preferences, unsupported/missing language fallback, both existing manual choices, returning to Auto, live languagechange events and blocked browser storage. Existing manual choices retain priority; Auto does not persist an implicit manual selection. Earlier fixed-default records above describe the previous behavior.

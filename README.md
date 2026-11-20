@@ -60,7 +60,9 @@ Pushes to `main` run the game checks, build the static game and deploy to GitHub
 
 ## Interface language
 
-Choose **English** or **简体中文** from the language selector in the top toolbar. Chinese is the original default. Your explicit choice is saved in this browser and restored on later visits; the browser or operating-system language does not override it.
+Choose **Auto** (the default), **English** or **简体中文** from the language selector in the top toolbar. Auto checks the browser’s preferred languages in order: Chinese variants use Simplified Chinese, English variants use English; if none match or language information is unavailable, English is used. Browser preferences usually follow the device language but can be customized in browser settings.
+
+An existing manual choice takes priority and is restored on later visits. Choose **Auto** to resume following the browser; it also responds when browser language preferences change while the page is open. Automatic detection does not save an implicit manual choice.
 
 Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Super cut-ins render their carved titles in the selected language, using `SUPER` and English move names with uppercase impact words such as `RAMPAGE` and `SINGULARITY`. Switching during a cut-in repaints its lettering without restarting the move. Existing voice recordings and text baked into imported artwork remain unchanged.
 

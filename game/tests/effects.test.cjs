@@ -31,7 +31,7 @@ function setup(inkBox = null) {
       return canvas;
     },
   };
-  const context = { window, document, localStorage: { getItem() {}, setItem() {} },
+  const context = { window, document, navigator: {language: 'zh-CN'}, localStorage: { getItem() {}, setItem() {} },
     Phaser: { Scene: class {}, Textures: { FilterMode: { LINEAR: 1 } } } };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/i18n.js'), 'utf8'), context);
   const source = fs.readFileSync(path.join(__dirname, '../src/game.js'), 'utf8');

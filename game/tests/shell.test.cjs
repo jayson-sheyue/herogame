@@ -49,6 +49,7 @@ function setup() {
   const context = {
     document,
     window,
+    navigator: {language: 'zh-CN'},
     localStorage: { getItem: (k) => stored.get(k), setItem: (k, v) => stored.set(k, v) },
     location: {
       reload() {
