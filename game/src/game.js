@@ -3141,7 +3141,10 @@
           .setOrigin(pose.originX, pose.originY)
           .setScale(pose.scale)
           .setFlipX(i === 1);
-        this.names[i].setText(this.heroName(index));
+        const nameLabel = this.names[i];
+        nameLabel.setFontSize(28).setText(this.heroName(index));
+        if (nameLabel.width > 260)
+          nameLabel.setFontSize(Math.max(12, Math.floor(28 * 260 / nameLabel.width)));
       });
       this.slotButtons.forEach((b, i) => b.paint(this.slot === (i ? "p2" : "p1")));
       this.cards.forEach((c) => {
