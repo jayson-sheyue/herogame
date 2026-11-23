@@ -16,31 +16,35 @@
 
 **经典街机选人：** 选择双方英灵、预览战场，并在开战前设置 CPU 难度。
 
-![中文街机选人界面：吕布对德川家康，展示英灵头像、战场预览与三档 CPU 难度](docs/media/zh-CN/character-select.jpg)
+![中文街机选人界面：霍金对牛顿，展示英灵头像、伊利奥斯天塔预览与三档 CPU 难度](docs/media/zh-CN/character-select.jpg)
 
 ### 小技能 · K
 
-| 吕布 · 掷戟贯穿 | 牛顿 · 光谱射线 |
-| --- | --- |
-| ![中文实战：吕布向白门雀台前方掷出带火焰特效的方天画戟](docs/media/zh-CN/halberd-skill.jpg) | ![中文实战：牛顿通过三棱镜向前释放七彩光谱射线](docs/media/zh-CN/prism-skill.jpg) |
+**牛顿 · 光谱射线 — 伊利奥斯天塔**
+
+![中文实战：牛顿在伊利奥斯天塔通过三棱镜向希特勒释放七彩光谱射线](docs/media/zh-CN/prism-skill.jpg)
 
 ### 奥义 · L
 
 巨幅字效斜向贯穿人物与战场，奥义截图采用整宽展示。
 
-**吕布 · 赤兔战争践踏**
-
-![中文奥义演出：骑乘赤兔的吕布，配有奥义与赤兔战争践踏字效，关键字放大、错落斜排](docs/media/zh-CN/red-hare-super.jpg)
-
 **霍金 · 奇点演说**
 
-![中文奥义演出：霍金与黑洞，配有奥义与奇点演说字效，关键字放大、错落斜排](docs/media/zh-CN/singularity-super.jpg)
+![中文奥义演出：伊利奥斯天塔上的霍金与黑洞，配有放大、错落斜排的奥义与奇点演说字效](docs/media/zh-CN/singularity-super.jpg)
+
+**希特勒 · 铁十字之辉**
+
+![中文奥义演出：亚特兰蒂斯总统山上的希特勒，配有放大、错落斜排的奥义与铁十字之辉字效](docs/media/zh-CN/iron-cross-super.jpg)
+
+**波尔布特 · 去城市化**
+
+![中文奥义演出：自由之巅上的波尔布特，配有放大、错落斜排的奥义与去城市化字效](docs/media/zh-CN/year-zero-super.jpg)
 
 ### 像素战场
 
-| 白门雀台 | 月球空间站 |
-| --- | --- |
-| ![中文 PVE 对战：吕布对德川家康，展示分层平台、生命、能量、体力与技能冷却](docs/media/zh-CN/bronze-sparrow-combat.jpg) | ![中文 PVE 对战：霍金与牛顿在月球空间站交手，窗外为地球](docs/media/zh-CN/lunar-arena.jpg) |
+| 伊利奥斯天塔 | 亚特兰蒂斯总统山 | 自由之巅 |
+| --- | --- | --- |
+| ![中文 PVE 对战：霍金对牛顿，蓝顶白墙、海滨露台与远方天塔](docs/media/zh-CN/ilios-arena.jpg) | ![中文 PVE 对战：希特勒对牛顿，海底总统雕像、沉没平台与珊瑚](docs/media/zh-CN/atlantis-arena.jpg) | ![中文 PVE 对战：波尔布特对霍金，雪山神庙、悬空金顶与自由女神像](docs/media/zh-CN/liberty-arena.jpg) |
 
 ## 本地运行（可选）
 

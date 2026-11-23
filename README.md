@@ -16,31 +16,35 @@ Real gameplay, captured with the English interface and English super-move effect
 
 **Classic arcade selection:** pick both fighters, preview the stage and choose the CPU difficulty.
 
-![English character selection: Lu Bu versus Tokugawa Ieyasu, fighter roster, stage preview and CPU difficulty](docs/media/en/character-select.jpg)
+![English character selection: Stephen Hawking versus Isaac Newton at Ilios Sky Tower, fighter roster and CPU difficulty](docs/media/en/character-select.jpg)
 
 ### Skills · K
 
-| Lu Bu · Halberd Throw | Newton · Spectrum Beam |
-| --- | --- |
-| ![English gameplay: Lu Bu launches a flaming halberd across Bronze Sparrow Terrace](docs/media/en/halberd-skill.jpg) | ![English gameplay: Isaac Newton fires a rainbow spectrum beam through a prism](docs/media/en/prism-skill.jpg) |
+**Isaac Newton · Spectrum Beam — Ilios Sky Tower**
+
+![English gameplay: Isaac Newton fires a rainbow spectrum beam through a prism at Adolf Hitler on Ilios Sky Tower](docs/media/en/prism-skill.jpg)
 
 ### Supers · L
 
 Giant, staggered lettering sweeps across the fighter and arena. These super cut-ins are shown at full width.
 
-**Lu Bu · Red Hare Rampage**
-
-![English super cut-in: mounted Lu Bu with SUPER and Red Hare / RAMPAGE lettering with oversized lead characters and staggered angles](docs/media/en/red-hare-super.jpg)
-
 **Hawking · Singularity**
 
-![English super cut-in: Stephen Hawking, a black hole, and SUPER and SINGULARITY lettering with oversized lead characters and staggered angles](docs/media/en/singularity-super.jpg)
+![English super cut-in: Stephen Hawking and a black hole at Ilios Sky Tower, with oversized angled SUPER and SINGULARITY lettering](docs/media/en/singularity-super.jpg)
+
+**Adolf Hitler · Iron Cross**
+
+![English super cut-in: Adolf Hitler at Atlantis Capitol, with oversized angled SUPER and Iron CROSS lettering](docs/media/en/iron-cross-super.jpg)
+
+**Pol Pot · Year Zero**
+
+![English super cut-in: Pol Pot at Liberty Peak, with oversized angled SUPER and Year ZERO lettering](docs/media/en/year-zero-super.jpg)
 
 ### Pixel-art arenas
 
-| Bronze Sparrow Terrace | Lunar Station |
-| --- | --- |
-| ![English PVE combat: Lu Bu versus Tokugawa Ieyasu, layered platforms and health, energy, stamina and cooldown HUD](docs/media/en/bronze-sparrow-combat.jpg) | ![English PVE combat: Stephen Hawking versus Isaac Newton in a lunar station overlooking Earth](docs/media/en/lunar-arena.jpg) |
+| Ilios Sky Tower | Atlantis Capitol | Liberty Peak |
+| --- | --- | --- |
+| ![English PVE combat: Hawking versus Newton among blue domes, white terraces and a seaside skyscraper](docs/media/en/ilios-arena.jpg) | ![English PVE combat: Adolf Hitler versus Newton among underwater presidential sculptures and sunken platforms](docs/media/en/atlantis-arena.jpg) | ![English PVE combat: Pol Pot versus Hawking on snowy temple platforms beside the Statue of Liberty](docs/media/en/liberty-arena.jpg) |
 
 ## Run locally (optional)
 
