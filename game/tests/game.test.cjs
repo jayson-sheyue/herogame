@@ -293,8 +293,45 @@ test('localizing the real fight updates names, countdown and result hint without
   assert.equal(scene.p1.hp, 97);
   assert.equal(scene.p2.hp, 202);
   assert.equal(scene.combatNow, 5000);
+  context.window.HeroI18n.setLanguage('ja');
+  let font;
+  scene.children = {list: [{setFontFamily(value) {font = value;}}]};
+  scene.localize();
+  assert.equal(scene.hudNames[0].text, '1P  蒋介石');
+  assert.equal(scene.countText.text, '勝負開始！');
+  assert.equal(scene.stageName(), 'アルプスの天守閣');
+  assert.equal(font, 'GameJP, GameUI, monospace');
+  assert.equal(scene.p1.hp, 97);
+  assert.equal(scene.combatNow, 5000);
   context.window.HeroI18n.setLanguage('zh-CN');
   scene.localize();
   assert.equal(scene.hudNames[0].text, '1P  蒋介石');
   assert.equal(scene.p1.fighter.displayName, '蒋介石');
+});
+
+test('Japanese result lettering keeps the source label for live language changes', () => {
+  context.document.documentElement = {};
+  context.document.querySelectorAll = () => [];
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/i18n.js'), 'utf8'), context);
+  const scene = new Fight(), draws = [];
+  scene.result = {setAlpha() {return this;}, setScale() {return this;}};
+  scene.resultWash = {clear() {return this;}, fillStyle() {return this;}, fillRect() {return this;}, setAlpha() {return this;}};
+  scene.scale = {width: 1344, height: 768};
+  scene.fitResultTitle = (label) => {draws.push(label); return {padW:600,padH:164};};
+  scene.resultHint = {setText() {}};
+  scene.resultShown = true;
+  scene.fighters = () => [];
+  scene.syncTitle = () => {};
+  for (const [key, expected] of [['YOU WIN','勝利'], ['YOU LOSE','敗北'], ['DRAW GAME','引き分け']]) {
+    context.window.HeroI18n.setLanguage('ja');
+    scene.paintResultTitle(key, 'win');
+    assert.equal(draws.at(-1), expected);
+    assert.equal(scene._resultLabel, key);
+    context.window.HeroI18n.setLanguage('en');
+    scene.localize();
+    assert.equal(draws.at(-1), key);
+    context.window.HeroI18n.setLanguage('ja');
+    scene.localize();
+    assert.equal(draws.at(-1), expected);
+  }
 });

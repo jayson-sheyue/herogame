@@ -15,6 +15,7 @@ import zipfile
 
 from PIL import Image
 from fontTools import subset
+from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -182,17 +183,37 @@ def build(source: Path, output: Path):
         css = site / "src/ui.css"
         style = css.read_text(encoding="utf-8")
         (site / "fonts").mkdir()
-        for name in ["GameUI", "BrushUI"]:
+        for name, filename in [("GameUI", "GameUI.ttf"), ("BrushUI", "BrushUI.ttf"),
+                               ("GameJP", "DotGothic16-Regular.ttf"), ("BrushJP", "YujiBoku-Regular.ttf")]:
             options = subset.Options()
             options.flavor = "woff2"
-            font = subset.load_font(str(source / f"game/fonts/{name}.ttf"), options)
+            font = subset.load_font(str(source / "game/fonts" / filename), options)
             subsetter = subset.Subsetter(options=options)
             subsetter.populate(text=text)
             subsetter.subset(font)
             target = site / f"fonts/{name}.woff2"
             subset.save_font(font, str(target), options)
             font.close()
-            style = style.replace(f"{name}.ttf\") format(\"truetype\")", f"{name}.woff2\") format(\"woff2\")")
+            style = style.replace(f"{filename}\") format(\"truetype\")", f"{name}.woff2\") format(\"woff2\")")
+        shutil.copytree(source / "game/fonts/licenses", site / "fonts/licenses")
+        # Japanese dictionaries are inline JSON. Check the actual exported fonts,
+        # including rare fighter names, rather than relying on system fallbacks.
+        locale_code = (site / "src/i18n.js").read_text(encoding="utf-8")
+        def locale_data(name):
+            return json.loads(re.search(r"const " + name + r" = (\{.*?\n  \});", locale_code, re.S)[1])
+        ja, names, arenas = [locale_data(name) for name in ["ja", "heroesJa", "stagesJa"]]
+        def cmap(name):
+            with TTFont(site / f"fonts/{name}.woff2") as font:
+                return set(font.getBestCmap())
+        ui_chars = json.dumps([ja, names, arenas], ensure_ascii=False)
+        ui_glyphs = cmap("GameJP") | cmap("GameUI")
+        missing = {c for c in ui_chars if not c.isspace() and ord(c) not in ui_glyphs}
+        titles = ["奥义", *re.findall(r': "([^"]+)"', code.split("const SUPER_TITLES = {", 1)[1].split("};", 1)[0])]
+        brush_chars = "".join(ja[key] for key in titles)
+        brush_glyphs = cmap("BrushJP")
+        missing |= {c for c in brush_chars if ord(c) not in brush_glyphs}
+        if missing:
+            raise ValueError("Missing Japanese font glyphs: " + "".join(sorted(missing)))
         css.write_text(style, encoding="utf-8")
 
         payload = {"catalog": catalog, "fighters": fighters, "stages": stages}

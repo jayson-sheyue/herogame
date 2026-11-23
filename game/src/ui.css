@@ -8,6 +8,19 @@
   src: url("../fonts/BrushUI.ttf") format("truetype");
   font-display: swap;
 }
+@font-face {
+  font-family: GameJP;
+  src: url("../fonts/DotGothic16-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: BrushJP;
+  src: url("../fonts/YujiBoku-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+:root:lang(ja) {
+  font-family: GameJP, GameUI, monospace;
+}
 :root {
   color-scheme: dark;
   --bg: #080c13;
@@ -392,6 +405,9 @@ dialog::backdrop {
   html[lang="en"] #game::after {
     content: "Landscape recommended · Keyboard required";
   }
+  html[lang="ja"] #game::after {
+    content: "横長の画面を推奨 · キーボードが必要です";
+  }
 }
 @media (max-width: 700px) {
   .edition {
@@ -405,7 +421,8 @@ dialog::backdrop {
     font-size: 11px;
     padding: 2px 4px;
   }
-  html[lang="en"] nav button {
+  html[lang="en"] nav button,
+  html[lang="ja"] nav button {
     font-size: 11px;
     padding: 3px 6px;
   }

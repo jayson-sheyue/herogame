@@ -65,3 +65,9 @@ The actual export was served under a subdirectory, then exercised in a browser: 
 ## Automatic interface language
 
 2026-11-20: The initial-language rule now follows browser preferences instead of always starting in Chinese. 36 automated regressions pass, covering Chinese/English locale variants, ordered preferences, unsupported/missing language fallback, both existing manual choices, returning to Auto, live languagechange events and blocked browser storage. Existing manual choices retain priority; Auto does not persist an implicit manual selection. Earlier fixed-default records above describe the previous behavior.
+
+## Japanese localization
+
+2026-11-23: 40 regressions and syntax checks pass. Japanese now has complete message coverage, built-in fighter/stage names, imported `i18n.ja.displayName` / `displayNameJa` fallback, `ja` / `ja-JP` auto-detection, saved manual preferences and live language changes. Effect checks cover all nine supers and the super tag in Chinese → English → Japanese → Chinese, including the Japanese brush family and texture cleanup. The real fight localization check preserves health/combat time while changing Japanese HUD names and fonts; results retain their source key for live translation.
+
+The actual static export passed Japanese UI and brush-glyph coverage checks using the exported WOFF2 files. In the browser at 1280×720, Japanese selection, Lu Bu / Newton skills, Lu Bu / Hawking supers, help, pause/resume, three-language switching and the lunar arena were exercised. Seven Japanese screenshots accompany `README.ja.md`. A 390×844 viewport had no horizontal document overflow; the Japanese Move List and Close button remained visible. Browser voice quality, every move and every arena are not claimed as verified.

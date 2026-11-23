@@ -197,6 +197,150 @@
     'help.result':
       'Knock out your opponent to win.<br><kbd>J</kbd> / <kbd>Enter</kbd> Rematch · <kbd>Esc</kbd> Return to Select',
   };
+  const ja = {
+    "fight.button": "対戦開始",
+    "CHARACTER SELECT": "キャラクター選択",
+    "STAGE SELECT": "ステージ選択",
+    "SELECT YOUR FIGHTER": "キャラクターを選択",
+    "PVE / SINGLE PLAYER": "PVE / ひとりプレイ",
+    "GET READY": "対戦準備",
+    "LOADING": "読み込み中",
+    "READY": "使用可",
+    "SELECT": "キャラ選択",
+    "英灵大乱斗": "英霊大乱闘",
+    "英灵大乱斗 · PVE": "英霊大乱闘 · PVE",
+    "英灵大乱斗 / PVE": "英霊大乱闘 / PVE",
+    "游戏工具": "ゲーム設定",
+    "英灵大乱斗游戏画面": "英霊大乱闘のゲーム画面",
+    "游戏画面。操作方法见出招表。": "ゲーム画面。操作方法は技表をご覧ください。",
+    "系统语言": "表示言語",
+    "跟随浏览器": "自動",
+    "声音：开": "音声：オン",
+    "声音：关": "音声：オフ",
+    "全屏": "全画面",
+    "退出全屏": "全画面を終了",
+    "出招表": "技表",
+    "关闭": "閉じる",
+    "选人": "キャラ選択",
+    "暂停": "一時停止",
+    "再战": "再戦",
+    "开战": "勝負開始！",
+    "加载中…": "読み込み中…",
+    "读取资源…": "素材を読み込み中…",
+    "读取人物与战场…": "キャラクターとステージを読み込み中…",
+    "资源加载进度": "素材の読み込み状況",
+    "重新加载": "再読み込み",
+    "返回英灵选择": "キャラ選択へ戻る",
+    "推荐横屏与实体键盘": "横長の画面とキーボードを推奨",
+    "对战已暂停，关闭后继续。": "対戦を一時停止中。技表を閉じると再開します。",
+    "对战暂停": "一時停止",
+    "冷却和战斗计时已停止。": "対戦時間とクールダウンは停止中です。",
+    "继续对战": "対戦を再開",
+    "建议横屏游玩 · 需要实体键盘": "横長の画面を推奨 · キーボードが必要です",
+    "正在集结英灵": "英霊を招集中",
+    "读取人物与战场，首次进入可能需要稍等片刻。": "キャラクターとステージを読み込んでいます。初回は少し時間がかかります。",
+    "未能读取游戏资源": "ゲーム素材を読み込めませんでした",
+    "请检查网络连接并重新加载。若仍失败，请稍后重试。": "接続を確認して再読み込みしてください。解決しない場合は、しばらくしてからお試しください。",
+    "还没有可用的英灵或战场": "使用できるキャラクターまたはステージがありません",
+    "请先导入完整资源包，再重新加载。": "完全な素材パックをインポートして、再読み込みしてください。",
+    "读取英灵与战场…": "キャラクターとステージのプレビューを読み込み中…",
+    "读取本局人物动作与战场…": "今回の対戦のアニメーションとステージを読み込み中…",
+    "英灵资源加载失败": "キャラクター素材を読み込めませんでした",
+    "请确认资源包完整。返回选人后可换一名英灵重试。": "素材パックを確認してください。キャラ選択に戻り、別のキャラクターで再試行できます。",
+    "游戏引擎加载失败": "ゲームエンジンを読み込めませんでした",
+    "浏览器未允许全屏，可使用浏览器的全屏菜单。": "全画面表示が許可されませんでした。ブラウザーの全画面メニューをお試しください。",
+    "正在读取资源，请稍候…": "素材を読み込んでいます。少々お待ちください…",
+    "选择英灵与对手": "自分と相手のキャラクターを選択",
+    "A D 移动 · W 跳跃 · S 防守 · J 普攻 · K 技能 · L 奥义": "A D 移動 · W ジャンプ · S ガード · J 攻撃 · K 必殺技 · L 奥義",
+    "1P  选择英灵": "1P  使用キャラクター",
+    "CPU  选择对手": "CPU  対戦相手",
+    "A D 选人   W S 切换 1P / CPU   ← → 战场   F 难度": "A D キャラ   W S 1P / CPU   ← → ステージ   F 難易度",
+    "J / ENTER  开战": "J / ENTER  対戦開始",
+    "J / ENTER  再战     ESC  选人": "J / ENTER  再戦     ESC  キャラ選択",
+    "初级": "初級",
+    "标准": "標準",
+    "高手": "上級",
+    "胜者": "勝者",
+    "败者": "敗者",
+    "奥义": "奥義",
+    "万有引力": "万有引力",
+    "铁十字之辉": "鉄十字の輝き",
+    "天威难测": "天威測り難し",
+    "优势在我": "優勢は我にあり",
+    "逆风解意": "逆風に咲く",
+    "三河魂": "三河魂",
+    "去城市化": "都市なき世界",
+    "奇点演说": "特異点の演説",
+    "赤兔战争践踏": "赤兎戦陣蹂躙",
+    "YOU WIN": "勝利",
+    "YOU LOSE": "敗北",
+    "DRAW GAME": "引き分け",
+    "help.select": "<kbd>A</kbd> <kbd>D</kbd> キャラ変更 · <kbd>W</kbd> 1P を選択 · <kbd>S</kbd> CPU を選択<br><kbd>←</kbd> <kbd>→</kbd> ステージ · <kbd>F</kbd> 難易度 · <kbd>J</kbd> / <kbd>Enter</kbd> 対戦開始",
+    "移动": "移動",
+    "普攻": "通常攻撃",
+    "技能": "必殺技",
+    "防守": "ガード",
+    "资源": "ゲージ",
+    "结束": "決着",
+    "help.move": "<kbd>A</kbd> <kbd>D</kbd> 移動 · <kbd>W</kbd> ジャンプ / 二段ジャンプ · <kbd>Shift</kbd> ダッシュ",
+    "help.attack": "<kbd>J</kbd> 通常攻撃 · <kbd>W</kbd> + <kbd>J</kbd> 対空攻撃 · <kbd>S</kbd> + <kbd>J</kbd> 下段攻撃",
+    "help.skill": "<kbd>K</kbd> 必殺技 · <kbd>W</kbd> + <kbd>K</kbd> 対空必殺技 · <kbd>S</kbd> + <kbd>K</kbd> 下段必殺技<br><kbd>L</kbd> 奥義。ダウン中・行動不能中は <kbd>L</kbd> で脱出",
+    "help.guard": "<kbd>S</kbd> ガードでスタミナ回復。被弾中に <kbd>Shift</kbd> で緊急回避",
+    "help.meters": "<i class=\"swatch hp\"></i>体力 · <i class=\"swatch mp\"></i>エネルギー：必殺技で消費<br><i class=\"swatch sp\"></i>スタミナ：通常攻撃・ダッシュ・脱出で消費",
+    "help.result": "相手を倒すと勝利。<kbd>J</kbd> / <kbd>Enter</kbd> 同じ組み合わせで再戦 · <kbd>Esc</kbd> キャラ選択へ戻る"
+  };
+  const heroesJa = {
+    "id_1786892372": [
+      "アドルフ・ヒトラー",
+      "ヒトラー"
+    ],
+    "id_1786886794": [
+      "蒋介石",
+      "蒋介石"
+    ],
+    "id_1786874191": [
+      "甄嬛",
+      "甄嬛"
+    ],
+    "17": [
+      "アイザック・ニュートン",
+      "ニュートン"
+    ],
+    "id_1786895186": [
+      "徳川家康",
+      "徳川家康"
+    ],
+    "id_1786960452": [
+      "朱元璋",
+      "朱元璋"
+    ],
+    "year_zero": [
+      "ポル・ポト",
+      "ポル・ポト"
+    ],
+    "id_1787634312": [
+      "スティーヴン・ホーキング",
+      "ホーキング"
+    ],
+    "id_1787793997": [
+      "呂布",
+      "呂布"
+    ]
+  };
+  const stagesJa = {
+    "abandoned_estate_site": "未完成の豪邸",
+    "alps_tenshukaku": "アルプスの天守閣",
+    "atlantis_capitol_ruins": "アトランティス議事堂",
+    "baimen_bronze_sparrow": "白門・銅雀台",
+    "broken_pantheon_terracotta": "崩れた神殿と兵馬俑",
+    "cyberpunk_shibuya_eiffel": "サイバー渋谷・エッフェル",
+    "forbidden_city_101": "紫禁城101",
+    "giants_pyramid_causeway": "巨人のピラミッド参道",
+    "great_wall_cologne": "万里の長城・ケルン",
+    "ilios_sky_tower": "イリオス天空塔",
+    "lunar_station_earth_view": "地球を望む月面基地",
+    "peak_of_liberty": "自由の頂"
+  };
   const heroes = {
     id_1786892372: ['Adolf Hitler', 'A. Hitler'],
     id_1786886794: ['Chiang Kai-shek', 'Chiang'],
@@ -223,7 +367,7 @@
     peak_of_liberty: 'Liberty Peak',
   };
   const listeners = new Set();
-  const choices = ['auto', 'zh-CN', 'en'];
+  const choices = ['auto', 'zh-CN', 'en', 'ja'];
   function browserLanguage() {
     const browser = typeof navigator === 'undefined' ? null : navigator;
     const preferred = [...(Array.isArray(browser?.languages) ? browser.languages : []), browser?.language];
@@ -231,6 +375,7 @@
       const base = typeof locale === 'string' ? locale.trim().toLowerCase().split(/[-_]/)[0] : '';
       if (base === 'zh') return 'zh-CN';
       if (base === 'en') return 'en';
+      if (base === 'ja') return 'ja';
     }
     return 'en';
   }
@@ -243,7 +388,8 @@
   }
   let language = preference === 'auto' ? browserLanguage() : preference;
   const t = (key) => {
-    if (language === 'en' && Object.hasOwn(en, key)) return en[key];
+    if (language === 'ja' && Object.hasOwn(ja, key)) return ja[key];
+    if (language !== 'zh-CN' && Object.hasOwn(en, key)) return en[key];
     return Object.hasOwn(zh, key) ? zh[key] : key;
   };
   const onChange = (listener) => {
@@ -281,22 +427,24 @@
       return text;
     },
     heroName(id, data, short = false) {
-      if (language !== 'en') return data?.displayName || id || '—';
+      if (language === 'zh-CN') return data?.displayName || id || '—';
       return (
-        data?.i18n?.en?.displayName ||
-        data?.displayNameEn ||
-        heroes[id]?.[short ? 1 : 0] ||
+        data?.i18n?.[language]?.displayName ||
+        data?.[language === 'ja' ? 'displayNameJa' : 'displayNameEn'] ||
+        (Object.hasOwn(language === 'ja' ? heroesJa : heroes, id) ?
+          (language === 'ja' ? heroesJa : heroes)[id][short ? 1 : 0] : '') ||
         data?.displayName ||
         id ||
         '—'
       );
     },
     stageName(id, data) {
-      if (language !== 'en') return data?.displayName || id || '—';
+      if (language === 'zh-CN') return data?.displayName || id || '—';
       return (
-        data?.i18n?.en?.displayName ||
-        data?.displayNameEn ||
-        (Object.hasOwn(stages, id) ? stages[id] : '') ||
+        data?.i18n?.[language]?.displayName ||
+        data?.[language === 'ja' ? 'displayNameJa' : 'displayNameEn'] ||
+        (Object.hasOwn(language === 'ja' ? stagesJa : stages, id) ?
+          (language === 'ja' ? stagesJa : stages)[id] : '') ||
         data?.displayName ||
         id ||
         '—'

@@ -19,17 +19,17 @@ function setup(stored = new Map(), elements = [], browser = { languages: ['zh-CN
     getElementById: (id) => id === 'languageSelect' ? select : null,
   };
   const window = { addEventListener: (type, fn) => { events[type] = fn; } };
-  vm.runInNewContext(source, {
+  vm.runInNewContext(source.replace('const heroes = {', 'window.testLocales = {zh,en,ja}; const heroes = {'), {
     window,
     document,
     navigator: browser,
     localStorage: { getItem: (k) => stored.get(k), setItem: (k, v) => stored.set(k, v) },
   });
-  return { i18n: window.HeroI18n, document, stored, select, events };
+  return { i18n: window.HeroI18n, document, stored, select, events, locales: window.testLocales };
 }
 test('first visit matches browser language variants without saving an implicit choice', () => {
   for (const [locale, expected] of [['zh', 'zh-CN'], ['zh-CN', 'zh-CN'], ['zh-TW', 'zh-CN'],
-    ['zh-Hant-HK', 'zh-CN'], ['ZH_hans_CN', 'zh-CN'], ['en-US', 'en'], ['en-GB', 'en'], ['ja-JP', 'en']]) {
+    ['zh-Hant-HK', 'zh-CN'], ['ZH_hans_CN', 'zh-CN'], ['en-US', 'en'], ['en-GB', 'en'], ['ja-JP', 'ja'], ['ja', 'ja'], ['fr-FR', 'en']]) {
     const env = setup(new Map(), [], { languages: [locale], language: locale });
     assert.equal(env.i18n.language, expected, locale);
     assert.equal(env.i18n.preference, 'auto');
@@ -41,14 +41,15 @@ test('first visit matches browser language variants without saving an implicit c
 test('browser preference order wins, with language-only and unsupported-language fallbacks', () => {
   for (const [browser, expected] of [
     [{ languages: ['en-GB', 'zh-CN'], language: 'en-GB' }, 'en'],
-    [{ languages: ['ja-JP', 'zh-Hant', 'en'], language: 'ja-JP' }, 'zh-CN'],
+    [{ languages: ['ja-JP', 'zh-Hant', 'en'], language: 'ja-JP' }, 'ja'],
+    [{ languages: ['fr-FR', 'ja-JP', 'en'], language: 'fr-FR' }, 'ja'],
     [{ languages: ['fr-FR', 'en', 'zh'], language: 'fr-FR' }, 'en'],
     [{ languages: [], language: 'zh-SG' }, 'zh-CN'],
     [{ language: 'en-AU' }, 'en'], [{}, 'en'], [null, 'en'],
   ]) assert.equal(setup(new Map(), [], browser).i18n.language, expected);
 });
 test('both saved manual choices override the browser and survive reopening', () => {
-  for (const [saved, browser] of [['en', { language: 'zh-CN' }], ['zh-CN', { language: 'en-US' }]]) {
+  for (const [saved, browser] of [['en', { language: 'zh-CN' }], ['zh-CN', { language: 'ja-JP' }], ['ja', {language: 'en-US'}]]) {
     const env = setup(new Map([['herogame-language', saved]]), [], browser);
     assert.equal(env.i18n.language, saved);
     assert.equal(env.select.value, saved);
@@ -162,4 +163,44 @@ test('asset names use English metadata or built-in labels while preserving autho
   assert.equal(i18n.stageName('lunar_station_earth_view', { displayName: '月球空间站' }), 'Lunar Station');
   i18n.setLanguage('zh-CN');
   assert.equal(i18n.heroName('id_1786886794', hero), '蒋介石');
+});
+
+test('Japanese covers every registered message and localizes built-in names and supers', () => {
+  const {i18n, locales, document} = setup(new Map([['herogame-language', 'ja']]));
+  for (const key of Object.keys(locales.zh)) {
+    assert.ok(Object.hasOwn(locales.ja, key), `Missing Japanese translation: ${key}`);
+    assert.equal(i18n.t(key), locales.ja[key]);
+    assert.equal(i18n.t(key).startsWith('help.'), false);
+  }
+  assert.equal(document.documentElement.lang, 'ja');
+  assert.equal(document.title, '英霊大乱闘 · PVE');
+  assert.equal(i18n.heroName('id_1787793997', {displayName:'吕布'}), '呂布');
+  assert.equal(i18n.heroName('id_1787634312', {}, true), 'ホーキング');
+  assert.equal(i18n.stageName('baimen_bronze_sparrow', {}), '白門・銅雀台');
+  assert.equal(i18n.t('赤兔战争践踏'), '赤兎戦陣蹂躙');
+  assert.equal(i18n.t('YOU WIN'), '勝利');
+  assert.equal(i18n.t('help.skill').includes('奥義'), true);
+});
+
+test('Japanese import metadata is preferred without changing the authored names', () => {
+  const {i18n} = setup(new Map([['herogame-language', 'ja']]));
+  const hero = {displayName: '原名', displayNameJa: '独自キャラ', i18n: {ja: {displayName:'翻訳名'}}};
+  const original = JSON.stringify(hero);
+  assert.equal(i18n.heroName('custom', hero), '翻訳名');
+  assert.equal(i18n.stageName('custom', {displayNameJa:'独自ステージ'}), '独自ステージ');
+  assert.equal(i18n.heroName('custom', {displayName:'作者原名'}), '作者原名');
+  assert.equal(i18n.stageName('constructor', {displayName:'Custom Stage'}), 'Custom Stage');
+  assert.equal(JSON.stringify(hero), original);
+});
+
+test('Auto switches live to Japanese while manual language selection keeps priority', () => {
+  const browser = {languages:['en-US']}, env = setup(new Map(), [], browser);
+  browser.languages = ['ja-JP'];
+  env.events.languagechange();
+  assert.equal(env.i18n.language, 'ja');
+  env.i18n.setLanguage('zh-CN');
+  env.events.languagechange();
+  assert.equal(env.i18n.language, 'zh-CN');
+  env.i18n.setLanguage('auto');
+  assert.equal(env.i18n.language, 'ja');
 });

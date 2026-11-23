@@ -1,6 +1,6 @@
 # PVE 对战端
 
-[English](README.md) | **简体中文**
+[English](README.md) | [日本語](../README.ja.md) | **简体中文**
 
 直接打开 [GitHub Pages 在线试玩](https://jayson-sheyue.github.io/herogame/)，需要电脑实体键盘。
 

@@ -21,9 +21,14 @@
   const heroName = (id, data, short = false) => window.HeroI18n?.heroName(id, data, short) ?? data?.displayName ?? id;
   const stageName = (id, data) => window.HeroI18n?.stageName(id, data) ?? data?.displayName ?? id;
   const GAME_NAME = "英灵大乱斗";
-  const UI_FONT = "GameUI, monospace";
-  const BODY_FONT = UI_FONT;
-  const BRUSH_FONT = "BrushUI, STKaiti, KaiTi, serif";
+  const uiFont = () => window.HeroI18n?.language === "ja" ? "GameJP, GameUI, monospace" : "GameUI, GameJP, monospace";
+  function localizeUiFonts(scene) {
+    const visit = (items) => items?.forEach((item) => {
+      item.setFontFamily?.(uiFont());
+      if (item.list) visit(item.list);
+    });
+    visit(scene.children?.list);
+  }
   const P1_DEFAULT = "id_1786892372";
   const P2_DEFAULT = "id_1786874191";
   const JIANG_ID = "id_1786886794";
@@ -1204,7 +1209,7 @@
 
   function uiText(scene, x, y, str, style) {
     const text = crispUi(scene.add.text(x, y, t(str || ""), {
-      fontFamily: UI_FONT, color: "#f4ead0", ...style,
+      fontFamily: uiFont(), color: "#f4ead0", ...style,
     }));
     window.HeroI18n?.bindText(text, str);
     return text;
@@ -1312,7 +1317,7 @@
     const measure = document.createElement("canvas").getContext("2d");
     if (!measure) return scene.add.container(0, 0).setScrollFactor(0);
     const fontAt = size => opts.latin ? `bold ${Math.round(size)}px GameUI, Impact, sans-serif` :
-      `${Math.round(size)}px BrushUI, STKaiti, KaiTi, serif`;
+      `${Math.round(size)}px ${window.HeroI18n?.language === "ja" ? "BrushJP, BrushUI" : "BrushUI"}, STKaiti, KaiTi, serif`;
     const glyphs = [];
     const rows = cutinLettering(String(text || ""), fontSize, opts.latin, opts.tag);
     rows.forEach(row => {
@@ -2852,6 +2857,8 @@
             document.fonts.load("24px GameUI"),
             document.fonts.load("64px BrushUI"),
             document.fonts.load("120px BrushUI"),
+            document.fonts.load("24px GameJP"),
+            document.fonts.load("64px BrushJP"),
           ]);
           await document.fonts.ready;
         }
@@ -3166,7 +3173,7 @@
       this.rememberSelection();
       window.HeroShell?.selection(this);
     }
-    localize() { this.refresh(); }
+    localize() { localizeUiFonts(this); this.refresh(); }
 
     confirm() {
       if (this.locked || !this.playable.length || !this.stageIds.length) return;
@@ -3418,7 +3425,7 @@
       this.resultWash = this.add.graphics().setScrollFactor(0).setDepth(54).setAlpha(0);
       this.result = this.add
         .text(w / 2, h * 0.46, "", {
-          fontFamily: UI_FONT,
+          fontFamily: uiFont(),
           fontSize: 96,
           color: "#f3e6c0",
           stroke: "#2a1a0c",
@@ -3430,7 +3437,7 @@
         .setAlpha(0);
       this.resultHint = this.add
         .text(w / 2, h * 0.72, "", {
-          fontFamily: UI_FONT,
+          fontFamily: uiFont(),
           fontSize: 16,
           color: "#c8b88a",
           stroke: "#000",
@@ -3443,7 +3450,7 @@
       this.countText = crispUi(
         this.add
           .text(w / 2, h * 0.42, "", {
-            fontFamily: UI_FONT,
+            fontFamily: uiFont(),
             fontSize: 118,
             color: "#f2e6c4",
             stroke: "#000",
@@ -3463,11 +3470,13 @@
     }
 
     localize() {
+      localizeUiFonts(this);
       this.fighters().forEach((actor, i) => {
         this.hudNames?.[i]?.setText(`${i ? "CPU" : "1P"}  ${heroName(i ? this.pack.p2Id : this.pack.p1Id, actor.fighter)}`);
       });
       if (this.countText?.alpha > 0) this.countText.setText(t(this._countLabelPrev));
       if (this.resultShown) this.resultHint.setText(t("J / ENTER  再战     ESC  选人"));
+      if (this.resultShown && this._resultLabel) this.paintResultTitle(this._resultLabel, this._resultMood);
       this.syncTitle();
     }
 
@@ -4490,7 +4499,7 @@
       if (!actor?.sprite || !(amount > 0)) return;
       const t = this.add
         .text(actor.sprite.x, actor.sprite.y - 110, `+${Math.round(amount)}`, {
-          fontFamily: UI_FONT,
+          fontFamily: uiFont(),
           fontSize: "28px",
           color: "#7dff9a",
           stroke: "#0a1a0c",
@@ -4516,7 +4525,7 @@
       const big = Boolean(opts?.big);
       const t = this.add
         .text(actor.sprite.x + jx, actor.sprite.y - 88 + jy, `${Math.round(amount)}`, {
-          fontFamily: UI_FONT,
+          fontFamily: uiFont(),
           fontSize: big ? "36px" : "26px",
           color: big ? "#ffe08a" : "#ffb4a0",
           stroke: "#2a0a08",
@@ -4824,7 +4833,7 @@
     spawnOutcomeTags(winners, losers) {
       this.clearOutcomeTags();
       const style = {
-        fontFamily: UI_FONT,
+        fontFamily: uiFont(),
         fontSize: 22,
         stroke: "#000",
         strokeThickness: 6,
@@ -7834,7 +7843,7 @@
 
     fitResultTitle(label, mood) {
       this.result
-        .setFontFamily(UI_FONT)
+        .setFontFamily(uiFont())
         .setFontSize(96)
         .setText(label)
         .setColor(mood === "win" ? "#efc05d" : "#f19580")
@@ -7843,7 +7852,9 @@
     }
 
     paintResultTitle(label, mood) {
-      const { padW, padH } = this.fitResultTitle(label, mood);
+      this._resultLabel = label;
+      this._resultMood = mood;
+      const { padW, padH } = this.fitResultTitle(t(label), mood);
       this.resultWash
         .clear()
         .fillStyle(0x080b13, 0.85)

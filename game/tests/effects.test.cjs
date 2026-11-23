@@ -57,7 +57,7 @@ function setup(inkBox = null) {
   return { ...window.testFx, i18n: window.HeroI18n, scene, textures };
 }
 
-test('every built-in super repaints actual effect glyphs in both languages and releases textures', () => {
+test('every built-in super repaints Chinese, English and Japanese effect glyphs and releases textures', () => {
   const { makeSekiroBrushKanji, SUPER_TITLES, i18n, scene, textures } = setup();
   for (const source of ['奥义', ...Object.values(SUPER_TITLES)]) for (const rot of [-0.24, 0.19]) {
     i18n.setLanguage('zh-CN');
@@ -81,6 +81,9 @@ test('every built-in super repaints actual effect glyphs in both languages and r
     const english = i18n.t(source).toUpperCase();
     assert.equal(/\p{Script=Han}/u.test(english), false);
     rendered(english);
+    i18n.setLanguage('ja');
+    rendered(i18n.t(source));
+    assert.ok(textures.values().next().value.ink.every(item => item.font.includes('BrushJP')));
     i18n.setLanguage('zh-CN');
     rendered(source);
     root.destroy();

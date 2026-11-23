@@ -1,11 +1,11 @@
 # Hero Clash · PVE Arcade Edition
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
 A browser-based pixel-art PVE fighting game built with Phaser 3. Pick a fighter and stage, then challenge the CPU through a classic arcade character-select screen and combat HUD.
 
 - Player-versus-CPU fights with three difficulty levels and mirror matches.
-- English / Chinese interface switching with a saved language preference.
+- English / Japanese / Chinese interface switching with a saved language preference.
 - Importable fighter and stage packs from the companion asset studio.
 
 **[▶ Play in your browser](https://jayson-sheyue.github.io/herogame/)** — no installation, account or command line. Choose a fighter, then press **J / Enter** or click **FIGHT**. Desktop keyboard required; no touch combat controls.
@@ -60,13 +60,13 @@ Pushes to `main` run the game checks, build the static game and deploy to GitHub
 
 ## Interface language
 
-Choose **Auto** (the default), **English** or **简体中文** from the language selector in the top toolbar. Auto checks the browser’s preferred languages in order: Chinese variants use Simplified Chinese, English variants use English; if none match or language information is unavailable, English is used. Browser preferences usually follow the device language but can be customized in browser settings.
+Choose **Auto** (the default), **English**, **日本語** or **简体中文** from the language selector in the top toolbar. Auto checks the browser’s preferred languages in order: Chinese variants use Simplified Chinese, English variants use English, Japanese variants use Japanese; if none match or language information is unavailable, English is used. Browser preferences usually follow the device language but can be customized in browser settings.
 
 An existing manual choice takes priority and is restored on later visits. Choose **Auto** to resume following the browser; it also responds when browser language preferences change while the page is open. Automatic detection does not save an implicit manual choice.
 
-Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English text. Super cut-ins render their carved titles in the selected language, using `SUPER` and English move names with uppercase impact words such as `RAMPAGE` and `SINGULARITY`. Switching during a cut-in repaints its lettering without restarting the move. Existing voice recordings and text baked into imported artwork remain unchanged.
+Switching updates the interface immediately and preserves fighter picks, stage, difficulty and the current fight. Menus, the Move List, loading and error messages, built-in fighter and stage names, and super-move titles have English and Japanese text. Super cut-ins render their carved titles in the selected language, using `SUPER` and English move names with uppercase impact words such as `RAMPAGE` and `SINGULARITY`. Switching during a cut-in repaints its lettering without restarting the move. Japanese cut-ins use Japanese move names and a bundled brush font. Existing voice recordings and text baked into imported artwork remain unchanged.
 
-Imported asset packs may provide `displayNameEn` or `i18n.en.displayName` in `fighter.json` / `stage.json`. Without an English name, the original authored name is shown. Source metadata is never rewritten by switching languages. If browser storage is unavailable, language changes work for the current page session.
+Imported asset packs may provide `displayNameEn` or `i18n.en.displayName` in `fighter.json` / `stage.json`. For Japanese, use `displayNameJa` or `i18n.ja.displayName`. Without a translation, the original authored name is shown. Source metadata is never rewritten by switching languages. If browser storage is unavailable, language changes work for the current page session.
 
 ## Select and start
 
@@ -123,4 +123,4 @@ The [test record](game/tests/README.md) lists the actual verification scope and 
 
 If a port is occupied, choose another with `--port`. If selection is empty, check `assets/game/index.json` and the fighter / stage files. Launch through the HTTP server rather than opening `index.html` directly; direct file launches redirect to the default local server.
 
-Do not commit imported packs, `_bak/`, local configuration, credentials or build caches. Licensed under the [MIT License](LICENSE).
+Do not commit imported packs, `_bak/`, local configuration, credentials or build caches. Source code is licensed under the [MIT License](LICENSE); bundled fonts retain [their own licenses](game/fonts/README.md).

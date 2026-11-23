@@ -1,6 +1,6 @@
 # PVE game client
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [日本語](../README.ja.md) | [简体中文](README.zh-CN.md)
 
 Play immediately at [GitHub Pages](https://jayson-sheyue.github.io/herogame/). A desktop keyboard is required.
 
